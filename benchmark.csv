@@ -1,0 +1,11 @@
+html_path,dom_id,attribute,expected_behavior
+html/justified_text.html,main_text,text,justified
+html/left_aligned_text.html,main_text,text,left_aligned
+html/right_aligned_text.html,main_text,text,right_aligned
+html/left_box.html,main_text,box,left
+html/center_box.html,main_text,box,center
+html/right_box.html,main_text,box,right
+html/bold_text.html,header,text,bold
+html/italic_text.html,header,text,italic
+html/underlined_text.html,header,text,underlined
+html/color_text.html,header,text,colored
