@@ -21,9 +21,9 @@ class TestPageTestingWorkflow:
         screenshot_dir = temp_dir / "screenshots"
         results_dir = temp_dir / "results"
         
-        with patch('scripts.testing.page_tester.LayoutLens') as mock_lens_class:
-            mock_lens = Mock()
-            mock_lens_class.return_value = mock_lens
+        with patch('scripts.testing.page_tester.openai') as mock_openai:
+            mock_client = Mock()
+            mock_openai.OpenAI.return_value = mock_client
             
             page_tester = PageTester(
                 screenshot_dir=str(screenshot_dir),
@@ -35,15 +35,20 @@ class TestPageTestingWorkflow:
             assert page_tester.results_dir == results_dir
             assert screenshot_dir.exists()
             assert results_dir.exists()
+            assert page_tester.openai_client == mock_client
     
     @patch('scripts.testing.page_tester.ScreenshotManager')
-    @patch('scripts.testing.page_tester.LayoutLens')
-    def test_complete_page_testing_workflow(self, mock_lens_class, mock_screenshot_class, temp_dir, sample_html_file):
+    @patch('scripts.testing.page_tester.openai')
+    def test_complete_page_testing_workflow(self, mock_openai, mock_screenshot_class, temp_dir, sample_html_file):
         """Test complete page testing from screenshot to results."""
-        # Setup mocks
-        mock_lens = Mock()
-        mock_lens_class.return_value = mock_lens
-        mock_lens.ask.return_value = "Yes, the layout looks correct."
+        # Setup OpenAI mock
+        mock_client = Mock()
+        mock_openai.OpenAI.return_value = mock_client
+        
+        # Mock OpenAI response
+        mock_response = Mock()
+        mock_response.choices[0].message.content = "Yes, the layout looks correct."
+        mock_client.chat.completions.create.return_value = mock_response
         
         mock_screenshot_manager = Mock()
         mock_screenshot_class.return_value.__enter__.return_value = mock_screenshot_manager
@@ -81,15 +86,20 @@ class TestPageTestingWorkflow:
         mock_screenshot_manager.capture_multiple_viewports.assert_called_once()
         
         # Verify LLM queries were made
-        assert mock_lens.ask.call_count == 2
+        assert mock_client.chat.completions.create.call_count == 2
     
     @patch('scripts.testing.page_tester.ScreenshotManager')
-    @patch('scripts.testing.page_tester.LayoutLens')
-    def test_page_testing_with_multiple_viewports(self, mock_lens_class, mock_screenshot_class, temp_dir, sample_html_file):
+    @patch('scripts.testing.page_tester.openai')
+    def test_page_testing_with_multiple_viewports(self, mock_openai, mock_screenshot_class, temp_dir, sample_html_file):
         """Test page testing across multiple viewports."""
-        mock_lens = Mock()
-        mock_lens_class.return_value = mock_lens
-        mock_lens.ask.return_value = "The layout is responsive."
+        # Setup OpenAI mock
+        mock_client = Mock()
+        mock_openai.OpenAI.return_value = mock_client
+        
+        # Mock OpenAI response
+        mock_response = Mock()
+        mock_response.choices[0].message.content = "The layout is responsive."
+        mock_client.chat.completions.create.return_value = mock_response
         
         mock_screenshot_manager = Mock()
         mock_screenshot_class.return_value.__enter__.return_value = mock_screenshot_manager
@@ -139,14 +149,18 @@ class TestPageTestingWorkflow:
         assert "mobile" in viewport_names
     
     @patch('scripts.testing.page_tester.ScreenshotManager')
-    @patch('scripts.testing.page_tester.LayoutLens')
+    @patch('scripts.testing.page_tester.openai')
     @patch('scripts.testing.page_tester.QueryGenerator')
-    def test_page_testing_with_auto_generated_queries(self, mock_query_gen_class, mock_lens_class, mock_screenshot_class, temp_dir, sample_html_file):
+    def test_page_testing_with_auto_generated_queries(self, mock_query_gen_class, mock_openai, mock_screenshot_class, temp_dir, sample_html_file):
         """Test page testing with auto-generated queries."""
-        # Setup mocks
-        mock_lens = Mock()
-        mock_lens_class.return_value = mock_lens
-        mock_lens.ask.return_value = "The element looks correct."
+        # Setup OpenAI mock
+        mock_client = Mock()
+        mock_openai.OpenAI.return_value = mock_client
+        
+        # Mock OpenAI response
+        mock_response = Mock()
+        mock_response.choices[0].message.content = "The element looks correct."
+        mock_client.chat.completions.create.return_value = mock_response
         
         mock_screenshot_manager = Mock()
         mock_screenshot_class.return_value.__enter__.return_value = mock_screenshot_manager
@@ -191,12 +205,17 @@ class TestPageTestingWorkflow:
             assert test_result.category in ["visibility", "text_alignment"]
     
     @patch('scripts.testing.page_tester.ScreenshotManager')
-    @patch('scripts.testing.page_tester.LayoutLens')
-    def test_page_comparison_workflow(self, mock_lens_class, mock_screenshot_class, temp_dir):
+    @patch('scripts.testing.page_tester.openai')
+    def test_page_comparison_workflow(self, mock_openai, mock_screenshot_class, temp_dir):
         """Test page comparison workflow."""
-        mock_lens = Mock()
-        mock_lens_class.return_value = mock_lens
-        mock_lens.ask.return_value = "The layouts look very similar with minor differences."
+        # Setup OpenAI mock
+        mock_client = Mock()
+        mock_openai.OpenAI.return_value = mock_client
+        
+        # Mock OpenAI response
+        mock_response = Mock()
+        mock_response.choices[0].message.content = "The layouts look very similar with minor differences."
+        mock_client.chat.completions.create.return_value = mock_response
         
         mock_screenshot_manager = Mock()
         mock_screenshot_class.return_value.__enter__.return_value = mock_screenshot_manager
@@ -398,8 +417,8 @@ class TestLayoutLensEndToEnd:
         assert len(results) == 1  # Should return list of results
         assert results[0] == mock_session
     
-    @patch('scripts.testing.page_tester.LayoutLens', side_effect=Exception("API Error"))
-    def test_error_handling_in_integration(self, mock_lens_class, temp_dir, sample_html_file):
+    @patch('scripts.testing.page_tester.openai.OpenAI', side_effect=Exception("API Error"))
+    def test_error_handling_in_integration(self, mock_openai_client, temp_dir, sample_html_file):
         """Test error handling in integration scenarios."""
         # Test that PageTester handles LLM initialization errors gracefully
         page_tester = PageTester(
