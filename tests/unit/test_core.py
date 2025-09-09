@@ -294,10 +294,20 @@ class TestLayoutLensCore:
         mock_generator = Mock()
         mock_benchmark_class.return_value = mock_generator
         
-        mock_suites = [Mock(), Mock()]
+        # Create mock suites with required attributes
+        mock_suite1 = Mock()
+        mock_suite1.name = "Suite 1"
+        mock_suite1.test_cases = [Mock(), Mock()]
+        
+        mock_suite2 = Mock()
+        mock_suite2.name = "Suite 2"
+        mock_suite2.test_cases = [Mock()]
+        
+        mock_suites = [mock_suite1, mock_suite2]
         mock_generator.generate_all_suites.return_value = mock_suites
         mock_generator.export_to_csv.return_value = "test.csv"
         mock_generator.export_to_json.return_value = "test.json"
+        mock_generator.output_dir = "/test/output"
         
         tester = LayoutLens()
         tester.generate_benchmark_data()
@@ -309,7 +319,18 @@ class TestLayoutLensCore:
     @patch('layoutlens.core.BenchmarkGenerator')
     def test_generate_benchmark_data_custom_dir(self, mock_benchmark_class):
         """Test benchmark data generation with custom directory."""
-        mock_benchmark_class.return_value = Mock()
+        mock_generator = Mock()
+        mock_benchmark_class.return_value = mock_generator
+        
+        # Create mock suite with required attributes
+        mock_suite = Mock()
+        mock_suite.name = "Custom Suite"
+        mock_suite.test_cases = [Mock()]
+        
+        mock_generator.generate_all_suites.return_value = [mock_suite]
+        mock_generator.export_to_csv.return_value = "test.csv"
+        mock_generator.export_to_json.return_value = "test.json"
+        mock_generator.output_dir = "custom_output"
         
         tester = LayoutLens()
         tester.generate_benchmark_data("custom_output")

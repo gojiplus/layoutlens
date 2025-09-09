@@ -3,6 +3,7 @@
 import pytest
 from unittest.mock import Mock, patch
 from pathlib import Path
+from bs4 import BeautifulSoup, Tag
 
 import sys
 sys.path.append('.')
@@ -154,31 +155,25 @@ class TestQueryGenerator:
         """Test significant element detection."""
         generator = QueryGenerator()
         
-        # Mock elements
-        element_with_id = Mock()
-        element_with_id.get.side_effect = lambda attr, default=None: "main_id" if attr == "id" else default
-        element_with_id.attrs = {"id": "main_id"}
+        # Create real BeautifulSoup elements for testing
+        soup = BeautifulSoup('<html></html>', 'html.parser')
         
-        element_semantic = Mock()
-        element_semantic.name = "header"
-        element_semantic.get.return_value = None
-        element_semantic.attrs = {}
+        # Element with ID - should be significant
+        element_with_id = soup.new_tag("div", **{"id": "main_id"})
         
-        element_with_text = Mock()
-        element_with_text.get.return_value = None
-        element_with_text.get_text.return_value = "This is a long text content that should be significant"
-        element_with_text.attrs = {}
+        # Semantic element - should be significant
+        element_semantic = soup.new_tag("header")
         
-        element_insignificant = Mock()
-        element_insignificant.get.return_value = None
-        element_insignificant.get_text.return_value = "Short"
-        element_insignificant.attrs = {}
-        element_insignificant.name = "span"
+        # Element with class - should be significant
+        element_with_class = soup.new_tag("div", **{"class": ["main-content"]})
+        
+        # Plain element without significant attributes - should not be significant
+        element_insignificant = soup.new_tag("span")
         
         # Test significance checks
         assert generator._is_significant_element(element_with_id) is True
         assert generator._is_significant_element(element_semantic) is True
-        assert generator._is_significant_element(element_with_text) is True
+        assert generator._is_significant_element(element_with_class) is True
         assert generator._is_significant_element(element_insignificant) is False
     
     def test_extract_element_info(self):

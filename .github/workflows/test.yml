@@ -47,7 +47,7 @@ jobs:
         
     - name: Run unit tests
       run: |
-        xvfb-run -a pytest tests/unit/ -v --cov=layoutlens --cov=framework --cov=screenshot --cov=scripts --cov-report=xml --cov-report=term-missing
+        xvfb-run -a pytest tests/unit/ -v --cov=layoutlens --cov=scripts --cov-report=xml --cov-report=term-missing
       env:
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY_TEST }}
 
@@ -83,7 +83,7 @@ jobs:
     - name: Test CLI
       run: |
         layoutlens --help
-        layoutlens generate config --output test_config.yaml
+        layoutlens --output test_config.yaml generate config
         layoutlens validate --config test_config.yaml
 
   test-examples:

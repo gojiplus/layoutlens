@@ -16,6 +16,8 @@ from typing import Dict, List, Optional, Any, Union
 from .config import Config, ViewportConfig
 
 # Clean v1.0 release - no legacy compatibility needed
+# Legacy compatibility placeholder
+OriginalLayoutLens = None
 
 # Import testing modules
 sys.path.append(str(Path(__file__).parent.parent / "scripts"))
