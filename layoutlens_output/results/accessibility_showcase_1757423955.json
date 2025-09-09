@@ -1,0 +1,29 @@
+{
+  "html_path": "benchmarks/accessibility_showcase.html",
+  "timestamp": "1757423955",
+  "summary": {
+    "total_tests": 0,
+    "passed_tests": 0,
+    "failed_tests": 0,
+    "success_rate": 0.0,
+    "execution_time": 1.7764899730682373
+  },
+  "screenshots": [
+    {
+      "path": "layoutlens_output/screenshots/accessibility_showcase_mobile_portrait.png",
+      "viewport": "mobile_portrait",
+      "file_size": 566673
+    },
+    {
+      "path": "layoutlens_output/screenshots/accessibility_showcase_desktop.png",
+      "viewport": "desktop",
+      "file_size": 280629
+    }
+  ],
+  "test_results": [],
+  "metadata": {
+    "viewports_tested": 2,
+    "auto_generated_queries": 85,
+    "custom_queries": 0
+  }
+}

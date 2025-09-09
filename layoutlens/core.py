@@ -7,6 +7,7 @@ testing capabilities and simple API for end users.
 from __future__ import annotations
 
 import os
+import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -14,13 +15,7 @@ from typing import Dict, List, Optional, Any, Union
 
 from .config import Config, ViewportConfig
 
-# Import the original LayoutLens for compatibility
-import sys
-sys.path.append(str(Path(__file__).parent.parent))
-try:
-    from legacy.framework import LayoutLens as OriginalLayoutLens
-except ImportError:
-    OriginalLayoutLens = None
+# Clean v1.0 release - no legacy compatibility needed
 
 # Import testing modules
 sys.path.append(str(Path(__file__).parent.parent / "scripts"))
@@ -56,6 +51,10 @@ class TestSuite:
     test_cases: List[TestCase] = field(default_factory=list)
     config: Optional[Config] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
+    
+    def add_test_case(self, test_case: TestCase) -> None:
+        """Add a test case to the suite."""
+        self.test_cases.append(test_case)
 
 
 class LayoutLens:

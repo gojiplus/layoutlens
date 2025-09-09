@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Premium Headphones - TechStore</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+        }
+        
+        .header {
+            background: #fff;
+            border-bottom: 1px solid #e0e0e0;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .nav {
+            display: flex;
+            gap: 2rem;
+        }
+        
+        .nav a {
+            text-decoration: none;
+            color: #666;
+            font-weight: 500;
+            transition: color 0.3s;
+        }
+        
+        .nav a:hover {
+            color: #3498db;
+        }
+        
+        .cart-icon {
+            background: #3498db;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        
+        .product-container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4rem;
+            align-items: start;
+        }
+        
+        .product-gallery {
+            position: sticky;
+            top: 2rem;
+        }
+        
+        .main-image {
+            width: 100%;
+            height: 500px;
+            object-fit: cover;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+            margin-bottom: 1rem;
+        }
+        
+        .thumbnail-list {
+            display: flex;
+            gap: 0.5rem;
+            overflow-x: auto;
+        }
+        
+        .thumbnail {
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 4px;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: border-color 0.3s;
+        }
+        
+        .thumbnail:hover,
+        .thumbnail.active {
+            border-color: #3498db;
+        }
+        
+        .product-details {
+            padding: 1rem 0;
+        }
+        
+        .product-title {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            color: #2c3e50;
+        }
+        
+        .product-rating {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .stars {
+            color: #f39c12;
+            font-size: 1.2rem;
+        }
+        
+        .rating-text {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .price-section {
+            margin: 2rem 0;
+            padding: 1.5rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #27ae60;
+        }
+        
+        .current-price {
+            font-size: 2.2rem;
+            font-weight: bold;
+            color: #27ae60;
+            margin-bottom: 0.5rem;
+        }
+        
+        .original-price {
+            font-size: 1.2rem;
+            color: #999;
+            text-decoration: line-through;
+            margin-right: 1rem;
+        }
+        
+        .discount {
+            background: #e74c3c;
+            color: white;
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+        
+        .features {
+            margin: 2rem 0;
+        }
+        
+        .features h3 {
+            font-size: 1.3rem;
+            margin-bottom: 1rem;
+            color: #2c3e50;
+        }
+        
+        .feature-list {
+            list-style: none;
+        }
+        
+        .feature-list li {
+            padding: 0.5rem 0;
+            padding-left: 1.5rem;
+            position: relative;
+        }
+        
+        .feature-list li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #27ae60;
+            font-weight: bold;
+        }
+        
+        .purchase-section {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 2rem;
+            margin: 2rem 0;
+        }
+        
+        .quantity-selector {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .quantity-input {
+            width: 80px;
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            text-align: center;
+        }
+        
+        .btn-primary {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            font-size: 1.1rem;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            width: 100%;
+            transition: background-color 0.3s;
+            margin-bottom: 1rem;
+        }
+        
+        .btn-primary:hover {
+            background: #2980b9;
+        }
+        
+        .btn-secondary {
+            background: transparent;
+            color: #3498db;
+            border: 2px solid #3498db;
+            padding: 0.8rem 2rem;
+            font-size: 1rem;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.3s;
+        }
+        
+        .btn-secondary:hover {
+            background: #3498db;
+            color: white;
+        }
+        
+        .shipping-info {
+            background: #e8f5e8;
+            border-left: 4px solid #27ae60;
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 4px;
+        }
+        
+        .description {
+            margin: 3rem 0;
+            line-height: 1.8;
+        }
+        
+        .description h3 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            color: #2c3e50;
+        }
+        
+        @media (max-width: 768px) {
+            .header {
+                padding: 1rem;
+                flex-direction: column;
+                gap: 1rem;
+            }
+            
+            .nav {
+                order: 3;
+                width: 100%;
+                justify-content: center;
+            }
+            
+            .product-container {
+                grid-template-columns: 1fr;
+                gap: 2rem;
+                padding: 0 1rem;
+            }
+            
+            .product-title {
+                font-size: 2rem;
+            }
+            
+            .current-price {
+                font-size: 1.8rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="logo">TechStore</div>
+        <nav class="nav">
+            <a href="#home">Home</a>
+            <a href="#products">Products</a>
+            <a href="#deals">Deals</a>
+            <a href="#support">Support</a>
+        </nav>
+        <a href="#cart" class="cart-icon">Cart (2)</a>
+    </header>
+    
+    <main class="product-container">
+        <section class="product-gallery">
+            <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTAwIiBoZWlnaHQ9IjUwMCIgdmlld0JveD0iMCAwIDUwMCA1MDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSI1MDAiIGhlaWdodD0iNTAwIiBmaWxsPSIjZjBmMGYwIi8+CjxwYXRoIGQ9Ik0yNTAgMTAwQzE5NC40NzcgMTAwIDE1MCA5NC40NzcgMTUwIDE1MFYzNTBDMTUwIDQwNS41MjMgMTk0LjQ3NyA0NTAgMjUwIDQ1MFM0NTAgNDA1LjUyMyA0NTAgMzUwVjE1MEM0NTAgMTQ0LjQ3NyA0MDUuNTIzIDEwMCAyNTAgMTAwWiIgZmlsbD0iIzMzMyIvPgo8Y2lyY2xlIGN4PSIyMDAiIGN5PSIyMDAiIHI9IjMwIiBmaWxsPSIjNjY2Ii8+CjxjaXJjbGUgY3g9IjMwMCIgY3k9IjIwMCIgcj0iMzAiIGZpbGw9IiM2NjYiLz4KPHBhdGggZD0iTTIwMCAzMDBIMzAwIiBzdHJva2U9IiM2NjYiIHN0cm9rZS13aWR0aD0iNCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+Cjx0ZXh0IHg9IjI1MCIgeT0iNDAwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjOTk5IiBmb250LXNpemU9IjE2IiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiI+UHJlbWl1bSBIZWFkcGhvbmVzPC90ZXh0Pgo8L3N2Zz4K" alt="Premium Headphones - Main View" class="main-image">
+            
+            <div class="thumbnail-list">
+                <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAiIGhlaWdodD0iODAiIHZpZXdCb3g9IjAgMCA4MCA4MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjgwIiBoZWlnaHQ9IjgwIiBmaWxsPSIjZjBmMGYwIi8+CjxjaXJjbGUgY3g9IjQwIiBjeT0iNDAiIHI9IjIwIiBmaWxsPSIjMzMzIi8+Cjx0ZXh0IHg9IjQwIiB5PSI3MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzk5OSIgZm9udC1zaXplPSI4IiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiI+VmlldyAxPC90ZXh0Pgo8L3N2Zz4K" alt="View 1" class="thumbnail active">
+                <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAiIGhlaWdodD0iODAiIHZpZXdCb3g9IjAgMCA4MCA4MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjgwIiBoZWlnaHQ9IjgwIiBmaWxsPSIjZjBmMGYwIi8+CjxyZWN0IHg9IjIwIiB5PSIzMCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjIwIiBmaWxsPSIjMzMzIi8+Cjx0ZXh0IHg9IjQwIiB5PSI3MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzk5OSIgZm9udC1zaXplPSI4IiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiI+VmlldyAyPC90ZXh0Pgo8L3N2Zz4K" alt="View 2" class="thumbnail">
+                <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAiIGhlaWdodD0iODAiIHZpZXdCb3g9IjAgMCA4MCA4MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjgwIiBoZWlnaHQ9IjgwIiBmaWxsPSIjZjBmMGYwIi8+Cjxwb2x5Z29uIHBvaW50cz0iNDAsMjAgNjAsMTAgNjAsNTAgMjAsNTAgMjAsMTAiIGZpbGw9IiMzMzMiLz4KPHR5eHQgeD0iNDAiIHk9IjcwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjOTk5IiBmb250LXNpemU9IjgiIGZvbnQtZmFtaWx5PSJzYW5zLXNlcmlmIj5WaWV3IDM8L3RleHQ+Cjwvc3ZnPgo=" alt="View 3" class="thumbnail">
+                <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAiIGhlaWdodD0iODAiIHZpZXdCb3g9IjAgMCA4MCA4MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjgwIiBoZWlnaHQ9IjgwIiBmaWxsPSIjZjBmMGYwIi8+CjxlbGxpcHNlIGN4PSI0MCIgY3k9IjQwIiByeD0iMjUiIHJ5PSIxNSIgZmlsbD0iIzMzMyIvPgo8dGV4dCB4PSI0MCIgeT0iNzAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiM5OTkiIGZvbnQtc2l6ZT0iOCIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiPlZpZXcgNDwvdGV4dD4KPC9zdmc+Cg==" alt="View 4" class="thumbnail">
+            </div>
+        </section>
+        
+        <section class="product-details">
+            <h1 class="product-title">SoundMax Pro Wireless Headphones</h1>
+            
+            <div class="product-rating">
+                <span class="stars">★★★★★</span>
+                <span class="rating-text">4.8/5 (2,847 reviews)</span>
+            </div>
+            
+            <div class="price-section">
+                <div class="current-price">$199.99</div>
+                <span class="original-price">$299.99</span>
+                <span class="discount">33% OFF</span>
+            </div>
+            
+            <div class="features">
+                <h3>Key Features</h3>
+                <ul class="feature-list">
+                    <li>Active Noise Cancellation with 95% noise reduction</li>
+                    <li>40-hour battery life with fast charging</li>
+                    <li>Premium leather ear cups with memory foam</li>
+                    <li>High-resolution audio with aptX HD support</li>
+                    <li>Multi-device pairing (up to 3 devices)</li>
+                    <li>Voice assistant compatible (Siri, Google, Alexa)</li>
+                    <li>Foldable design with premium travel case</li>
+                </ul>
+            </div>
+            
+            <div class="purchase-section">
+                <div class="quantity-selector">
+                    <label for="quantity">Quantity:</label>
+                    <input type="number" id="quantity" class="quantity-input" value="1" min="1" max="5">
+                </div>
+                
+                <button class="btn-primary">Add to Cart - $199.99</button>
+                <button class="btn-secondary">Add to Wishlist</button>
+                
+                <div class="shipping-info">
+                    <strong>✓ Free shipping</strong> on orders over $50<br>
+                    <strong>✓ 30-day return policy</strong><br>
+                    <strong>✓ 2-year warranty included</strong>
+                </div>
+            </div>
+            
+            <div class="description">
+                <h3>Product Description</h3>
+                <p>Experience premium sound quality with the SoundMax Pro Wireless Headphones. Engineered with cutting-edge active noise cancellation technology, these headphones deliver an immersive audio experience whether you're commuting, working, or relaxing at home.</p>
+                
+                <p>The premium leather ear cups with memory foam padding provide exceptional comfort for extended listening sessions, while the 40-hour battery life ensures your music never stops. Fast charging technology gives you 5 hours of playback with just 15 minutes of charging.</p>
+                
+                <p>Compatible with all major voice assistants and featuring multi-device pairing, these headphones seamlessly integrate into your digital lifestyle. The foldable design and included premium travel case make them perfect for travel.</p>
+            </div>
+        </section>
+    </main>
+</body>
+</html>

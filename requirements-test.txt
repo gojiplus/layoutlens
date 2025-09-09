@@ -1,27 +1,46 @@
-# Testing dependencies
+# Test dependencies for LayoutLens development
+
+# Core testing framework
 pytest>=7.0.0
 pytest-cov>=4.0.0
 pytest-mock>=3.10.0
 pytest-xdist>=3.0.0
 pytest-asyncio>=0.21.0
 
-# Core dependencies for testing
-openai>=1.0.0
+# Coverage reporting
+coverage[toml]>=7.0.0
+
+# Browser automation for testing
 playwright>=1.40.0
+
+# HTML parsing and processing  
 beautifulsoup4>=4.12.0
+
+# Configuration file support
 pyyaml>=6.0
+
+# Image processing
 Pillow>=10.0.0
 
-# Development and quality tools
+# Development tools
 black>=23.0.0
 flake8>=6.0.0
 mypy>=1.0.0
 isort>=5.12.0
 
-# Documentation
+# Pre-commit hooks (optional)
+pre-commit>=3.0.0
+
+# Documentation building (optional)
 sphinx>=5.0.0
 sphinx-rtd-theme>=1.0.0
 
-# Coverage reporting
-coverage[toml]>=7.0.0
-codecov>=2.1.0
+# Security scanning (optional)
+pip-audit>=2.6.0
+
+# Dependency analysis (optional) 
+pip-tree>=0.4.0
+
+# Performance profiling (optional)
+psutil>=5.9.0
+memory-profiler>=0.61.0

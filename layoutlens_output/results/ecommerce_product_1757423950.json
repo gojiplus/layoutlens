@@ -1,0 +1,29 @@
+{
+  "html_path": "benchmarks/ecommerce_product.html",
+  "timestamp": "1757423950",
+  "summary": {
+    "total_tests": 0,
+    "passed_tests": 0,
+    "failed_tests": 0,
+    "success_rate": 0.0,
+    "execution_time": 2.9738199710845947
+  },
+  "screenshots": [
+    {
+      "path": "layoutlens_output/screenshots/ecommerce_product_mobile_portrait.png",
+      "viewport": "mobile_portrait",
+      "file_size": 365576
+    },
+    {
+      "path": "layoutlens_output/screenshots/ecommerce_product_desktop.png",
+      "viewport": "desktop",
+      "file_size": 182111
+    }
+  ],
+  "test_results": [],
+  "metadata": {
+    "viewports_tested": 2,
+    "auto_generated_queries": 34,
+    "custom_queries": 0
+  }
+}

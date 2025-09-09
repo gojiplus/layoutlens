@@ -1,0 +1,29 @@
+{
+  "html_path": "benchmarks/css_grid_showcase.html",
+  "timestamp": "1757423957",
+  "summary": {
+    "total_tests": 0,
+    "passed_tests": 0,
+    "failed_tests": 0,
+    "success_rate": 0.0,
+    "execution_time": 1.791261911392212
+  },
+  "screenshots": [
+    {
+      "path": "layoutlens_output/screenshots/css_grid_showcase_mobile_portrait.png",
+      "viewport": "mobile_portrait",
+      "file_size": 630732
+    },
+    {
+      "path": "layoutlens_output/screenshots/css_grid_showcase_desktop.png",
+      "viewport": "desktop",
+      "file_size": 291150
+    }
+  ],
+  "test_results": [],
+  "metadata": {
+    "viewports_tested": 2,
+    "auto_generated_queries": 94,
+    "custom_queries": 0
+  }
+}

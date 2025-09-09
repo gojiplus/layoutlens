@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytics Dashboard - DataViz Pro</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f7fa;
+            color: #2d3748;
+        }
+        
+        .dashboard {
+            display: grid;
+            grid-template-areas: 
+                "sidebar header header"
+                "sidebar main main";
+            grid-template-columns: 260px 1fr;
+            grid-template-rows: 70px 1fr;
+            height: 100vh;
+        }
+        
+        .sidebar {
+            grid-area: sidebar;
+            background: #2d3748;
+            color: white;
+            padding: 0;
+        }
+        
+        .sidebar-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid #4a5568;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .logo {
+            font-size: 1.3rem;
+            font-weight: bold;
+            color: #81e6d9;
+        }
+        
+        .nav-menu {
+            padding: 1rem 0;
+        }
+        
+        .nav-item {
+            padding: 0.75rem 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            cursor: pointer;
+            transition: background 0.2s;
+            text-decoration: none;
+            color: #e2e8f0;
+        }
+        
+        .nav-item:hover {
+            background: #4a5568;
+        }
+        
+        .nav-item.active {
+            background: #3182ce;
+            border-right: 3px solid #81e6d9;
+        }
+        
+        .nav-icon {
+            width: 20px;
+            height: 20px;
+            background: currentColor;
+            mask-size: contain;
+            mask-repeat: no-repeat;
+        }
+        
+        .header {
+            grid-area: header;
+            background: white;
+            padding: 0 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #e2e8f0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .header-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #2d3748;
+        }
+        
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .search-bar {
+            padding: 0.5rem 1rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            width: 300px;
+            font-size: 0.9rem;
+        }
+        
+        .search-bar:focus {
+            outline: none;
+            border-color: #3182ce;
+            box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.1);
+        }
+        
+        .user-menu {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 6px;
+            transition: background 0.2s;
+        }
+        
+        .user-menu:hover {
+            background: #f7fafc;
+        }
+        
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+        
+        .main-content {
+            grid-area: main;
+            padding: 2rem;
+            overflow-y: auto;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border-left: 4px solid transparent;
+        }
+        
+        .stat-card.revenue {
+            border-left-color: #48bb78;
+        }
+        
+        .stat-card.users {
+            border-left-color: #3182ce;
+        }
+        
+        .stat-card.orders {
+            border-left-color: #ed8936;
+        }
+        
+        .stat-card.conversion {
+            border-left-color: #9f7aea;
+        }
+        
+        .stat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+        
+        .stat-title {
+            font-size: 0.9rem;
+            color: #718096;
+            font-weight: 500;
+        }
+        
+        .stat-change {
+            font-size: 0.8rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 12px;
+            font-weight: 600;
+        }
+        
+        .stat-change.positive {
+            background: #c6f6d5;
+            color: #22543d;
+        }
+        
+        .stat-change.negative {
+            background: #fed7d7;
+            color: #742a2a;
+        }
+        
+        .stat-value {
+            font-size: 2.2rem;
+            font-weight: bold;
+            color: #2d3748;
+        }
+        
+        .charts-section {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .chart-card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .chart-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .chart-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #2d3748;
+        }
+        
+        .chart-controls {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .chart-btn {
+            padding: 0.4rem 0.8rem;
+            border: 1px solid #e2e8f0;
+            background: white;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .chart-btn.active {
+            background: #3182ce;
+            color: white;
+            border-color: #3182ce;
+        }
+        
+        .chart-content {
+            height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+            position: relative;
+        }
+        
+        .chart-placeholder {
+            color: #a0aec0;
+            font-size: 1rem;
+            text-align: center;
+        }
+        
+        .data-table {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .table-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: between;
+            align-items: center;
+        }
+        
+        .table-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #2d3748;
+        }
+        
+        .table-content {
+            overflow-x: auto;
+        }
+        
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .table th,
+        .table td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid #f7fafc;
+        }
+        
+        .table th {
+            background: #f7fafc;
+            font-weight: 600;
+            color: #4a5568;
+            font-size: 0.9rem;
+        }
+        
+        .table tr:hover {
+            background: #f7fafc;
+        }
+        
+        .status-badge {
+            padding: 0.3rem 0.8rem;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        
+        .status-active {
+            background: #c6f6d5;
+            color: #22543d;
+        }
+        
+        .status-inactive {
+            background: #fed7d7;
+            color: #742a2a;
+        }
+        
+        .status-pending {
+            background: #feebc8;
+            color: #744210;
+        }
+        
+        @media (max-width: 1024px) {
+            .dashboard {
+                grid-template-areas: 
+                    "header header"
+                    "main main";
+                grid-template-columns: 1fr;
+                grid-template-rows: 70px 1fr;
+            }
+            
+            .sidebar {
+                position: fixed;
+                left: -260px;
+                top: 0;
+                height: 100vh;
+                z-index: 1000;
+                transition: left 0.3s;
+            }
+            
+            .sidebar.open {
+                left: 0;
+            }
+            
+            .charts-section {
+                grid-template-columns: 1fr;
+            }
+            
+            .stats-grid {
+                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .main-content {
+                padding: 1rem;
+            }
+            
+            .header {
+                padding: 0 1rem;
+            }
+            
+            .search-bar {
+                width: 200px;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">📊 DataViz Pro</div>
+            </div>
+            
+            <nav class="nav-menu">
+                <a href="#dashboard" class="nav-item active">
+                    <div class="nav-icon"></div>
+                    Dashboard
+                </a>
+                <a href="#analytics" class="nav-item">
+                    <div class="nav-icon"></div>
+                    Analytics
+                </a>
+                <a href="#reports" class="nav-item">
+                    <div class="nav-icon"></div>
+                    Reports
+                </a>
+                <a href="#users" class="nav-item">
+                    <div class="nav-icon"></div>
+                    Users
+                </a>
+                <a href="#settings" class="nav-item">
+                    <div class="nav-icon"></div>
+                    Settings
+                </a>
+            </nav>
+        </aside>
+        
+        <header class="header">
+            <h1 class="header-title">Analytics Dashboard</h1>
+            <div class="header-actions">
+                <input type="search" class="search-bar" placeholder="Search...">
+                <div class="user-menu">
+                    <div class="user-avatar">JD</div>
+                    <span>John Doe</span>
+                </div>
+            </div>
+        </header>
+        
+        <main class="main-content">
+            <div class="stats-grid">
+                <div class="stat-card revenue">
+                    <div class="stat-header">
+                        <div class="stat-title">Total Revenue</div>
+                        <div class="stat-change positive">+12.5%</div>
+                    </div>
+                    <div class="stat-value">$284,592</div>
+                </div>
+                
+                <div class="stat-card users">
+                    <div class="stat-header">
+                        <div class="stat-title">Active Users</div>
+                        <div class="stat-change positive">+8.2%</div>
+                    </div>
+                    <div class="stat-value">12,847</div>
+                </div>
+                
+                <div class="stat-card orders">
+                    <div class="stat-header">
+                        <div class="stat-title">Orders</div>
+                        <div class="stat-change negative">-3.1%</div>
+                    </div>
+                    <div class="stat-value">3,249</div>
+                </div>
+                
+                <div class="stat-card conversion">
+                    <div class="stat-header">
+                        <div class="stat-title">Conversion Rate</div>
+                        <div class="stat-change positive">+1.4%</div>
+                    </div>
+                    <div class="stat-value">4.8%</div>
+                </div>
+            </div>
+            
+            <div class="charts-section">
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <div class="chart-title">Revenue Trend</div>
+                        <div class="chart-controls">
+                            <button class="chart-btn">7D</button>
+                            <button class="chart-btn active">30D</button>
+                            <button class="chart-btn">90D</button>
+                        </div>
+                    </div>
+                    <div class="chart-content">
+                        <div class="chart-placeholder">📈 Revenue Chart<br><small>Interactive chart would be rendered here</small></div>
+                    </div>
+                </div>
+                
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <div class="chart-title">User Distribution</div>
+                    </div>
+                    <div class="chart-content">
+                        <div class="chart-placeholder">🥧 User Breakdown<br><small>Pie chart would be rendered here</small></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="data-table">
+                <div class="table-header">
+                    <div class="table-title">Recent Transactions</div>
+                </div>
+                <div class="table-content">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Transaction ID</th>
+                                <th>Customer</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                                <th>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>#TXN-001</td>
+                                <td>Alice Johnson</td>
+                                <td>$1,249.00</td>
+                                <td><span class="status-badge status-active">Completed</span></td>
+                                <td>2024-01-15</td>
+                            </tr>
+                            <tr>
+                                <td>#TXN-002</td>
+                                <td>Bob Smith</td>
+                                <td>$849.50</td>
+                                <td><span class="status-badge status-pending">Pending</span></td>
+                                <td>2024-01-15</td>
+                            </tr>
+                            <tr>
+                                <td>#TXN-003</td>
+                                <td>Carol White</td>
+                                <td>$2,199.99</td>
+                                <td><span class="status-badge status-active">Completed</span></td>
+                                <td>2024-01-14</td>
+                            </tr>
+                            <tr>
+                                <td>#TXN-004</td>
+                                <td>David Brown</td>
+                                <td>$459.00</td>
+                                <td><span class="status-badge status-inactive">Failed</span></td>
+                                <td>2024-01-14</td>
+                            </tr>
+                            <tr>
+                                <td>#TXN-005</td>
+                                <td>Emma Davis</td>
+                                <td>$3,299.00</td>
+                                <td><span class="status-badge status-active">Completed</span></td>
+                                <td>2024-01-13</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

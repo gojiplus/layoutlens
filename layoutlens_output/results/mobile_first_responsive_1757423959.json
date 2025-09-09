@@ -1,0 +1,29 @@
+{
+  "html_path": "benchmarks/mobile_first_responsive.html",
+  "timestamp": "1757423959",
+  "summary": {
+    "total_tests": 0,
+    "passed_tests": 0,
+    "failed_tests": 0,
+    "success_rate": 0.0,
+    "execution_time": 1.9859521389007568
+  },
+  "screenshots": [
+    {
+      "path": "layoutlens_output/screenshots/mobile_first_responsive_mobile_portrait.png",
+      "viewport": "mobile_portrait",
+      "file_size": 735086
+    },
+    {
+      "path": "layoutlens_output/screenshots/mobile_first_responsive_desktop.png",
+      "viewport": "desktop",
+      "file_size": 627247
+    }
+  ],
+  "test_results": [],
+  "metadata": {
+    "viewports_tested": 2,
+    "auto_generated_queries": 117,
+    "custom_queries": 0
+  }
+}

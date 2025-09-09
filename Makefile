@@ -59,7 +59,7 @@ test-e2e:
 	pytest tests/e2e/ -v -m e2e
 
 test-coverage:
-	pytest tests/ -v --cov=layoutlens --cov=framework --cov=screenshot --cov=scripts --cov-report=html --cov-report=term-missing
+	pytest tests/ -v --cov=layoutlens --cov=scripts --cov-report=html --cov-report=term-missing
 
 test-fast:
 	pytest tests/ -v -m "not slow"

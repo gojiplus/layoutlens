@@ -94,8 +94,8 @@ addopts = [
     "--strict-markers",
     "--strict-config",
     "--cov=layoutlens",
-    "--cov=framework", 
-    "--cov=screenshot",
+    "--cov=legacy.framework", 
+    "--cov=legacy.screenshot",
     "--cov=scripts",
     "--cov-report=term-missing",
     "--cov-report=html:htmlcov",
@@ -113,7 +113,7 @@ filterwarnings = [
 ]
 
 [tool.coverage.run]
-source = ["layoutlens", "framework", "screenshot", "scripts"]
+source = ["layoutlens", "scripts"]
 omit = [
     "tests/*",
     "setup.py",

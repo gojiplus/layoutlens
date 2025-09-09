@@ -179,7 +179,7 @@ def test_with_mock_response(mock_openai_response):
 Always mock external API calls in tests:
 
 ```python
-@patch('framework.OpenAI')
+@patch('legacy.framework.OpenAI')
 def test_layoutlens_with_mock_api(mock_openai):
     """Test with mocked OpenAI API."""
     mock_client = Mock()
@@ -219,7 +219,7 @@ def test_file_reading(mock_open):
 Mock browser automation for screenshot tests:
 
 ```python
-@patch('screenshot.sync_playwright')
+@patch('legacy.screenshot.sync_playwright')
 def test_screenshot_capture(mock_playwright, temp_dir):
     """Test screenshot capture with mocked Playwright."""
     mock_playwright_instance = Mock()
@@ -232,6 +232,7 @@ def test_screenshot_capture(mock_playwright, temp_dir):
     mock_browser.new_page.return_value = mock_page
     
     # Test screenshot function
+    from legacy.screenshot import html_to_image
     html_to_image("test.html", "output.png")
     
     # Verify calls
