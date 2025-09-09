@@ -25,7 +25,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt', '**/setup.py') }}
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml') }}
         restore-keys: |
           ${{ runner.os }}-pip-
 
@@ -37,9 +37,7 @@ jobs:
     - name: Install Python dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -e .
-        pip install pytest pytest-cov pytest-mock pytest-xdist
-        pip install playwright beautifulsoup4 pyyaml
+        pip install -e .[test]
 
     - name: Install Playwright browsers
       run: |
@@ -100,8 +98,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -e .
-        pip install playwright beautifulsoup4 pyyaml
+        pip install -e .[test]
         playwright install chromium
         
     - name: Test example configurations

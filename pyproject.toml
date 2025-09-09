@@ -92,11 +92,10 @@ addopts = [
     "--strict-markers",
     "--strict-config",
     "--cov=layoutlens",
-    "--cov=legacy.framework", 
-    "--cov=legacy.screenshot",
     "--cov=scripts",
     "--cov-report=term-missing",
     "--cov-report=html:htmlcov",
+    "--cov-report=xml",
 ]
 markers = [
     "unit: Unit tests",

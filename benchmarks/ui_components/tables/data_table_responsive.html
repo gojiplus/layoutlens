@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Responsive Data Table Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: #f8fafc;
+            line-height: 1.6;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .table-header {
+            padding: 30px;
+            background: #f8fafc;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .table-header h1 {
+            color: #1f2937;
+            margin-bottom: 8px;
+            font-size: 24px;
+        }
+        
+        .table-header p {
+            color: #6b7280;
+        }
+        
+        .table-controls {
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+            background: #fafbfc;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .search-box {
+            display: flex;
+            align-items: center;
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 8px 12px;
+            min-width: 250px;
+        }
+        
+        .search-box input {
+            border: none;
+            outline: none;
+            flex: 1;
+            padding: 4px 8px;
+            font-size: 14px;
+        }
+        
+        .filter-select {
+            padding: 8px 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            background: white;
+            font-size: 14px;
+        }
+        
+        .table-wrapper {
+            overflow-x: auto;
+            position: relative;
+        }
+        
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        
+        .data-table th,
+        .data-table td {
+            padding: 16px 20px;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .data-table th {
+            background: #f8fafc;
+            color: #374151;
+            font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        
+        .data-table tbody tr:hover {
+            background: #f9fafb;
+        }
+        
+        .data-table td {
+            color: #1f2937;
+        }
+        
+        /* Column-specific styling */
+        .col-avatar {
+            width: 60px;
+        }
+        
+        .col-name {
+            min-width: 180px;
+        }
+        
+        .col-email {
+            min-width: 220px;
+        }
+        
+        .col-role {
+            min-width: 120px;
+        }
+        
+        .col-status {
+            min-width: 100px;
+        }
+        
+        .col-actions {
+            width: 120px;
+        }
+        
+        .avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 16px;
+        }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .user-details h4 {
+            color: #1f2937;
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+        
+        .user-details p {
+            color: #6b7280;
+            font-size: 12px;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .status-active {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .status-inactive {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .status-pending {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .role-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .role-admin {
+            background: #ede9fe;
+            color: #6b21a8;
+        }
+        
+        .role-user {
+            background: #e0f2fe;
+            color: #0c4a6e;
+        }
+        
+        .role-manager {
+            background: #ecfdf5;
+            color: #065f46;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .btn-action {
+            padding: 6px 12px;
+            border: 1px solid #d1d5db;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            color: #374151;
+            transition: all 0.2s ease;
+        }
+        
+        .btn-action:hover {
+            background: #f3f4f6;
+            border-color: #9ca3af;
+        }
+        
+        .btn-primary {
+            background: #2563eb;
+            border-color: #2563eb;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #1d4ed8;
+            border-color: #1d4ed8;
+        }
+        
+        /* Mobile responsive design */
+        @media (max-width: 768px) {
+            .container {
+                margin: 10px;
+                border-radius: 8px;
+            }
+            
+            .table-header,
+            .table-controls {
+                padding: 20px;
+            }
+            
+            .table-controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .search-box {
+                min-width: auto;
+            }
+            
+            /* Stack table on mobile */
+            .data-table,
+            .data-table thead,
+            .data-table tbody,
+            .data-table th,
+            .data-table td,
+            .data-table tr {
+                display: block;
+            }
+            
+            .data-table thead tr {
+                position: absolute;
+                top: -9999px;
+                left: -9999px;
+            }
+            
+            .data-table tr {
+                border: 1px solid #e5e7eb;
+                border-radius: 8px;
+                margin-bottom: 16px;
+                padding: 16px;
+                background: white;
+            }
+            
+            .data-table td {
+                border: none;
+                position: relative;
+                padding: 8px 0;
+                padding-left: 100px;
+                border-bottom: 1px solid #f3f4f6;
+            }
+            
+            .data-table td:last-child {
+                border-bottom: none;
+            }
+            
+            .data-table td:before {
+                content: attr(data-label);
+                position: absolute;
+                left: 0;
+                width: 90px;
+                padding-right: 10px;
+                white-space: nowrap;
+                font-weight: 600;
+                color: #6b7280;
+                font-size: 12px;
+                text-transform: uppercase;
+            }
+            
+            .user-info {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+            }
+            
+            .action-buttons {
+                justify-content: flex-start;
+            }
+        }
+        
+        .pagination {
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px solid #e5e7eb;
+            background: #fafbfc;
+        }
+        
+        .pagination-info {
+            color: #6b7280;
+            font-size: 14px;
+        }
+        
+        .pagination-controls {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .page-btn {
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #374151;
+            transition: all 0.2s ease;
+        }
+        
+        .page-btn:hover:not(.active):not(:disabled) {
+            background: #f3f4f6;
+            border-color: #9ca3af;
+        }
+        
+        .page-btn.active {
+            background: #2563eb;
+            border-color: #2563eb;
+            color: white;
+        }
+        
+        .page-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="table-header">
+            <h1>User Management</h1>
+            <p>Manage users, roles, and permissions in your organization</p>
+        </header>
+        
+        <div class="table-controls" id="table_controls">
+            <div class="search-box">
+                <span>🔍</span>
+                <input type="text" placeholder="Search users..." aria-label="Search users">
+            </div>
+            <select class="filter-select" aria-label="Filter by status">
+                <option value="all">All Status</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="pending">Pending</option>
+            </select>
+        </div>
+        
+        <div class="table-wrapper">
+            <table class="data-table" id="users_table">
+                <thead>
+                    <tr>
+                        <th class="col-avatar">Avatar</th>
+                        <th class="col-name">Name</th>
+                        <th class="col-email">Email</th>
+                        <th class="col-role">Role</th>
+                        <th class="col-status">Status</th>
+                        <th class="col-actions">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="col-avatar" data-label="Avatar">
+                            <div class="avatar">JS</div>
+                        </td>
+                        <td class="col-name" data-label="Name">
+                            <div class="user-info">
+                                <div class="user-details">
+                                    <h4>John Smith</h4>
+                                    <p>Joined 2 years ago</p>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="col-email" data-label="Email">john.smith@company.com</td>
+                        <td class="col-role" data-label="Role">
+                            <span class="role-badge role-admin">Admin</span>
+                        </td>
+                        <td class="col-status" data-label="Status">
+                            <span class="status-badge status-active">Active</span>
+                        </td>
+                        <td class="col-actions" data-label="Actions">
+                            <div class="action-buttons">
+                                <button class="btn-action">Edit</button>
+                                <button class="btn-action btn-primary">View</button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="col-avatar" data-label="Avatar">
+                            <div class="avatar" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">MJ</div>
+                        </td>
+                        <td class="col-name" data-label="Name">
+                            <div class="user-info">
+                                <div class="user-details">
+                                    <h4>Maria Johnson</h4>
+                                    <p>Joined 6 months ago</p>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="col-email" data-label="Email">maria.johnson@company.com</td>
+                        <td class="col-role" data-label="Role">
+                            <span class="role-badge role-manager">Manager</span>
+                        </td>
+                        <td class="col-status" data-label="Status">
+                            <span class="status-badge status-active">Active</span>
+                        </td>
+                        <td class="col-actions" data-label="Actions">
+                            <div class="action-buttons">
+                                <button class="btn-action">Edit</button>
+                                <button class="btn-action btn-primary">View</button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="col-avatar" data-label="Avatar">
+                            <div class="avatar" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">DW</div>
+                        </td>
+                        <td class="col-name" data-label="Name">
+                            <div class="user-info">
+                                <div class="user-details">
+                                    <h4>David Wilson</h4>
+                                    <p>Joined 3 weeks ago</p>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="col-email" data-label="Email">david.wilson@company.com</td>
+                        <td class="col-role" data-label="Role">
+                            <span class="role-badge role-user">User</span>
+                        </td>
+                        <td class="col-status" data-label="Status">
+                            <span class="status-badge status-pending">Pending</span>
+                        </td>
+                        <td class="col-actions" data-label="Actions">
+                            <div class="action-buttons">
+                                <button class="btn-action">Edit</button>
+                                <button class="btn-action btn-primary">View</button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="col-avatar" data-label="Avatar">
+                            <div class="avatar" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">SB</div>
+                        </td>
+                        <td class="col-name" data-label="Name">
+                            <div class="user-info">
+                                <div class="user-details">
+                                    <h4>Sarah Brown</h4>
+                                    <p>Joined 1 year ago</p>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="col-email" data-label="Email">sarah.brown@company.com</td>
+                        <td class="col-role" data-label="Role">
+                            <span class="role-badge role-user">User</span>
+                        </td>
+                        <td class="col-status" data-label="Status">
+                            <span class="status-badge status-inactive">Inactive</span>
+                        </td>
+                        <td class="col-actions" data-label="Actions">
+                            <div class="action-buttons">
+                                <button class="btn-action">Edit</button>
+                                <button class="btn-action btn-primary">View</button>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="pagination">
+            <div class="pagination-info">
+                Showing 1-4 of 24 users
+            </div>
+            <div class="pagination-controls">
+                <button class="page-btn" disabled>← Previous</button>
+                <button class="page-btn active">1</button>
+                <button class="page-btn">2</button>
+                <button class="page-btn">3</button>
+                <button class="page-btn">Next →</button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
