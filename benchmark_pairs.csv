@@ -1,0 +1,3 @@
+html_path_a,html_path_b,query,expected
+html/columns_layout.html,html/columns_layout.html,Do these two layouts look the same?,yes
+html/columns_layout.html,html/columns_layout_shifted.html,Do these two layouts look the same?,no
