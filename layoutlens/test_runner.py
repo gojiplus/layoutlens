@@ -16,11 +16,9 @@ from typing import Dict, List, Optional, Any, Callable, Union
 from .config import Config
 from .core import TestSuite, TestCase
 
-# Import testing components
-import sys
-sys.path.append(str(Path(__file__).parent.parent / "scripts"))
+# Import components
 try:
-    from testing import PageTester, PageTestResult
+    from .vision import PageTester, PageTestResult
 except ImportError:
     PageTester = None
     PageTestResult = None
@@ -452,7 +450,7 @@ class TestRunner:
         if not viewport_names:
             return None
         
-        from scripts.testing.screenshot_manager import ViewportConfig as SMViewportConfig
+        from .capture.screenshot_manager import ViewportConfig as SMViewportConfig
         
         configs = []
         for name in viewport_names:

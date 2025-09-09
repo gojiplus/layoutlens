@@ -19,11 +19,13 @@ from .config import Config, ViewportConfig
 # Legacy compatibility placeholder
 OriginalLayoutLens = None
 
-# Import testing modules
-sys.path.append(str(Path(__file__).parent.parent / "scripts"))
+# Import modules
 try:
-    from testing import PageTester, PageTestResult, ScreenshotManager, ScreenshotOptions
-    from benchmark import BenchmarkGenerator
+    from .vision import PageTester, PageTestResult
+    from .capture import ScreenshotManager, ScreenshotOptions
+    # Import benchmark generator from benchmarks folder
+    sys.path.append(str(Path(__file__).parent.parent / "benchmarks"))
+    from benchmark_generator import BenchmarkGenerator
 except ImportError:
     PageTester = None
     PageTestResult = None
@@ -201,7 +203,7 @@ class LayoutLens:
                 viewport = self.config.get_viewport_by_name(viewport_name)
                 if viewport:
                     # Convert to ScreenshotManager ViewportConfig
-                    from scripts.testing.screenshot_manager import ViewportConfig as SMViewportConfig
+                    from .capture.screenshot_manager import ViewportConfig as SMViewportConfig
                     sm_viewport = SMViewportConfig(
                         name=viewport.name,
                         width=viewport.width,
@@ -273,7 +275,7 @@ class LayoutLens:
             return None
         
         # Convert to ScreenshotManager ViewportConfig
-        from scripts.testing.screenshot_manager import ViewportConfig as SMViewportConfig
+        from .capture.screenshot_manager import ViewportConfig as SMViewportConfig
         sm_viewport = SMViewportConfig(
             name=viewport_config.name,
             width=viewport_config.width,

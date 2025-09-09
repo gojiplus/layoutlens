@@ -7,7 +7,15 @@ from .core import LayoutLens, TestSuite, TestCase
 from .config import Config
 from .test_runner import TestRunner
 
+# Framework modules
+try:
+    from .vision import PageTester, PageTestResult
+    from .capture import ScreenshotManager
+    from .analysis import QueryGenerator
+    __all__ = ["LayoutLens", "TestSuite", "TestCase", "Config", "TestRunner", 
+               "PageTester", "PageTestResult", "ScreenshotManager", "QueryGenerator"]
+except ImportError:
+    __all__ = ["LayoutLens", "TestSuite", "TestCase", "Config", "TestRunner"]
+
 __version__ = "1.0.0"
 __author__ = "LayoutLens Team"
-
-__all__ = ["LayoutLens", "TestSuite", "TestCase", "Config", "TestRunner"]

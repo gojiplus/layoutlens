@@ -51,6 +51,8 @@ dev = [
 docs = [
     "sphinx>=5.0.0",
     "sphinx-rtd-theme>=1.0.0",
+    "myst-parser>=0.18.0",
+    "sphinx-autodoc-typehints>=1.19.0",
 ]
 test = [
     "pytest>=7.0.0",
@@ -72,13 +74,13 @@ test = [
 layoutlens = "layoutlens.cli:main"
 
 [tool.setuptools]
-packages = ["layoutlens", "scripts", "scripts.benchmark", "scripts.testing"]
+packages = ["layoutlens"]
 include-package-data = true
 
 [tool.setuptools.package-data]
 layoutlens = ["*.yaml", "*.yml"]
 examples = ["*.yaml", "*.yml", "*.html"]
-"scripts.benchmark" = ["templates/*"]
+benchmarks = ["templates/*"]
 
 [tool.pytest.ini_options]
 minversion = "7.0"
@@ -91,11 +93,6 @@ addopts = [
     "--tb=short",
     "--strict-markers",
     "--strict-config",
-    "--cov=layoutlens",
-    "--cov=scripts",
-    "--cov-report=term-missing",
-    "--cov-report=html:htmlcov",
-    "--cov-report=xml",
 ]
 markers = [
     "unit: Unit tests",
@@ -110,7 +107,7 @@ filterwarnings = [
 ]
 
 [tool.coverage.run]
-source = ["layoutlens", "scripts"]
+source = ["layoutlens"]
 omit = [
     "tests/*",
     "setup.py",
@@ -156,7 +153,7 @@ exclude = '''
 profile = "black"
 multi_line_output = 3
 line_length = 88
-known_first_party = ["layoutlens", "scripts"]
+known_first_party = ["layoutlens"]
 known_third_party = ["pytest", "openai", "playwright", "beautifulsoup4", "yaml", "PIL"]
 
 [tool.mypy]

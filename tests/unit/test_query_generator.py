@@ -7,7 +7,7 @@ from bs4 import BeautifulSoup, Tag
 
 import sys
 sys.path.append('.')
-from scripts.testing.query_generator import QueryGenerator, GeneratedQuery, ElementInfo, generate_queries_from_file
+from layoutlens.analysis.query_generator import QueryGenerator, GeneratedQuery, ElementInfo, generate_queries_from_file
 
 
 @pytest.mark.unit
@@ -85,11 +85,11 @@ class TestQueryGenerator:
     
     def test_query_generator_without_beautifulsoup(self):
         """Test QueryGenerator raises error without BeautifulSoup."""
-        with patch('scripts.testing.query_generator.BeautifulSoup', None):
+        with patch('layoutlens.analysis.query_generator.BeautifulSoup', None):
             with pytest.raises(ImportError, match="beautifulsoup4 is required"):
                 QueryGenerator()
     
-    @patch('scripts.testing.query_generator.BeautifulSoup')
+    @patch('layoutlens.analysis.query_generator.BeautifulSoup')
     def test_analyze_html_content(self, mock_bs):
         """Test HTML content analysis."""
         # Setup mock BeautifulSoup
@@ -410,7 +410,7 @@ class TestQueryGenerator:
 class TestQueryGeneratorUtilities:
     """Test utility functions."""
     
-    @patch('scripts.testing.query_generator.QueryGenerator')
+    @patch('layoutlens.analysis.query_generator.QueryGenerator')
     def test_generate_queries_from_file(self, mock_generator_class):
         """Test convenience function for generating queries from file."""
         mock_generator = Mock()

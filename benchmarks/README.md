@@ -174,7 +174,7 @@ print(f"Success rate: {result.success_rate:.1%}")
 
 ```python
 # Generate additional test variations
-from scripts.benchmark import BenchmarkGenerator
+from benchmark_generator import BenchmarkGenerator
 
 generator = BenchmarkGenerator("custom_benchmarks")
 suite = generator.generate_typography_suite()

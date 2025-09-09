@@ -1,8 +1,10 @@
 # LayoutLens: AI-Enabled UI Test System
 
-[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Build Status](https://github.com/matmulai/layoutlens/workflows/tests/badge.svg)](https://github.com/matmulai/layoutlens/actions)
+[![Documentation Status](https://readthedocs.org/projects/layoutlens/badge/?version=latest)](https://layoutlens.readthedocs.io/en/latest/?badge=latest)
+[![PyPI version](https://badge.fury.io/py/layoutlens.svg)](https://badge.fury.io/py/layoutlens)
 
 Write visual UI tests using natural language to validate web layouts, accessibility compliance, and user interface consistency across devices. LayoutLens combines computer vision AI with automated screenshot testing to provide comprehensive UI validation.
 
@@ -241,6 +243,25 @@ testing:
   auto_generate_queries: true
   screenshot_format: "png"
 ```
+
+## 📚 Documentation
+
+**Complete documentation is available on ReadTheDocs:** [https://layoutlens.readthedocs.io](https://layoutlens.readthedocs.io)
+
+### Quick Links
+
+- **[Quick Start Guide](https://layoutlens.readthedocs.io/en/latest/quickstart.html)** - Get up and running in 5 minutes
+- **[API Reference](https://layoutlens.readthedocs.io/en/latest/api/core.html)** - Complete Python API documentation  
+- **[User Guide](https://layoutlens.readthedocs.io/en/latest/user-guide/basic-usage.html)** - Detailed usage patterns and examples
+- **[Configuration](https://layoutlens.readthedocs.io/en/latest/user-guide/configuration.html)** - Configuration options and settings
+
+### Documentation Features
+
+- **Auto-Generated API Docs**: Sphinx autodoc generates API documentation directly from code docstrings
+- **Live Code Examples**: All examples are tested and verified to work
+- **Multi-Format**: Available in HTML, PDF, and ePub formats
+- **Version Controlled**: Documentation versions match code releases
+- **Search Enabled**: Full-text search across all documentation
 
 ## 🤝 Contributing
 

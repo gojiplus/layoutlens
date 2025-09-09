@@ -12,10 +12,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Union
 
-from .screenshot_manager import (
+from ..capture.screenshot_manager import (
     ScreenshotManager, ViewportConfig, ScreenshotOptions, ScreenshotResult
 )
-from .query_generator import QueryGenerator, GeneratedQuery
+from ..analysis.query_generator import QueryGenerator, GeneratedQuery
 
 # Import OpenAI for LLM functionality
 import os
