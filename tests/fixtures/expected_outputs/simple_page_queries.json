@@ -1,0 +1,62 @@
+{
+  "expected_queries": [
+    {
+      "query": "Is the text centered?",
+      "element_id": "centered_paragraph",
+      "category": "text_alignment",
+      "expected_answer": "yes",
+      "confidence": 0.9
+    },
+    {
+      "query": "Is the main title visible and prominent?",
+      "element_id": "main_title", 
+      "category": "visibility",
+      "expected_answer": "yes",
+      "confidence": 0.95
+    },
+    {
+      "query": "Are the buttons clearly visible?",
+      "element_id": "primary_button",
+      "category": "interactive_elements",
+      "expected_answer": "yes",
+      "confidence": 0.9
+    },
+    {
+      "query": "Is the form properly laid out?",
+      "element_id": "test_form",
+      "category": "layout",
+      "expected_answer": "yes",
+      "confidence": 0.85
+    },
+    {
+      "query": "Is the header properly positioned at the top?",
+      "element_id": "page_header",
+      "category": "positioning",
+      "expected_answer": "yes",
+      "confidence": 0.9
+    }
+  ],
+  "viewport_specific_expectations": {
+    "desktop": {
+      "layout_score": 0.95,
+      "readability_score": 0.9,
+      "navigation_score": 0.9
+    },
+    "mobile_portrait": {
+      "layout_score": 0.85,
+      "readability_score": 0.85,
+      "touch_targets_score": 0.9
+    },
+    "tablet_portrait": {
+      "layout_score": 0.9,
+      "readability_score": 0.9,
+      "navigation_score": 0.85
+    }
+  },
+  "accessibility_expectations": {
+    "color_contrast": "sufficient",
+    "form_labels": "present",
+    "semantic_markup": "good",
+    "focus_indicators": "visible"
+  }
+}

@@ -1,0 +1,41 @@
+# Include important documentation files
+include README.md
+include LICENSE
+include CLAUDE.md
+include CHANGELOG.md
+
+# Include configuration files
+include *.toml
+include *.ini
+include *.cfg
+include requirements*.txt
+include Makefile
+
+# Include test files and fixtures
+recursive-include tests *.py
+recursive-include tests/fixtures *.html *.json *.yaml *.yml
+
+# Include example files
+recursive-include examples *.py *.yaml *.yml *.html *.md
+
+# Include documentation
+recursive-include docs *.md *.rst *.txt
+
+# Include template files
+recursive-include scripts/benchmark/templates *.html *.css *.js
+
+# Include GitHub workflows
+recursive-include .github/workflows *.yml *.yaml
+
+# Exclude unnecessary files
+global-exclude *.pyc
+global-exclude *.pyo
+global-exclude *.pyd
+global-exclude __pycache__
+global-exclude .DS_Store
+global-exclude .coverage
+global-exclude htmlcov
+global-exclude .pytest_cache
+global-exclude *.egg-info
+global-exclude build
+global-exclude dist

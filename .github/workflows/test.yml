@@ -1,0 +1,125 @@
+name: Test Suite
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.8, 3.9, '3.10', '3.11', '3.12']
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt', '**/setup.py') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y xvfb
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .
+        pip install pytest pytest-cov pytest-mock pytest-xdist
+        pip install playwright beautifulsoup4 pyyaml
+
+    - name: Install Playwright browsers
+      run: |
+        playwright install chromium
+        
+    - name: Run unit tests
+      run: |
+        xvfb-run -a pytest tests/unit/ -v --cov=layoutlens --cov=framework --cov=screenshot --cov=scripts --cov-report=xml --cov-report=term-missing
+      env:
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY_TEST }}
+
+    - name: Run integration tests
+      run: |
+        xvfb-run -a pytest tests/integration/ -v -m "not slow" --maxfail=5
+      env:
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY_TEST }}
+        
+    - name: Upload coverage reports to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        fail_ci_if_error: false
+
+  test-package:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+        
+    - name: Test package installation
+      run: |
+        python -m pip install --upgrade pip build twine
+        python -m build
+        pip install dist/*.whl
+        python -c "import layoutlens; print('Package installed successfully')"
+        
+    - name: Test CLI
+      run: |
+        layoutlens --help
+        layoutlens generate config --output test_config.yaml
+        layoutlens validate --config test_config.yaml
+
+  test-examples:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .
+        pip install playwright beautifulsoup4 pyyaml
+        playwright install chromium
+        
+    - name: Test example configurations
+      run: |
+        python -c "
+        import yaml
+        with open('examples/layoutlens_config.yaml', 'r') as f:
+            config = yaml.safe_load(f)
+        print('Config validation: OK')
+        
+        with open('examples/sample_test_suite.yaml', 'r') as f:
+            suite = yaml.safe_load(f)
+        print('Test suite validation: OK')
+        "
+        
+    - name: Validate example code syntax
+      run: |
+        python -m py_compile examples/basic_usage.py
+        python -m py_compile examples/advanced_usage.py
+        python -m py_compile examples/ci_cd_integration.py
+        echo "All example files compile successfully"

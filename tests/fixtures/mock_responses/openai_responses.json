@@ -1,0 +1,109 @@
+{
+  "successful_responses": [
+    {
+      "query": "Is the text centered?",
+      "response": "Yes, the text appears to be center-aligned within its container. The text is positioned in the middle of the available horizontal space.",
+      "confidence": "high"
+    },
+    {
+      "query": "Is the navigation menu visible?", 
+      "response": "Yes, the navigation menu is clearly visible at the top of the page. The menu items are well-spaced and have good contrast against the dark background.",
+      "confidence": "high"
+    },
+    {
+      "query": "Are the buttons appropriately sized for touch interaction?",
+      "response": "Yes, the buttons appear to meet touch target guidelines with adequate padding and spacing. They are large enough for comfortable finger interaction on mobile devices.",
+      "confidence": "medium"
+    },
+    {
+      "query": "Is the color contrast sufficient for readability?",
+      "response": "Yes, the color contrast between text and background appears sufficient. The dark text on light background and white text on dark background provide good readability.",
+      "confidence": "high"
+    },
+    {
+      "query": "Does the layout work well on mobile devices?",
+      "response": "Yes, the layout appears to be mobile-friendly. Elements are properly stacked vertically and text remains readable without horizontal scrolling.",
+      "confidence": "medium"
+    }
+  ],
+  "negative_responses": [
+    {
+      "query": "Is the text left-aligned?",
+      "response": "No, the text appears to be center-aligned rather than left-aligned. The text is positioned in the middle of its container.",
+      "confidence": "high"
+    },
+    {
+      "query": "Are there any layout issues visible?",
+      "response": "No significant layout issues are visible. The elements appear to be properly positioned and aligned according to the design.",
+      "confidence": "medium"
+    },
+    {
+      "query": "Is the navigation hidden or collapsed?",
+      "response": "No, the navigation is fully visible and expanded. All menu items are clearly displayed in the header area.",
+      "confidence": "high"
+    }
+  ],
+  "comparison_responses": [
+    {
+      "query": "Do these two layouts look the same?",
+      "response": "Yes, the layouts appear substantially similar. Both pages have the same basic structure, navigation, and content organization.",
+      "confidence": "high"
+    },
+    {
+      "query": "Do these two layouts look the same?",
+      "response": "No, there are noticeable differences between these layouts. The second layout has additional elements and different spacing that distinguish it from the first.",
+      "confidence": "medium"
+    },
+    {
+      "query": "Are the layouts visually consistent?",
+      "response": "Yes, both layouts maintain visual consistency with the same color scheme, typography, and overall design patterns.",
+      "confidence": "high"
+    }
+  ],
+  "error_responses": [
+    {
+      "query": "Any query",
+      "response": "I'm unable to analyze this image due to a technical issue. Please try again or check the image format.",
+      "error_type": "api_error"
+    },
+    {
+      "query": "Any query", 
+      "response": "The image appears to be corrupted or in an unsupported format. Please verify the image file.",
+      "error_type": "image_error"
+    },
+    {
+      "query": "Any query",
+      "response": "Request timeout. The analysis took too long to complete.",
+      "error_type": "timeout_error"
+    }
+  ],
+  "partial_responses": [
+    {
+      "query": "Is the layout responsive?",
+      "response": "The layout shows some responsive characteristics, though there may be minor issues with spacing on very small screens.",
+      "confidence": "low"
+    },
+    {
+      "query": "Are all elements properly aligned?",
+      "response": "Most elements appear to be properly aligned, though there might be slight inconsistencies in the spacing between certain sections.",
+      "confidence": "low"
+    }
+  ],
+  "accessibility_responses": [
+    {
+      "query": "Does this page have sufficient color contrast?",
+      "response": "Yes, the page demonstrates good color contrast ratios. The dark text on light backgrounds and light text on dark backgrounds meet accessibility guidelines for readability.",
+      "confidence": "high"
+    },
+    {
+      "query": "Are form fields properly labeled?",
+      "response": "Yes, the form fields appear to have appropriate labels associated with them, which supports screen reader accessibility.",
+      "confidence": "high"
+    },
+    {
+      "query": "Is the page structure semantically meaningful?",
+      "response": "Yes, the page uses semantic HTML elements like header, main, and section tags that provide meaningful structure for assistive technologies.",
+      "confidence": "high"
+    }
+  ]
+}

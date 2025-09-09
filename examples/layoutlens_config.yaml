@@ -1,0 +1,145 @@
+# LayoutLens Configuration File
+# This file configures all aspects of the LayoutLens UI testing framework
+
+# Language Model Configuration
+llm:
+  provider: "openai"                    # LLM provider (openai, anthropic)
+  model: "gpt-4o-mini"                 # Model to use for visual analysis
+  api_key_env: "OPENAI_API_KEY"       # Environment variable for API key
+  max_retries: 3                       # Maximum retry attempts for API calls
+  timeout: 60                          # Timeout in seconds for API calls
+  temperature: 0.1                     # Temperature for response generation
+  custom_params: {}                    # Additional provider-specific parameters
+
+# Screenshot Configuration
+screenshot:
+  format: "png"                        # Image format: png or jpeg
+  quality: null                        # JPEG quality (1-100), null for PNG
+  full_page: true                      # Capture full page or viewport only
+  omit_background: false               # Remove background for transparency
+  animations: "disabled"               # Handle animations: disabled or allow
+  wait_timeout: 30000                  # Max wait time for page load (ms)
+  wait_for_selector: null              # CSS selector to wait for before capture
+  mask_selectors: []                   # CSS selectors to mask in screenshots
+  mask_color: "#FF0000"               # Color for masked elements
+
+# Test Execution Configuration
+test:
+  auto_generate_queries: true          # Automatically generate test queries
+  focus_areas:                         # Areas to focus on for auto-generated queries
+    - "typography"
+    - "layout"
+    - "color"
+    - "accessibility"
+  parallel_execution: false            # Run tests in parallel
+  max_workers: 4                       # Maximum parallel workers
+  continue_on_error: true              # Continue testing after failures
+  save_screenshots: true               # Save screenshots for analysis
+  save_detailed_results: true          # Save detailed test results
+
+# Output and Reporting Configuration
+output:
+  base_dir: "layoutlens_output"        # Base directory for all outputs
+  screenshots_dir: "screenshots"       # Screenshots subdirectory
+  results_dir: "results"              # Test results subdirectory
+  reports_dir: "reports"              # Reports subdirectory
+  format: "json"                      # Output format: json, yaml, html
+  include_metadata: true              # Include detailed metadata
+  compress_results: false             # Compress result files
+
+# Viewport Configurations
+viewports:
+  - name: "mobile_portrait"
+    width: 375
+    height: 667
+    device_scale_factor: 2.0
+    is_mobile: true
+    has_touch: true
+    user_agent: null
+
+  - name: "mobile_landscape"
+    width: 667
+    height: 375
+    device_scale_factor: 2.0
+    is_mobile: true
+    has_touch: true
+    user_agent: null
+
+  - name: "tablet_portrait"
+    width: 768
+    height: 1024
+    device_scale_factor: 2.0
+    is_mobile: true
+    has_touch: true
+    user_agent: null
+
+  - name: "tablet_landscape"
+    width: 1024
+    height: 768
+    device_scale_factor: 2.0
+    is_mobile: true
+    has_touch: true
+    user_agent: null
+
+  - name: "desktop"
+    width: 1440
+    height: 900
+    device_scale_factor: 1.0
+    is_mobile: false
+    has_touch: false
+    user_agent: null
+
+  - name: "desktop_large"
+    width: 1920
+    height: 1080
+    device_scale_factor: 1.0
+    is_mobile: false
+    has_touch: false
+    user_agent: null
+
+  - name: "desktop_xl"
+    width: 2560
+    height: 1440
+    device_scale_factor: 1.0
+    is_mobile: false
+    has_touch: false
+    user_agent: null
+
+# Custom Query Libraries
+custom_queries:
+  navigation:
+    - "Is the main navigation menu visible and accessible?"
+    - "Are navigation items properly aligned?"
+    - "Is there a clear visual hierarchy in the navigation?"
+    - "Are mobile navigation patterns (hamburger menu) implemented correctly?"
+
+  accessibility:
+    - "Are all interactive elements keyboard accessible?"
+    - "Do form fields have proper labels?"
+    - "Is there sufficient color contrast for readability?"
+    - "Are focus indicators visible and clear?"
+    - "Are ARIA labels properly implemented?"
+
+  layout:
+    - "Is the page layout visually balanced?"
+    - "Are elements properly aligned and spaced?"
+    - "Is the content hierarchy clear and logical?"
+    - "Does the layout work across different screen sizes?"
+
+  typography:
+    - "Is the text readable and appropriately sized?"
+    - "Is there consistent typography throughout the page?"
+    - "Are headings properly sized and hierarchical?"
+    - "Is line spacing appropriate for readability?"
+
+  performance:
+    - "Do images load properly and appear crisp?"
+    - "Are there any visible layout shifts or rendering issues?"
+    - "Do animations and transitions appear smooth?"
+    - "Are loading states handled appropriately?"
+
+  branding:
+    - "Is the brand logo prominently displayed?"
+    - "Are brand colors used consistently?"
+    - "Is the overall design consistent with brand guidelines?"
+    - "Are brand elements properly positioned?"

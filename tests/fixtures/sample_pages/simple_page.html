@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Test Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .header {
+            background-color: #333;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .content {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .centered-text {
+            text-align: center;
+            font-size: 18px;
+            color: #666;
+            margin: 20px 0;
+        }
+        
+        .button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 0;
+        }
+        
+        .button:hover {
+            background-color: #0056b3;
+        }
+        
+        .footer {
+            margin-top: 40px;
+            text-align: center;
+            color: #888;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <header id="page_header" class="header">
+        <h1 id="main_title">Simple Test Page</h1>
+        <p>A basic page for testing LayoutLens functionality</p>
+    </header>
+    
+    <main class="content">
+        <section id="intro_section">
+            <h2>Introduction</h2>
+            <p>This is a simple test page designed to validate various UI testing scenarios. It includes common elements like headers, text content, buttons, and layouts.</p>
+        </section>
+        
+        <section id="content_section">
+            <h3>Main Content</h3>
+            <p class="centered-text" id="centered_paragraph">
+                This paragraph is centered and should be easily identifiable by the testing framework.
+            </p>
+            
+            <p>Regular paragraph text that should be left-aligned by default. This text provides content for testing text analysis and readability checks.</p>
+        </section>
+        
+        <section id="interactive_section">
+            <h3>Interactive Elements</h3>
+            <button id="primary_button" class="button">Primary Action</button>
+            <button id="secondary_button" class="button" style="background-color: #6c757d;">Secondary Action</button>
+            
+            <form id="test_form" style="margin-top: 20px;">
+                <label for="test_input">Test Input:</label>
+                <input type="text" id="test_input" name="test_input" placeholder="Enter test text">
+                
+                <label for="test_select">Test Select:</label>
+                <select id="test_select" name="test_select">
+                    <option value="">Choose an option</option>
+                    <option value="option1">Option 1</option>
+                    <option value="option2">Option 2</option>
+                </select>
+            </form>
+        </section>
+    </main>
+    
+    <footer id="page_footer" class="footer">
+        <p>&copy; 2024 LayoutLens Test Suite</p>
+    </footer>
+</body>
+</html>

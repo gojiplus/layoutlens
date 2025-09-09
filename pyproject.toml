@@ -1,0 +1,204 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "layoutlens"
+version = "1.0.0"
+description = "AI-Enabled UI Test System for natural language visual testing"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "LayoutLens Team", email = "team@layoutlens.ai"}
+]
+maintainers = [
+    {name = "LayoutLens Team", email = "team@layoutlens.ai"}
+]
+keywords = ["ui testing", "visual regression", "ai", "computer vision", "web testing", "layout testing"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Testing",
+    "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
+    "Topic :: Multimedia :: Graphics :: Capture :: Screen Capture",
+    "Operating System :: OS Independent",
+]
+requires-python = ">=3.8"
+dependencies = [
+    "openai>=1.0.0",
+    "playwright>=1.40.0",
+    "beautifulsoup4>=4.12.0",
+    "pyyaml>=6.0",
+    "Pillow>=10.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-mock>=3.10.0",
+    "pytest-xdist>=3.0.0",
+    "black>=23.0.0",
+    "flake8>=6.0.0",
+    "mypy>=1.0.0",
+    "isort>=5.12.0",
+]
+docs = [
+    "sphinx>=5.0.0",
+    "sphinx-rtd-theme>=1.0.0",
+]
+test = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0", 
+    "pytest-mock>=3.10.0",
+    "pytest-xdist>=3.0.0",
+    "pytest-asyncio>=0.21.0",
+    "coverage[toml]>=7.0.0",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/layoutlens/layoutlens"
+"Bug Reports" = "https://github.com/layoutlens/layoutlens/issues"
+"Documentation" = "https://layoutlens.readthedocs.io/"
+"Source" = "https://github.com/layoutlens/layoutlens"
+"Changelog" = "https://github.com/layoutlens/layoutlens/blob/main/CHANGELOG.md"
+
+[project.scripts]
+layoutlens = "layoutlens.cli:main"
+
+[tool.setuptools]
+packages = ["layoutlens", "scripts", "scripts.benchmark", "scripts.testing"]
+include-package-data = true
+
+[tool.setuptools.package-data]
+layoutlens = ["*.yaml", "*.yml"]
+examples = ["*.yaml", "*.yml", "*.html"]
+"scripts.benchmark" = ["templates/*"]
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--tb=short",
+    "--strict-markers",
+    "--strict-config",
+    "--cov=layoutlens",
+    "--cov=framework", 
+    "--cov=screenshot",
+    "--cov=scripts",
+    "--cov-report=term-missing",
+    "--cov-report=html:htmlcov",
+]
+markers = [
+    "unit: Unit tests",
+    "integration: Integration tests", 
+    "e2e: End-to-end tests",
+    "slow: Slow running tests",
+    "requires_api: Tests that require API access",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
+
+[tool.coverage.run]
+source = ["layoutlens", "framework", "screenshot", "scripts"]
+omit = [
+    "tests/*",
+    "setup.py",
+    "*/conftest.py",
+    "*/__pycache__/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError", 
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
+
+[tool.black]
+line-length = 88
+target-version = ['py38', 'py39', 'py310', 'py311', 'py312']
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+  | __pycache__
+)/
+'''
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+known_first_party = ["layoutlens", "scripts"]
+known_third_party = ["pytest", "openai", "playwright", "beautifulsoup4", "yaml", "PIL"]
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+check_untyped_defs = true
+disallow_untyped_decorators = false
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = [
+    "openai.*",
+    "playwright.*",
+    "bs4.*",
+    "PIL.*",
+    "yaml.*",
+]
+ignore_missing_imports = true
+
+[tool.flake8]
+max-line-length = 88
+extend-ignore = ["E203", "E501", "W503"]
+exclude = [
+    ".git",
+    "__pycache__", 
+    "build",
+    "dist",
+    ".eggs",
+    "*.egg-info",
+    ".tox",
+    ".venv",
+    "venv",
+]
