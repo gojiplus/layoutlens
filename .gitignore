@@ -170,3 +170,13 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 .DS_Store
+
+# LayoutLens specific
+layoutlens_output/
+*_results.json
+test_screenshots/
+venv_*/
+test_env/
+test_homepage.html
+test_basic_functionality.py
+RELEASE_CLEANUP_PLAN.md

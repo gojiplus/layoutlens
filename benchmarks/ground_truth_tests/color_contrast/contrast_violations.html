@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Color Contrast Violations Test - WCAG Compliance Issues</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            min-height: 100vh;
+        }
+        
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+        
+        .header-title {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .header-subtitle {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        
+        .main-content {
+            padding: 2rem;
+        }
+        
+        .test-section {
+            margin-bottom: 3rem;
+            padding: 2rem;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+        
+        .section-title {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            color: #2c3e50;
+        }
+        
+        .contrast-info {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+            color: #666;
+        }
+        
+        /* SEVERE CONTRAST VIOLATIONS */
+        
+        /* Test 1: Yellow text on white background - Contrast ratio: 1.07:1 (FAILS severely) */
+        .severe-violation-1 {
+            background-color: #ffffff;
+            color: #ffff00;
+            padding: 1.5rem;
+            margin: 1rem 0;
+            border-radius: 4px;
+            font-size: 1rem;
+            border: 1px solid #ddd;
+        }
+        
+        /* Test 2: Light gray text on white background - Contrast ratio: 1.61:1 (FAILS) */
+        .severe-violation-2 {
+            background-color: #ffffff;
+            color: #cccccc;
+            padding: 1.5rem;
+            margin: 1rem 0;
+            border-radius: 4px;
+            font-size: 1rem;
+            border: 1px solid #ddd;
+        }
+        
+        /* Test 3: Light blue text on white background - Contrast ratio: 1.92:1 (FAILS) */
+        .moderate-violation-1 {
+            background-color: #ffffff;
+            color: #87ceeb;
+            padding: 1.5rem;
+            margin: 1rem 0;
+            border-radius: 4px;
+            font-size: 1rem;
+            border: 1px solid #ddd;
+        }
+        
+        /* Test 4: Medium gray on light gray - Contrast ratio: 2.1:1 (FAILS for normal text) */
+        .moderate-violation-2 {
+            background-color: #f0f0f0;
+            color: #999999;
+            padding: 1.5rem;
+            margin: 1rem 0;
+            border-radius: 4px;
+            font-size: 1rem;
+            border: 1px solid #ddd;
+        }
+        
+        /* Test 5: Orange text on yellow background - Contrast ratio: 1.6:1 (FAILS) */
+        .moderate-violation-3 {
+            background-color: #ffff99;
+            color: #ff9900;
+            padding: 1.5rem;
+            margin: 1rem 0;
+            border-radius: 4px;
+            font-size: 1rem;
+            border: 1px solid #ddd;
+        }
+        
+        /* Test 6: Large text with borderline failure - Contrast ratio: 2.8:1 */
+        .large-text-violation {
+            background-color: #ffffff;
+            color: #a0a0a0;
+            padding: 1.5rem;
+            margin: 1rem 0;
+            border-radius: 4px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            border: 1px solid #ddd;
+        }
+        
+        /* GOOD CONTRAST EXAMPLES FOR COMPARISON */
+        .good-contrast-1 {
+            background-color: #ffffff;
+            color: #333333;
+            padding: 1.5rem;
+            margin: 1rem 0;
+            border-radius: 4px;
+            font-size: 1rem;
+            border: 1px solid #ddd;
+        }
+        
+        .good-contrast-2 {
+            background-color: #2c3e50;
+            color: #ffffff;
+            padding: 1.5rem;
+            margin: 1rem 0;
+            border-radius: 4px;
+            font-size: 1rem;
+            border: 1px solid #ddd;
+        }
+        
+        /* BUTTON CONTRAST VIOLATIONS */
+        .button-section {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            margin: 2rem 0;
+        }
+        
+        /* Button with poor contrast - Light gray on white */
+        .btn-poor-contrast {
+            background-color: #f8f8f8;
+            color: #d0d0d0;
+            border: 1px solid #e0e0e0;
+            padding: 0.75rem 1.5rem;
+            border-radius: 4px;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        
+        /* Button with borderline contrast */
+        .btn-borderline-contrast {
+            background-color: #ffeb3b;
+            color: #ffc107;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 4px;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        
+        /* Good contrast button for comparison */
+        .btn-good-contrast {
+            background-color: #2196f3;
+            color: #ffffff;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 4px;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        
+        /* LINK CONTRAST ISSUES */
+        .link-section p {
+            margin: 1rem 0;
+            font-size: 1rem;
+        }
+        
+        /* Poor contrast link - Light blue on white */
+        .poor-link {
+            color: #b3d9ff;
+            text-decoration: underline;
+        }
+        
+        /* Borderline contrast link */
+        .borderline-link {
+            color: #99ccff;
+            text-decoration: underline;
+        }
+        
+        /* Good contrast link */
+        .good-link {
+            color: #1976d2;
+            text-decoration: underline;
+        }
+        
+        /* Test metadata - hidden from visual display */
+        .test-metadata {
+            display: none;
+        }
+        
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 2rem 0;
+            font-size: 0.9rem;
+        }
+        
+        .results-table th,
+        .results-table td {
+            border: 1px solid #ddd;
+            padding: 0.75rem;
+            text-align: left;
+        }
+        
+        .results-table th {
+            background: #f5f5f5;
+            font-weight: 600;
+        }
+        
+        .fail {
+            color: #d32f2f;
+            font-weight: 600;
+        }
+        
+        .pass {
+            color: #388e3c;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <!-- Test Metadata: Ground Truth Information -->
+    <div class="test-metadata">
+        <div data-test-case="color-contrast-violations">
+            <div data-question="Does the yellow text on white background meet WCAG accessibility standards?">
+                <div data-correct-answer="No">Contrast ratio 1.07:1 fails WCAG AA standard (requires 4.5:1)</div>
+                <div data-measured-ratio="1.07:1">Calculated contrast ratio</div>
+                <div data-wcag-requirement="4.5:1 for normal text">WCAG AA standard</div>
+                <div data-severity="severe">Extremely poor readability</div>
+            </div>
+            <div data-question="Is the light gray text on white background accessible?">
+                <div data-correct-answer="No">Contrast ratio 1.61:1 fails WCAG AA standard</div>
+                <div data-measured-ratio="1.61:1">Calculated contrast ratio</div>
+                <div data-severity="severe">Very poor readability</div>
+            </div>
+            <div data-question="Does the light blue text meet accessibility requirements?">
+                <div data-correct-answer="No">Contrast ratio 1.92:1 fails WCAG AA (requires 4.5:1)</div>
+                <div data-measured-ratio="1.92:1">Calculated contrast ratio</div>
+                <div data-severity="high">Poor readability</div>
+            </div>
+            <div data-question="Is the large bold text with 2.8:1 contrast acceptable?">
+                <div data-correct-answer="Partial">Fails WCAG AA for large text (requires 3:1) but close to threshold</div>
+                <div data-measured-ratio="2.8:1">Calculated contrast ratio</div>
+                <div data-wcag-requirement="3.0:1 for large text">WCAG AA large text standard</div>
+                <div data-severity="moderate">Borderline readability</div>
+            </div>
+            <div data-question="Are there multiple contrast violations on this page?">
+                <div data-correct-answer="Yes">At least 6 elements with insufficient color contrast</div>
+                <div data-violation-count="6+">Multiple accessibility issues</div>
+                <div data-severity="high">Systematic accessibility problems</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <header class="header">
+            <h1 class="header-title">Color Contrast Test</h1>
+            <p class="header-subtitle">Testing WCAG Color Contrast Compliance - Multiple Violations</p>
+        </header>
+
+        <main class="main-content">
+            <section class="test-section">
+                <h2 class="section-title">Severe Contrast Violations</h2>
+                <div class="contrast-info">
+                    <strong>WCAG AA Requirements:</strong> Normal text requires 4.5:1 contrast ratio, Large text requires 3:1 contrast ratio
+                </div>
+                
+                <div class="severe-violation-1">
+                    <strong>Test 1 - Yellow on White (1.07:1):</strong> This yellow text on white background has extremely poor contrast and is nearly impossible to read for users with any visual impairment.
+                </div>
+                
+                <div class="severe-violation-2">
+                    <strong>Test 2 - Light Gray on White (1.61:1):</strong> This light gray text fails WCAG standards severely. Users with visual impairments or in bright lighting conditions would struggle to read this content.
+                </div>
+                
+                <div class="moderate-violation-1">
+                    <strong>Test 3 - Light Blue on White (1.92:1):</strong> This light blue text appears decorative but fails accessibility standards. The contrast is insufficient for reliable readability across different conditions and abilities.
+                </div>
+            </section>
+
+            <section class="test-section">
+                <h2 class="section-title">Moderate Contrast Violations</h2>
+                
+                <div class="moderate-violation-2">
+                    <strong>Test 4 - Medium Gray on Light Gray (2.1:1):</strong> While better than the severe cases above, this combination still fails WCAG AA standards for normal text and would be difficult to read for many users.
+                </div>
+                
+                <div class="moderate-violation-3">
+                    <strong>Test 5 - Orange on Yellow (1.6:1):</strong> This warm color combination has poor contrast despite appearing bright. The similar hues create insufficient differentiation for accessibility compliance.
+                </div>
+                
+                <div class="large-text-violation">
+                    <strong>Test 6 - Large Text Borderline (2.8:1):</strong> Even as large, bold text, this fails WCAG AA standards for large text (3:1 requirement).
+                </div>
+            </section>
+
+            <section class="test-section">
+                <h2 class="section-title">Button Contrast Issues</h2>
+                
+                <div class="button-section">
+                    <button class="btn-poor-contrast">Poor Contrast Button</button>
+                    <button class="btn-borderline-contrast">Borderline Contrast</button>
+                    <button class="btn-good-contrast">Good Contrast</button>
+                </div>
+                
+                <p>The first two buttons demonstrate poor and borderline contrast ratios that fail WCAG guidelines, while the third provides proper contrast for comparison.</p>
+            </section>
+
+            <section class="test-section">
+                <h2 class="section-title">Link Contrast Problems</h2>
+                
+                <div class="link-section">
+                    <p>Here are examples of link contrast issues:</p>
+                    <p>This paragraph contains a <a href="#" class="poor-link">poor contrast link</a> that fails accessibility standards.</p>
+                    <p>This paragraph has a <a href="#" class="borderline-link">borderline contrast link</a> that also fails WCAG requirements.</p>
+                    <p>This paragraph shows a <a href="#" class="good-link">properly contrasted link</a> that meets accessibility standards.</p>
+                </div>
+            </section>
+
+            <section class="test-section">
+                <h2 class="section-title">Good Contrast Examples (For Comparison)</h2>
+                
+                <div class="good-contrast-1">
+                    <strong>Good Example 1 - Dark Gray on White (12.6:1):</strong> This text demonstrates proper contrast that exceeds WCAG AA requirements and provides excellent readability for all users.
+                </div>
+                
+                <div class="good-contrast-2">
+                    <strong>Good Example 2 - White on Dark Blue (12.6:1):</strong> This reversed color scheme also provides excellent contrast and readability while maintaining visual appeal.
+                </div>
+            </section>
+
+            <section class="test-section">
+                <h2 class="section-title">Contrast Ratio Summary</h2>
+                
+                <table class="results-table">
+                    <thead>
+                        <tr>
+                            <th>Test Element</th>
+                            <th>Foreground</th>
+                            <th>Background</th>
+                            <th>Contrast Ratio</th>
+                            <th>WCAG AA Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Yellow Text</td>
+                            <td>#ffff00</td>
+                            <td>#ffffff</td>
+                            <td>1.07:1</td>
+                            <td class="fail">FAIL</td>
+                        </tr>
+                        <tr>
+                            <td>Light Gray Text</td>
+                            <td>#cccccc</td>
+                            <td>#ffffff</td>
+                            <td>1.61:1</td>
+                            <td class="fail">FAIL</td>
+                        </tr>
+                        <tr>
+                            <td>Light Blue Text</td>
+                            <td>#87ceeb</td>
+                            <td>#ffffff</td>
+                            <td>1.92:1</td>
+                            <td class="fail">FAIL</td>
+                        </tr>
+                        <tr>
+                            <td>Medium Gray</td>
+                            <td>#999999</td>
+                            <td>#f0f0f0</td>
+                            <td>2.1:1</td>
+                            <td class="fail">FAIL</td>
+                        </tr>
+                        <tr>
+                            <td>Orange on Yellow</td>
+                            <td>#ff9900</td>
+                            <td>#ffff99</td>
+                            <td>1.6:1</td>
+                            <td class="fail">FAIL</td>
+                        </tr>
+                        <tr>
+                            <td>Large Text</td>
+                            <td>#a0a0a0</td>
+                            <td>#ffffff</td>
+                            <td>2.8:1</td>
+                            <td class="fail">FAIL (Large)</td>
+                        </tr>
+                        <tr>
+                            <td>Good Dark Gray</td>
+                            <td>#333333</td>
+                            <td>#ffffff</td>
+                            <td>12.6:1</td>
+                            <td class="pass">PASS</td>
+                        </tr>
+                        <tr>
+                            <td>Good White Text</td>
+                            <td>#ffffff</td>
+                            <td>#2c3e50</td>
+                            <td>12.6:1</td>
+                            <td class="pass">PASS</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <section class="test-section">
+                <h2 class="section-title">Expected Test Results</h2>
+                <div style="background: #f8f9fa; padding: 1.5rem; border-radius: 4px;">
+                    <p><strong>Primary Question:</strong> "Does this page meet WCAG color contrast accessibility standards?"</p>
+                    <p><strong>Expected Answer:</strong> No - multiple elements have insufficient contrast ratios</p>
+                    <br>
+                    <p><strong>Secondary Questions:</strong></p>
+                    <ul style="margin-left: 2rem; margin-top: 0.5rem;">
+                        <li>"Is the yellow text readable?" → No (1.07:1 ratio)</li>
+                        <li>"Does the light gray text meet standards?" → No (1.61:1 ratio)</li>
+                        <li>"Are the buttons accessible?" → Some fail, some pass</li>
+                        <li>"How many contrast violations exist?" → 6+ violations identified</li>
+                    </ul>
+                    <br>
+                    <p><strong>Difficulty Level:</strong> Easy to Medium (objective measurements but requires contrast evaluation)</p>
+                </div>
+            </section>
+        </main>
+    </div>
+</body>
+</html>

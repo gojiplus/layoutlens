@@ -17,13 +17,14 @@ from .screenshot_manager import (
 )
 from .query_generator import QueryGenerator, GeneratedQuery
 
-# Import LayoutLens from the root module
-import sys
-sys.path.append(str(Path(__file__).parent.parent.parent))
+# Import OpenAI for LLM functionality
+import os
 try:
-    from legacy.framework import LayoutLens
+    import openai
+    OPENAI_AVAILABLE = True
 except ImportError:
-    LayoutLens = None
+    OPENAI_AVAILABLE = False
+    openai = None
 
 
 @dataclass
@@ -102,15 +103,20 @@ class PageTester:
         
         self.query_generator = QueryGenerator()
         
-        # Initialize LayoutLens if possible
-        self.layout_lens = None
-        if LayoutLens and openai_api_key:
+        # Initialize OpenAI client
+        self.openai_client = None
+        self.model = model
+        
+        if OPENAI_AVAILABLE and openai_api_key:
             try:
-                self.layout_lens = LayoutLens(api_key=openai_api_key, model=model)
+                self.openai_client = openai.OpenAI(api_key=openai_api_key)
+                print(f"OpenAI client initialized with model: {model}")
             except Exception as e:
-                print(f"Warning: Could not initialize LayoutLens: {e}")
-        elif not LayoutLens:
-            print("Warning: LayoutLens not available. Install 'openai' package for LLM testing.")
+                print(f"Warning: Could not initialize OpenAI client: {e}")
+        elif not OPENAI_AVAILABLE:
+            print("Warning: OpenAI not available. Install 'openai' package for LLM testing.")
+        else:
+            print("Warning: No OpenAI API key provided.")
     
     def test_page(
         self,
@@ -247,8 +253,8 @@ class PageTester:
         Dict[str, Any]
             Comparison result with screenshots and LLM analysis
         """
-        if not self.layout_lens:
-            raise RuntimeError("LayoutLens not available for comparison")
+        if not self.openai_client:
+            raise RuntimeError("OpenAI client not available for comparison")
         
         if viewport is None:
             viewport = ScreenshotManager.VIEWPORT_PRESETS["desktop"]
@@ -266,12 +272,14 @@ class PageTester:
                 output_name=f"compare_b_{Path(page_b_path).stem}"
             )
         
-        # Compare using LLM
+        # Compare using OpenAI
         try:
-            answer = self.layout_lens.ask(
-                [screenshot_a.path, screenshot_b.path],
-                comparison_query
-            )
+            if self.openai_client:
+                answer = self._compare_screenshots_with_openai(
+                    screenshot_a.path, screenshot_b.path, comparison_query
+                )
+            else:
+                answer = "Error: No OpenAI client available for comparison"
         except Exception as e:
             answer = f"Error during comparison: {e}"
         
@@ -338,8 +346,8 @@ class PageTester:
         """Execute visual tests using screenshots and queries."""
         results = []
         
-        if not self.layout_lens:
-            print("Warning: No LLM available. Skipping visual validation.")
+        if not self.openai_client:
+            print("Warning: No OpenAI client available. Skipping visual validation.")
             return results
         
         for screenshot in screenshots:
@@ -347,7 +355,8 @@ class PageTester:
                 start_time = time.time()
                 
                 try:
-                    answer = self.layout_lens.ask([screenshot.path], query.query)
+                    # Use OpenAI Vision to analyze screenshot
+                    answer = self._analyze_screenshot_with_openai(screenshot.path, query.query)
                     execution_time = time.time() - start_time
                     
                     result = TestResult(
@@ -378,6 +387,74 @@ class PageTester:
                     results.append(result)
         
         return results
+    
+    def _analyze_screenshot_with_openai(self, screenshot_path: str, question: str) -> str:
+        """Analyze screenshot using OpenAI Vision API."""
+        import base64
+        
+        # Read and encode the screenshot
+        with open(screenshot_path, "rb") as image_file:
+            image_data = base64.b64encode(image_file.read()).decode()
+        
+        response = self.openai_client.chat.completions.create(
+            model="gpt-4o",  # Use vision model
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": f"Please analyze this screenshot and answer the question: {question}"},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/png;base64,{image_data}"
+                            }
+                        }
+                    ]
+                }
+            ],
+            max_tokens=500
+        )
+        
+        return response.choices[0].message.content
+    
+    def _compare_screenshots_with_openai(self, screenshot_a: str, screenshot_b: str, question: str) -> str:
+        """Compare two screenshots using OpenAI Vision API."""
+        import base64
+        
+        # Read and encode both screenshots
+        with open(screenshot_a, "rb") as image_file:
+            image_a_data = base64.b64encode(image_file.read()).decode()
+            
+        with open(screenshot_b, "rb") as image_file:
+            image_b_data = base64.b64encode(image_file.read()).decode()
+        
+        response = self.openai_client.chat.completions.create(
+            model="gpt-4o",  # Use vision model
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": f"Please compare these two screenshots and answer: {question}"},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/png;base64,{image_a_data}"
+                            }
+                        },
+                        {"type": "text", "text": "Second image:"},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/png;base64,{image_b_data}"
+                            }
+                        }
+                    ]
+                }
+            ],
+            max_tokens=500
+        )
+        
+        return response.choices[0].message.content
     
     def _is_test_passed(self, result: TestResult) -> bool:
         """Determine if a test result indicates success."""
