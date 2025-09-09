@@ -14,10 +14,11 @@ The system capture screenshots of the current UI state, compares to reference im
 
 The repository now includes a small framework for running natural-language tests:
 
-- `framework.py` provides a `LayoutLens` class that wraps OpenAI's vision models.
-- `screenshot.py` converts HTML snippets into screenshots using Playwright.
-- `benchmark_runner.py` renders the examples from `benchmark.csv` and `benchmark_pairs.csv` and optionally queries the LLM.
-- `benchmark_pairs.csv` adds a simple dataset for cross-layout comparison (e.g., "do these layouts look the same?").
+- `legacy/framework.py` provides the original `LayoutLens` class that wraps OpenAI's vision models.
+- `legacy/screenshot.py` converts HTML snippets into screenshots using Playwright.
+- `legacy/benchmark_runner.py` renders the examples from `benchmarks/benchmark.csv` and `benchmarks/benchmark_pairs.csv` and optionally queries the LLM.
+- `benchmarks/benchmark_pairs.csv` adds a simple dataset for cross-layout comparison (e.g., "do these layouts look the same?").
+- `layoutlens/` provides the enhanced framework with modern API, CLI interface, and comprehensive testing capabilities.
 
 ### Running the benchmark
 
@@ -31,11 +32,11 @@ playwright install chromium
 Generate screenshots only:
 
 ```bash
-python benchmark_runner.py --skip-model
+python legacy/benchmark_runner.py --skip-model
 ```
 
 Run with an OpenAI key to get model answers:
 
 ```bash
-OPENAI_API_KEY=... python benchmark_runner.py
+OPENAI_API_KEY=... python legacy/benchmark_runner.py
 ```

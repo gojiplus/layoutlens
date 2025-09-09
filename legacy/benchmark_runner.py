@@ -20,7 +20,7 @@ except Exception:  # pragma: no cover - if openai not installed
 
 
 def run_single(csv_path: str, out_dir: str, skip_model: bool) -> None:
-    """Run the basic benchmark defined in ``benchmark.csv``."""
+    """Run the basic benchmark defined in ``../benchmarks/benchmark.csv``."""
     rows = list(csv.DictReader(open(csv_path)))
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
@@ -107,8 +107,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--skip-model", action="store_true", help="do not call OpenAI")
     parser.add_argument("--out", default="screenshots", help="output directory for screenshots")
-    parser.add_argument("--benchmark", default="benchmark.csv")
-    parser.add_argument("--pairs", default="benchmark_pairs.csv")
+    parser.add_argument("--benchmark", default="../benchmarks/benchmark.csv")
+    parser.add_argument("--pairs", default="../benchmarks/benchmark_pairs.csv")
     args = parser.parse_args()
 
     if Path(args.benchmark).exists():

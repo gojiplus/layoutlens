@@ -21,7 +21,7 @@ from .query_generator import QueryGenerator, GeneratedQuery
 import sys
 sys.path.append(str(Path(__file__).parent.parent.parent))
 try:
-    from framework import LayoutLens
+    from legacy.framework import LayoutLens
 except ImportError:
     LayoutLens = None
 

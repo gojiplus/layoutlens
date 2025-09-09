@@ -9,10 +9,10 @@ description = "AI-Enabled UI Test System for natural language visual testing"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
-    {name = "LayoutLens Team", email = "team@layoutlens.ai"}
+    {name = "Gaurav Sood", email = "contact@gsood.com"}
 ]
 maintainers = [
-    {name = "LayoutLens Team", email = "team@layoutlens.ai"}
+    {name = "Gaurav Sood", email = "contact@gsood.com"}
 ]
 keywords = ["ui testing", "visual regression", "ai", "computer vision", "web testing", "layout testing"]
 classifiers = [
@@ -64,11 +64,11 @@ test = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/layoutlens/layoutlens"
-"Bug Reports" = "https://github.com/layoutlens/layoutlens/issues"
+"Homepage" = "https://github.com/matmulai/layoutlens"
+"Bug Reports" = "https://github.com/matmulai/layoutlens/issues"
 "Documentation" = "https://layoutlens.readthedocs.io/"
-"Source" = "https://github.com/layoutlens/layoutlens"
-"Changelog" = "https://github.com/layoutlens/layoutlens/blob/main/CHANGELOG.md"
+"Source" = "https://github.com/matmulai/layoutlens"
+"Changelog" = "https://github.com/matmulai/layoutlens/blob/main/CHANGELOG.md"
 
 [project.scripts]
 layoutlens = "layoutlens.cli:main"

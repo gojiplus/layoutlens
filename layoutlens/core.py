@@ -18,7 +18,7 @@ from .config import Config, ViewportConfig
 import sys
 sys.path.append(str(Path(__file__).parent.parent))
 try:
-    from framework import LayoutLens as OriginalLayoutLens
+    from legacy.framework import LayoutLens as OriginalLayoutLens
 except ImportError:
     OriginalLayoutLens = None
 

@@ -18,51 +18,53 @@ playwright install chromium
 
 Generate screenshots only (no AI model calls):
 ```bash
-python benchmark_runner.py --skip-model
+python legacy/benchmark_runner.py --skip-model
 ```
 
 Run full benchmark with OpenAI model:
 ```bash
-OPENAI_API_KEY=your_key_here python benchmark_runner.py
+OPENAI_API_KEY=your_key_here python legacy/benchmark_runner.py
 ```
 
 Run with custom output directory:
 ```bash
-python benchmark_runner.py --out custom_screenshots_dir
+python legacy/benchmark_runner.py --out custom_screenshots_dir
 ```
 
 Run with custom benchmark files:
 ```bash
-python benchmark_runner.py --benchmark custom.csv --pairs custom_pairs.csv
+python legacy/benchmark_runner.py --benchmark benchmarks/custom.csv --pairs benchmarks/custom_pairs.csv
 ```
 
 ## Architecture
 
 ### Core Components
 
-- **`framework.py`**: Contains the `LayoutLens` class that wraps OpenAI's vision models for natural language UI queries
-- **`screenshot.py`**: Provides `html_to_image()` function using Playwright to render HTML files to screenshots  
-- **`benchmark_runner.py`**: Main benchmark execution system that processes CSV test definitions and runs queries
-- **`eval.py`**: Legacy evaluation script (uses older OpenAI API patterns)
+- **`legacy/framework.py`**: Contains the original `LayoutLens` class that wraps OpenAI's vision models for natural language UI queries
+- **`legacy/screenshot.py`**: Provides `html_to_image()` function using Playwright to render HTML files to screenshots  
+- **`legacy/benchmark_runner.py`**: Original benchmark execution system that processes CSV test definitions and runs queries
+- **`legacy/eval.py`**: Legacy evaluation script (uses older OpenAI API patterns)
+- **`layoutlens/`**: Enhanced framework with modern API, testing orchestration, and CLI interface
+- **`scripts/`**: Comprehensive testing and benchmark generation tools
 
 ### Test Data Structure
 
 The system uses CSV files to define tests:
 
-**Single Image Tests (`benchmark.csv`)**:
+**Single Image Tests (`benchmarks/benchmark.csv`)**:
 - `html_path`: Path to HTML file to render
 - `dom_id`: DOM element ID to test
 - `attribute`: Type of attribute (text, box, etc.)
 - `expected_behavior`: Expected behavior (justified, left_aligned, bold, etc.)
 
-**Pairwise Comparison Tests (`benchmark_pairs.csv`)**:
+**Pairwise Comparison Tests (`benchmarks/benchmark_pairs.csv`)**:
 - `html_path_a`, `html_path_b`: Paths to two HTML files to compare
 - `query`: Natural language question (typically "Do these two layouts look the same?")
 - `expected`: Expected answer (yes/no)
 
 ### HTML Test Files
 
-Located in `html/` directory with examples covering:
+Located in `tests/fixtures/sample_pages/legacy_samples/` directory with examples covering:
 - Text alignment (justified, left, right)
 - Text formatting (bold, italic, underlined, colored)
 - Box positioning (left, center, right)

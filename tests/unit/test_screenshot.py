@@ -6,7 +6,7 @@ from pathlib import Path
 
 import sys
 sys.path.append('.')
-from screenshot import html_to_image
+from legacy.screenshot import html_to_image
 
 
 @pytest.mark.unit
@@ -15,7 +15,7 @@ class TestScreenshotUtilities:
     
     def test_html_to_image_success(self, temp_dir):
         """Test successful HTML to image conversion."""
-        with patch('screenshot.sync_playwright') as mock_playwright:
+        with patch('legacy.screenshot.sync_playwright') as mock_playwright:
             # Setup playwright mocks
             mock_playwright_instance = Mock()
             mock_playwright.return_value.__enter__.return_value = mock_playwright_instance
@@ -44,7 +44,7 @@ class TestScreenshotUtilities:
     
     def test_html_to_image_custom_dimensions(self, temp_dir):
         """Test HTML to image with custom width and height."""
-        with patch('screenshot.sync_playwright') as mock_playwright:
+        with patch('legacy.screenshot.sync_playwright') as mock_playwright:
             # Setup mocks
             mock_playwright_instance = Mock()
             mock_playwright.return_value.__enter__.return_value = mock_playwright_instance
@@ -68,7 +68,7 @@ class TestScreenshotUtilities:
     
     def test_html_to_image_creates_output_directory(self, temp_dir):
         """Test that output directory is created if it doesn't exist."""
-        with patch('screenshot.sync_playwright') as mock_playwright:
+        with patch('legacy.screenshot.sync_playwright') as mock_playwright:
             # Setup mocks
             mock_playwright_instance = Mock()
             mock_playwright.return_value.__enter__.return_value = mock_playwright_instance
@@ -105,7 +105,7 @@ class TestScreenshotUtilities:
     
     def test_html_to_image_resolves_relative_paths(self, temp_dir):
         """Test that relative paths are resolved to absolute paths."""
-        with patch('screenshot.sync_playwright') as mock_playwright:
+        with patch('legacy.screenshot.sync_playwright') as mock_playwright:
             # Setup mocks
             mock_playwright_instance = Mock()
             mock_playwright.return_value.__enter__.return_value = mock_playwright_instance
@@ -130,7 +130,7 @@ class TestScreenshotUtilities:
     
     def test_html_to_image_browser_exception_cleanup(self, temp_dir):
         """Test that browser is cleaned up even if an exception occurs."""
-        with patch('screenshot.sync_playwright') as mock_playwright:
+        with patch('legacy.screenshot.sync_playwright') as mock_playwright:
             # Setup mocks
             mock_playwright_instance = Mock()
             mock_playwright.return_value.__enter__.return_value = mock_playwright_instance
@@ -163,7 +163,7 @@ class TestScreenshotUtilities:
     ])
     def test_html_to_image_various_dimensions(self, temp_dir, width, height):
         """Test HTML to image with various viewport dimensions."""
-        with patch('screenshot.sync_playwright') as mock_playwright:
+        with patch('legacy.screenshot.sync_playwright') as mock_playwright:
             # Setup mocks
             mock_playwright_instance = Mock()
             mock_playwright.return_value.__enter__.return_value = mock_playwright_instance

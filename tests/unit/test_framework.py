@@ -6,7 +6,7 @@ import os
 
 import sys
 sys.path.append('.')
-from framework import LayoutLens
+from legacy.framework import LayoutLens
 
 
 @pytest.mark.unit
@@ -15,7 +15,7 @@ class TestLayoutLens:
     
     def test_init_with_api_key(self):
         """Test LayoutLens initialization with API key."""
-        with patch('framework.OpenAI') as mock_openai:
+        with patch('legacy.framework.OpenAI') as mock_openai:
             mock_client = Mock()
             mock_openai.return_value = mock_client
             
