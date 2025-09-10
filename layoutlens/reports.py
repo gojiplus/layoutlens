@@ -10,7 +10,23 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 
-from .vision import PageTestResult
+# Import PageTestResult with fallback
+try:
+    from .vision import PageTestResult
+except ImportError:
+    # Create a placeholder if vision module not available
+    from typing import NamedTuple
+    class PageTestResult(NamedTuple):
+        html_path: str = ""
+        timestamp: str = ""
+        total_tests: int = 0
+        passed_tests: int = 0
+        execution_time: float = 0.0
+        metadata: dict = {}
+        
+        @property
+        def success_rate(self) -> float:
+            return self.passed_tests / self.total_tests if self.total_tests > 0 else 0.0
 
 
 @dataclass

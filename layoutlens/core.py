@@ -37,8 +37,8 @@ try:
     # Import benchmark generator from benchmarks folder
     sys.path.append(str(Path(__file__).parent.parent / "benchmarks"))
     from benchmark_generator import BenchmarkGenerator
-except ImportError as e:
-    print(f"Warning: BenchmarkGenerator not available: {e}")
+except ImportError:
+    # Silently skip - only show warning if user actually tries to use benchmark features
     BenchmarkGenerator = None
 
 
@@ -128,7 +128,7 @@ class LayoutLens:
             self.config.llm.api_key = api_key
         if model != "gpt-4o-mini":
             self.config.llm.model = model
-        if output_dir != "layoutlens_output":
+        if output_dir and output_dir != "layoutlens_output":
             self.config.output.base_dir = output_dir
         
         # Validate configuration
@@ -455,7 +455,7 @@ class LayoutLens:
         >>> print("Benchmark data generated successfully")
         """
         if not self.benchmark_generator:
-            print("BenchmarkGenerator not available. Check dependencies.")
+            print("BenchmarkGenerator not available: benchmark_generator module not found in benchmarks/ directory.")
             return
         
         if output_dir:

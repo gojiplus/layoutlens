@@ -226,6 +226,45 @@ def cmd_regression(args) -> None:
         sys.exit(1)
 
 
+def cmd_info(args) -> None:
+    """Execute info command."""
+    from . import __version__
+    import sys
+    
+    print(f"LayoutLens v{__version__}")
+    print(f"Python: {sys.version.split()[0]}")
+    
+    # Check dependencies
+    try:
+        import openai
+        print(f"OpenAI: {openai.__version__}")
+    except ImportError:
+        print("OpenAI: Not installed")
+    
+    try:
+        import playwright
+        # Playwright doesn't expose __version__ at top level
+        print("Playwright: Installed")
+    except ImportError:
+        print("Playwright: Not installed")
+    
+    # Check API key
+    import os
+    api_key = os.getenv('OPENAI_API_KEY')
+    if api_key:
+        print(f"API Key: Set (***{api_key[-4:]})")
+    else:
+        print("API Key: Not set (set OPENAI_API_KEY environment variable)")
+    
+    # Test basic functionality
+    try:
+        from .core import LayoutLens
+        tester = LayoutLens()
+        print("✓ LayoutLens initialization: OK")
+    except Exception as e:
+        print(f"✗ LayoutLens initialization: Failed ({e})")
+
+
 def cmd_validate(args) -> None:
     """Execute validation command."""
     if args.config:
@@ -349,6 +388,9 @@ Examples:
     regression_parser.add_argument('--viewports', help='Comma-separated viewport names')
     regression_parser.add_argument('--threshold', type=float, default=0.8, help='Success rate threshold')
     
+    # Info command
+    info_parser = subparsers.add_parser('info', help='Show system information and check setup')
+    
     # Validate command
     validate_parser = subparsers.add_parser('validate', help='Validate configuration or test suite')
     validate_group = validate_parser.add_mutually_exclusive_group(required=True)
@@ -371,6 +413,8 @@ Examples:
         cmd_generate(args)
     elif args.command == 'regression':
         cmd_regression(args)
+    elif args.command == 'info':
+        cmd_info(args)
     elif args.command == 'validate':
         cmd_validate(args)
     else:

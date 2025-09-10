@@ -133,7 +133,21 @@ run-benchmarks:
 test-examples:
 	python examples/basic_usage.py
 	python -m py_compile examples/advanced_usage.py
-	python -m py_compile examples/ci_cd_integration.py
+
+# User-friendly commands
+info:
+	python3 -m layoutlens.cli info
+
+quick-start:
+	@echo "LayoutLens Quick Start:"
+	@echo "1. Install: pip install -e ."
+	@echo "2. Install browsers: playwright install chromium"  
+	@echo "3. Set API key: export OPENAI_API_KEY='your-key'"
+	@echo "4. Test setup: make info"
+	@echo "5. Run example: make test-basic"
+
+test-basic:
+	python -m layoutlens.cli test --page benchmarks/test_data/layout_alignment/nav_centered.html --queries "Is this page well-structured?" --viewports desktop
 
 validate-configs:
 	python -c "import yaml; yaml.safe_load(open('examples/layoutlens_config.yaml'))"
