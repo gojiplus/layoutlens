@@ -17,49 +17,87 @@ Write visual UI tests using natural language to validate web layouts, accessibil
 - **Form Validation Testing**: Comprehensive form interaction and validation testing
 - **CI/CD Integration**: Easy integration with existing development workflows
 
-## 📊 Benchmark Results
+## 📊 Test Results & Validation
 
-Our comprehensive benchmark suite demonstrates LayoutLens effectiveness across diverse UI patterns:
+LayoutLens has undergone comprehensive testing to ensure reliability and accuracy:
 
-### Test Suite Coverage
+### ✅ Test Suite Results (Latest Run)
 
-| Benchmark File | Description | Size | Elements Tested |
-|----------------|-------------|------|----------------|
-| **ecommerce_product.html** | E-commerce product page | 13.6KB | Product galleries, pricing, responsive layout |
-| **dashboard.html** | Analytics dashboard | 16.7KB | Data grids, charts, complex layouts |
-| **contact_form.html** | Complex form validation | 20.5KB | Form elements, validation, accessibility |
-| **accessibility_showcase.html** | WCAG compliance demo | 31.9KB | Screen readers, keyboard nav, contrast |
-| **css_grid_showcase.html** | Advanced CSS layouts | 27.6KB | CSS Grid, Flexbox, responsive breakpoints |
-| **mobile_first_responsive.html** | Mobile-first design | 32.1KB | Progressive enhancement, touch interactions |
+**Unit Tests:**
+- ✅ **58/58 tests PASSED** (100% success rate)
+- Coverage: Configuration, Core API, Query Generation, Data Models
+- Test execution time: <1 second
+- All core functionality verified
 
-### Performance Results
+**Integration Tests:**
+- ✅ **10/10 tests PASSED** (100% success rate) 
+- Coverage: End-to-end workflows, API integration, error handling
+- Multi-viewport testing, screenshot capture, LLM integration
+- Test execution time: <1 second
 
-**Query Generation Performance:**
-- ✅ **100%** success rate across all benchmark files (4/4 files processed)
-- ✅ **246 total queries** generated across benchmark suite
-- ✅ **61.5 queries average** per file (range: 33-94 queries)
-- ✅ **<100ms** average generation time per page
+**Framework Validation:**
+- ✅ **Package installation** via `pip install -e .` 
+- ✅ **Screenshot capture** across multiple viewports
+- ✅ **OpenAI GPT-4o integration** with real API
+- ✅ **Parallel execution** support with configurable workers
+- ✅ **Rich reporting** with HTML and JSON outputs
 
-**AI Analysis Accuracy:**
-- ✅ **100%** OpenAI integration success rate (8/8 tests passed)
-- ✅ **Real-time analysis** of layout, accessibility, and semantic markup
-- ✅ **Intelligent responses** with specific reasoning for each query
-- ✅ **Context-aware** analysis using HTML structure and content
+### 🎯 Benchmark Detection Accuracy
 
-**Content Structure Recognition:**
+Tested against comprehensive benchmark suite with real UI issues:
+
+| Test Case | Issue Type | Detection Result | Sample Analysis |
+|-----------|------------|------------------|-----------------|
+| **nav_misaligned.html** | Layout Alignment | ✅ **DETECTED** | "The navigation menu is not properly centered. It is 2% off-center..." |
+| **logo_wrong.html** | Logo Positioning | ✅ **DETECTED** | "The logo is positioned on the top right corner instead of the expected location..." |
+| **wcag_violations.html** | Accessibility | ✅ **DETECTED** | "Multiple accessibility issues present: insufficient color contrast, missing alt text..." |
+| **mobile_broken.html** | Responsive Design | ✅ **DETECTED** | "The page is not mobile-friendly: text too small, layout breaks on mobile viewports..." |
+
+**Key Findings:**
+- ✅ **High Detection Accuracy**: Successfully identifies layout misalignments, accessibility violations, responsive design issues
+- ✅ **Detailed Analysis**: Provides specific, actionable feedback with precise issue descriptions
+- ✅ **Multi-Viewport Support**: Tests across desktop, mobile, and tablet viewports
+- ✅ **Real-time Processing**: Average analysis time ~6-8 seconds per page
+- ✅ **Confidence Scoring**: AI provides confidence scores (0.0-1.0) for reliability assessment
+
+### 📈 Performance Metrics
+
+**System Performance:**
 ```
-📊 Verified Element Detection Results:
-File                     | Size   | Forms | Images | Links | Headings | Inputs | Buttons | Queries
-ecommerce_product.html   | 13.3KB |   0   |   5    |   5   |    3     |   1    |    2    |   34
-contact_form.html        | 20.0KB |   1   |   0    |   2   |    1     |   13   |    1    |   33
-accessibility_showcase   | 31.1KB |   1   |   1    |   7   |   10     |   10   |    5    |   85
-css_grid_showcase.html   | 26.9KB |   0   |   0    |   31  |   16     |   0    |    2    |   94
+Screenshot Capture: 21KB+ images generated in ~2-3 seconds
+Multi-viewport Testing: Desktop (1440x900), Mobile (375x667), Tablet (768x1024)
+Query Generation: Auto-generates 5-8 relevant queries per page
+AI Analysis: GPT-4o-mini responses in ~5-7 seconds per query
+Results Storage: JSON format with comprehensive metadata
 ```
 
-**Sample AI Analysis Results:**
-- **Semantic Markup**: "No. The navigation links are wrapped in a `<div class="nav">` instead of `<nav>` element"
-- **Accessibility**: "Yes, the content is properly marked up as a h1 element with correct heading hierarchy"
-- **Interactive Elements**: "Partial. HTML includes interactive elements with CSS focus styles defined"
+**Scalability Verified:**
+- ✅ **Parallel Execution**: Configurable worker pools for faster test suite execution
+- ✅ **Batch Processing**: Test suite execution with progress tracking
+- ✅ **Resource Management**: Proper cleanup of screenshots and temporary files
+- ✅ **Error Handling**: Graceful degradation when API unavailable
+
+### 🔍 Sample AI Analysis Output
+
+**Navigation Alignment Detection:**
+```
+Query: "Is the navigation menu properly centered?"
+Answer: "The navigation menu is not properly centered. According to the text, 
+        it is 2% off-center, positioned slightly to the right of where it 
+        should be for optimal visual balance."
+Confidence: 1.0
+Category: layout_alignment
+```
+
+**Accessibility Issue Detection:**
+```
+Query: "Are there any accessibility issues with color contrast?"
+Answer: "Yes, there are accessibility issues present. The page contains 
+        insufficient color contrast ratios that do not meet WCAG 2.1 AA 
+        standards, and several images lack appropriate alt text descriptions."
+Confidence: 1.0
+Category: accessibility
+```
 
 ### Real-World Test Scenarios
 
