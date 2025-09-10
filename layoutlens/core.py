@@ -9,9 +9,10 @@ from __future__ import annotations
 import os
 import sys
 import time
+import concurrent.futures
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Union
+from typing import Dict, List, Optional, Any, Union, Callable
 
 from .config import Config, ViewportConfig
 
@@ -23,14 +24,21 @@ OriginalLayoutLens = None
 try:
     from .vision import PageTester, PageTestResult
     from .capture import ScreenshotManager, ScreenshotOptions
-    # Import benchmark generator from benchmarks folder
-    sys.path.append(str(Path(__file__).parent.parent / "benchmarks"))
-    from benchmark_generator import BenchmarkGenerator
-except ImportError:
+except ImportError as e:
+    print(f"Warning: Failed to import vision/capture modules: {e}")
     PageTester = None
     PageTestResult = None
     ScreenshotManager = None
     ScreenshotOptions = None
+
+# Import benchmark generator separately to avoid import errors
+BenchmarkGenerator = None
+try:
+    # Import benchmark generator from benchmarks folder
+    sys.path.append(str(Path(__file__).parent.parent / "benchmarks"))
+    from benchmark_generator import BenchmarkGenerator
+except ImportError as e:
+    print(f"Warning: BenchmarkGenerator not available: {e}")
     BenchmarkGenerator = None
 
 
@@ -148,6 +156,8 @@ class LayoutLens:
                 )
             except Exception as e:
                 print(f"Warning: Could not initialize PageTester: {e}")
+                import traceback
+                traceback.print_exc()
         
         if BenchmarkGenerator:
             try:
@@ -298,13 +308,25 @@ class LayoutLens:
             print(f"Error comparing pages: {e}")
             return None
     
-    def run_test_suite(self, test_suite: Union[str, TestSuite]) -> List[PageTestResult]:
+    def run_test_suite(
+        self, 
+        test_suite: Union[str, TestSuite],
+        parallel: bool = False,
+        max_workers: int = 4,
+        progress_callback: Optional[Callable[[str, int, int], None]] = None
+    ) -> List[PageTestResult]:
         """Run a complete test suite.
         
         Parameters
         ----------
         test_suite : str or TestSuite
             Path to YAML test suite file or TestSuite instance
+        parallel : bool, default False
+            Execute tests in parallel for faster execution
+        max_workers : int, default 4
+            Maximum number of parallel workers
+        progress_callback : callable, optional
+            Callback function for progress updates: callback(message, current, total)
             
         Returns
         -------
@@ -328,30 +350,16 @@ class LayoutLens:
             print("Could not load test suite")
             return []
         
-        results = []
         print(f"Running test suite: {suite.name}")
         print(f"Test cases: {len(suite.test_cases)}")
         
-        for i, test_case in enumerate(suite.test_cases):
-            print(f"\n[{i+1}/{len(suite.test_cases)}] Running: {test_case.name}")
-            
-            try:
-                result = self.test_page(
-                    html_path=test_case.html_path,
-                    queries=test_case.queries,
-                    viewports=test_case.viewports,
-                    auto_generate_queries=len(test_case.queries) == 0
-                )
-                
-                if result:
-                    results.append(result)
-                    print(f"  Completed: {result.passed_tests}/{result.total_tests} tests passed")
-                else:
-                    print(f"  Failed to test {test_case.name}")
-                    
-            except Exception as e:
-                print(f"  Error: {e}")
-                continue
+        # Choose execution mode
+        if parallel and len(suite.test_cases) > 1:
+            print(f"Executing in parallel with {max_workers} workers")
+            results = self._execute_parallel(suite, max_workers, progress_callback)
+        else:
+            print("Executing sequentially")
+            results = self._execute_sequential(suite, progress_callback)
         
         # Generate summary
         if results:
@@ -527,6 +535,83 @@ class LayoutLens:
         Path(save_path).parent.mkdir(parents=True, exist_ok=True)
         with open(save_path, 'w', encoding='utf-8') as f:
             yaml.dump(data, f, default_flow_style=False, indent=2)
+    
+    def _execute_sequential(self, suite: TestSuite, progress_callback: Optional[Callable[[str, int, int], None]] = None) -> List[PageTestResult]:
+        """Execute test cases sequentially."""
+        results = []
+        
+        for i, test_case in enumerate(suite.test_cases):
+            if progress_callback:
+                progress_callback(f"Test {test_case.name}", i, len(suite.test_cases))
+            
+            print(f"  [{i+1}/{len(suite.test_cases)}] {test_case.name}")
+            
+            try:
+                result = self.test_page(
+                    html_path=test_case.html_path,
+                    queries=test_case.queries,
+                    viewports=test_case.viewports,
+                    auto_generate_queries=len(test_case.queries) == 0
+                )
+                
+                if result:
+                    results.append(result)
+                    print(f"    Passed: {result.passed_tests}/{result.total_tests}")
+                else:
+                    print(f"    Error: Test execution failed")
+                    
+            except Exception as e:
+                print(f"    Error: {e}")
+                continue
+        
+        return results
+    
+    def _execute_parallel(self, suite: TestSuite, max_workers: int, progress_callback: Optional[Callable[[str, int, int], None]] = None) -> List[PageTestResult]:
+        """Execute test cases in parallel."""
+        results = []
+        
+        def execute_test_case(test_case: TestCase) -> Optional[PageTestResult]:
+            """Execute a single test case (for parallel execution)."""
+            try:
+                result = self.test_page(
+                    html_path=test_case.html_path,
+                    queries=test_case.queries,
+                    viewports=test_case.viewports,
+                    auto_generate_queries=len(test_case.queries) == 0
+                )
+                return result
+                
+            except Exception as e:
+                print(f"Error in parallel execution for {test_case.name}: {e}")
+                return None
+        
+        # Execute test cases in parallel
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all test cases
+            future_to_test = {
+                executor.submit(execute_test_case, test_case): test_case 
+                for test_case in suite.test_cases
+            }
+            
+            # Collect results as they complete
+            for i, future in enumerate(concurrent.futures.as_completed(future_to_test)):
+                test_case = future_to_test[future]
+                
+                if progress_callback:
+                    progress_callback(f"Test {test_case.name}", i, len(suite.test_cases))
+                
+                try:
+                    result = future.result()
+                    if result:
+                        results.append(result)
+                        print(f"  Completed {test_case.name}: {result.passed_tests}/{result.total_tests}")
+                    else:
+                        print(f"  Failed {test_case.name}")
+                        
+                except Exception as e:
+                    print(f"  Error in {test_case.name}: {e}")
+        
+        return results
     
     # Backward compatibility with original LayoutLens
     def ask(self, images: List[str], query: str) -> str:

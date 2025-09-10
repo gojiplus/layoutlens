@@ -1,0 +1,151 @@
+{
+  "benchmark_info": {
+    "category": "accessibility",
+    "version": "1.0",
+    "total_tests": 2,
+    "created": "2025-01-09",
+    "description": "Ground truth answers for accessibility compliance test cases"
+  },
+  "test_cases": {
+    "wcag_compliant.html": {
+      "queries": {
+        "Does this page meet WCAG accessibility guidelines?": {
+          "expected": "yes",
+          "confidence_threshold": 0.9,
+          "reasoning": "Page implements all major WCAG AA requirements",
+          "measurable_criteria": "Skip links, proper labels, focus indicators, color contrast 4.5:1+",
+          "issue_severity": null
+        },
+        "Are all form fields properly labeled?": {
+          "expected": "yes",
+          "confidence_threshold": 0.9,
+          "reasoning": "All inputs have associated labels with proper for/id relationships",
+          "measurable_criteria": "label[for] matches input[id] for all form controls"
+        },
+        "Is the color contrast sufficient for readability?": {
+          "expected": "yes",
+          "confidence_threshold": 0.8,
+          "reasoning": "Text colors provide high contrast ratios exceeding WCAG standards",
+          "measurable_criteria": "Body text: 16.9:1, headings: 12.6:1 (both exceed 4.5:1 minimum)"
+        },
+        "Are focus indicators visible and clear?": {
+          "expected": "yes",
+          "confidence_threshold": 0.9,
+          "reasoning": "All interactive elements have prominent 3px focus outlines",
+          "measurable_criteria": "outline: 3px solid with high contrast colors and offset"
+        },
+        "Are touch targets appropriately sized?": {
+          "expected": "yes",
+          "confidence_threshold": 0.8,
+          "reasoning": "All interactive elements meet 44px minimum touch target size",
+          "measurable_criteria": "min-height: 44px on all buttons and inputs"
+        },
+        "Is keyboard navigation supported?": {
+          "expected": "yes",
+          "confidence_threshold": 0.8,
+          "reasoning": "Skip link and proper focus management enable keyboard-only use",
+          "measurable_criteria": "Skip link present, all interactive elements focusable"
+        }
+      },
+      "metadata": {
+        "intentional_issue": false,
+        "example_type": "positive",
+        "difficulty": "medium",
+        "wcag_level": "AA",
+        "accessibility_features": [
+          "skip_link",
+          "proper_labels", 
+          "focus_indicators",
+          "color_contrast",
+          "touch_targets",
+          "keyboard_navigation"
+        ]
+      }
+    },
+    "wcag_violations.html": {
+      "queries": {
+        "Does this page meet WCAG accessibility guidelines?": {
+          "expected": "no",
+          "confidence_threshold": 0.9,
+          "reasoning": "Page contains multiple critical WCAG violations",
+          "measurable_criteria": "Poor contrast, missing labels, no focus styles, improper hierarchy",
+          "issue_severity": "critical"
+        },
+        "Are all form fields properly labeled?": {
+          "expected": "no",
+          "confidence_threshold": 0.9,
+          "reasoning": "Form inputs use placeholder text instead of proper labels",
+          "measurable_criteria": "No label elements, only placeholder attributes (WCAG violation)"
+        },
+        "Is the color contrast sufficient for readability?": {
+          "expected": "no",
+          "confidence_threshold": 0.9,
+          "reasoning": "Text colors provide poor contrast ratios below WCAG minimums",
+          "measurable_criteria": "Body text: 2.85:1, headings: 1.61:1 (both below 4.5:1 minimum)"
+        },
+        "Are focus indicators visible and clear?": {
+          "expected": "no",
+          "confidence_threshold": 0.8,
+          "reasoning": "No focus styles defined for any interactive elements",
+          "measurable_criteria": "No CSS focus pseudo-selectors or outline styles"
+        },
+        "Are touch targets appropriately sized?": {
+          "expected": "no",
+          "confidence_threshold": 0.9,
+          "reasoning": "Interactive elements are too small for reliable touch interaction",
+          "measurable_criteria": "Buttons: 24px height, inputs: 20px height (both below 44px minimum)"
+        },
+        "Is the heading hierarchy logical?": {
+          "expected": "no",
+          "confidence_threshold": 0.8,
+          "reasoning": "Page starts with h3 instead of h1, violating hierarchy rules",
+          "measurable_criteria": "First heading is h3, no h1 or h2 present"
+        },
+        "Does the page include alternative text for images?": {
+          "expected": "no",
+          "confidence_threshold": 0.9,
+          "reasoning": "Images present without alt attributes",
+          "measurable_criteria": "img elements without alt attributes"
+        }
+      },
+      "metadata": {
+        "intentional_issue": true,
+        "issue_type": "accessibility_violations",
+        "example_type": "negative", 
+        "difficulty": "easy",
+        "wcag_level": "fails_AA",
+        "violations": [
+          "poor_color_contrast",
+          "missing_form_labels",
+          "no_focus_indicators",
+          "small_touch_targets",
+          "improper_heading_hierarchy",
+          "missing_alt_text",
+          "no_skip_link"
+        ],
+        "fixes_required": [
+          "increase color contrast to 4.5:1 minimum",
+          "replace placeholders with proper label elements",
+          "add focus styles with 3px outlines",
+          "increase touch targets to 44px minimum",
+          "fix heading hierarchy (h1 → h2 → h3)",
+          "add alt text to all images",
+          "add skip link for keyboard users"
+        ]
+      }
+    }
+  },
+  "validation_config": {
+    "confidence_thresholds": {
+      "high_confidence": 0.9,
+      "medium_confidence": 0.7, 
+      "low_confidence": 0.5
+    },
+    "accuracy_target": 0.95,
+    "wcag_criteria": {
+      "color_contrast_minimum": 4.5,
+      "touch_target_minimum": 44,
+      "focus_outline_minimum": 3
+    }
+  }
+}

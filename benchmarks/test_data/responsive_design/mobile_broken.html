@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mobile-Broken Responsive Design</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 0; 
+            font-size: 12px; /* Too small for mobile - VIOLATION */
+        }
+        .container { 
+            width: 1200px; /* Fixed width causes horizontal scroll - VIOLATION */
+            margin: 0 auto; 
+            padding: 1rem; 
+        }
+        .header { 
+            background: #2c3e50; 
+            color: white; 
+            padding: 1rem; 
+            width: 100%;
+        }
+        .nav { 
+            display: flex; 
+            gap: 0.2rem; /* Too small gaps */
+        }
+        .nav a { 
+            color: white; 
+            text-decoration: none; 
+            padding: 2px 4px; /* Tiny touch targets - VIOLATION */
+            font-size: 10px; /* Too small */
+            height: 20px; /* Below 44px minimum - VIOLATION */
+        }
+        .grid { 
+            display: grid; 
+            grid-template-columns: repeat(3, 1fr); /* Never changes - VIOLATION */
+            gap: 0.5rem; 
+            margin: 2rem 0; 
+        }
+        .card { 
+            border: 1px solid #ddd; 
+            padding: 0.5rem; 
+            background: #f9f9f9; 
+            min-width: 300px; /* Causes overflow on mobile - VIOLATION */
+        }
+        .btn { 
+            background: #007bff; 
+            color: white; 
+            padding: 2px 4px; /* Too small for touch - VIOLATION */
+            border: none; 
+            font-size: 8px; /* Unreadable on mobile */
+            height: 16px; /* Too small - VIOLATION */
+            cursor: pointer;
+        }
+        
+        /* No mobile media queries - VIOLATION */
+        /* Content will overflow and be unusable on mobile */
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <h1>Broken Mobile Design</h1>
+            <nav class="nav">
+                <a href="#home">Home</a>
+                <a href="#about">About</a>
+                <a href="#services">Services</a>
+                <a href="#contact">Contact</a>
+            </nav>
+        </div>
+    </header>
+    
+    <main class="container">
+        <div class="grid">
+            <div class="card">
+                <h2>Service 1</h2>
+                <p>This text is too small to read on mobile devices.</p>
+                <button class="btn">Tiny Button</button>
+            </div>
+            <div class="card">
+                <h2>Service 2</h2>
+                <p>Fixed width layout causes horizontal scrolling on mobile.</p>
+                <button class="btn">Too Small</button>
+            </div>
+            <div class="card">
+                <h2>Service 3</h2>
+                <p>Touch targets are too small to tap accurately on touch screens.</p>
+                <button class="btn">Unusable</button>
+            </div>
+        </div>
+    </main>
+</body>
+</html>

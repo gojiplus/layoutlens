@@ -11,7 +11,6 @@ from typing import List, Optional
 
 from .config import Config, create_default_config
 from .core import LayoutLens
-from .test_runner import TestRunner
 
 
 def cmd_test(args) -> None:
@@ -41,15 +40,19 @@ def cmd_test(args) -> None:
     
     elif args.suite:
         # Test suite
-        runner = TestRunner(tester.config)
-        session = runner.run_test_suite(
-            test_suite=args.suite,
-            parallel=args.parallel,
-            max_workers=args.workers
-        )
+        results = tester.run_test_suite(args.suite)
         
-        print(f"Session completed: {session.success_rate:.2%} success rate")
-        if session.success_rate < 0.8:
+        if results:
+            # Calculate overall success rate
+            total_tests = sum(r.total_tests for r in results)
+            total_passed = sum(r.passed_tests for r in results)
+            success_rate = total_passed / total_tests if total_tests > 0 else 0
+            
+            print(f"Suite completed: {success_rate:.2%} success rate")
+            if success_rate < 0.8:
+                sys.exit(1)
+        else:
+            print("Test suite execution failed")
             sys.exit(1)
     
     else:
@@ -131,27 +134,95 @@ def cmd_generate(args) -> None:
 
 def cmd_regression(args) -> None:
     """Execute regression testing command."""
+    import glob
+    from .core import TestCase, TestSuite
+    
     config_path = args.config if args.config else None
-    runner = TestRunner(Config(config_path) if config_path else None)
+    tester = LayoutLens(config=config_path)
     
     patterns = args.patterns.split(',') if args.patterns else ["*.html"]
-    viewports = args.viewports.split(',') if args.viewports else None
+    viewports = args.viewports.split(',') if args.viewports else ["desktop"]
     
     print(f"Running regression tests:")
     print(f"  Baseline: {args.baseline}")
     print(f"  Current: {args.current}")
     print(f"  Patterns: {patterns}")
     
-    session = runner.run_regression_tests(
-        baseline_dir=args.baseline,
-        current_dir=args.current,
-        test_patterns=patterns,
-        viewports=viewports
+    # Find matching files
+    baseline_files = []
+    current_files = []
+    
+    for pattern in patterns:
+        baseline_matches = glob.glob(str(Path(args.baseline) / pattern))
+        current_matches = glob.glob(str(Path(args.current) / pattern))
+        
+        baseline_files.extend(baseline_matches)
+        current_files.extend(current_matches)
+    
+    # Match baseline and current files
+    test_pairs = []
+    for baseline_file in baseline_files:
+        baseline_name = Path(baseline_file).name
+        current_file = None
+        
+        for cf in current_files:
+            if Path(cf).name == baseline_name:
+                current_file = cf
+                break
+        
+        if current_file:
+            test_pairs.append((baseline_file, current_file))
+        else:
+            print(f"Warning: No current version found for {baseline_name}")
+    
+    if not test_pairs:
+        print("No matching file pairs found for regression testing")
+        sys.exit(1)
+    
+    # Create test cases for comparison
+    test_cases = []
+    for i, (baseline_file, current_file) in enumerate(test_pairs):
+        file_name = Path(baseline_file).name
+        test_case = TestCase(
+            name=f"Regression_{file_name}",
+            html_path=current_file,  # Test the current version
+            queries=[
+                f"Does this layout match the baseline design?",
+                f"Are there any visual regressions compared to the baseline?",
+                f"Is the layout consistent with the previous version?"
+            ],
+            viewports=viewports,
+            metadata={
+                "baseline_file": baseline_file,
+                "current_file": current_file,
+                "test_type": "regression"
+            }
+        )
+        test_cases.append(test_case)
+    
+    # Create regression test suite
+    regression_suite = TestSuite(
+        name="Regression_Tests",
+        description=f"Regression testing: {args.baseline} vs {args.current}",
+        test_cases=test_cases,
+        metadata={
+            "baseline_dir": args.baseline,
+            "current_dir": args.current,
+            "test_patterns": patterns
+        }
     )
     
-    print(f"Regression testing completed: {session.success_rate:.2%} success rate")
-    if session.success_rate < args.threshold:
-        print(f"Regression test failed: success rate {session.success_rate:.2%} below threshold {args.threshold:.2%}")
+    # Execute regression tests
+    results = tester.run_test_suite(regression_suite)
+    
+    # Calculate success rate
+    total_tests = sum(r.total_tests for r in results)
+    total_passed = sum(r.passed_tests for r in results)
+    success_rate = total_passed / total_tests if total_tests > 0 else 0
+    
+    print(f"Regression testing completed: {success_rate:.2%} success rate")
+    if success_rate < args.threshold:
+        print(f"Regression test failed: success rate {success_rate:.2%} below threshold {args.threshold:.2%}")
         sys.exit(1)
 
 

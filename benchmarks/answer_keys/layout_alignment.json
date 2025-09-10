@@ -1,0 +1,139 @@
+{
+  "benchmark_info": {
+    "category": "layout_alignment",
+    "version": "1.0",
+    "total_tests": 4,
+    "created": "2025-01-09",
+    "description": "Ground truth answers for layout alignment test cases"
+  },
+  "test_cases": {
+    "nav_centered.html": {
+      "queries": {
+        "Is the navigation menu properly centered?": {
+          "expected": "yes",
+          "confidence_threshold": 0.9,
+          "reasoning": "Navigation uses perfect centering with transform: translateX(-50%)",
+          "measurable_criteria": "left: 50% with translateX(-50%) for precise centering",
+          "issue_severity": null
+        },
+        "Does the navigation appear professionally aligned?": {
+          "expected": "yes",
+          "confidence_threshold": 0.8,
+          "reasoning": "Perfect alignment demonstrates professional design standards",
+          "measurable_criteria": "No visual offset from center line"
+        },
+        "Are the navigation links evenly spaced?": {
+          "expected": "yes",
+          "confidence_threshold": 0.8,
+          "reasoning": "Consistent margin: 0 1rem provides even spacing",
+          "measurable_criteria": "Equal margins between all navigation items"
+        }
+      },
+      "metadata": {
+        "intentional_issue": false,
+        "example_type": "positive",
+        "difficulty": "easy"
+      }
+    },
+    "nav_misaligned.html": {
+      "queries": {
+        "Is the navigation menu properly centered?": {
+          "expected": "no",
+          "confidence_threshold": 0.9,
+          "reasoning": "Navigation is positioned 2% off-center to the right",
+          "measurable_criteria": "left: 52% instead of 50% - creates subtle misalignment",
+          "issue_severity": "medium"
+        },
+        "Does the navigation appear professionally aligned?": {
+          "expected": "no",
+          "confidence_threshold": 0.7,
+          "reasoning": "Subtle misalignment affects professional appearance",
+          "measurable_criteria": "Visible offset when compared to true center"
+        },
+        "Is there a noticeable alignment issue?": {
+          "expected": "yes",
+          "confidence_threshold": 0.8,
+          "reasoning": "2% offset is subtle but should be detectable by AI vision",
+          "measurable_criteria": "Measurable deviation from perfect centering"
+        }
+      },
+      "metadata": {
+        "intentional_issue": true,
+        "issue_type": "layout_precision",
+        "example_type": "negative",
+        "difficulty": "medium",
+        "fix_required": "change left: 52% to left: 50%"
+      }
+    },
+    "logo_correct.html": {
+      "queries": {
+        "Is the company logo positioned correctly?": {
+          "expected": "yes",
+          "confidence_threshold": 0.9,
+          "reasoning": "Logo is correctly positioned on the left side following web conventions",
+          "measurable_criteria": "Logo has order: 0 (first position) in flexbox layout",
+          "issue_severity": null
+        },
+        "Does the header follow standard web layout patterns?": {
+          "expected": "yes",
+          "confidence_threshold": 0.8,
+          "reasoning": "Logo left, navigation right follows 95% of professional websites",
+          "measurable_criteria": "Standard F-pattern layout with logo at top-left"
+        },
+        "Is the brand identity properly positioned?": {
+          "expected": "yes",
+          "confidence_threshold": 0.9,
+          "reasoning": "Logo placement supports brand recognition and user expectations",
+          "measurable_criteria": "Logo in primary visual hierarchy position"
+        }
+      },
+      "metadata": {
+        "intentional_issue": false,
+        "example_type": "positive",
+        "difficulty": "easy"
+      }
+    },
+    "logo_wrong.html": {
+      "queries": {
+        "Is the company logo positioned correctly?": {
+          "expected": "no",
+          "confidence_threshold": 0.9,
+          "reasoning": "Logo is incorrectly positioned on the right side, violating web conventions",
+          "measurable_criteria": "Logo has order: 1 (second position), navigation has order: 0",
+          "issue_severity": "high"
+        },
+        "Does the header follow standard web layout patterns?": {
+          "expected": "no",
+          "confidence_threshold": 0.8,
+          "reasoning": "Reversed layout violates user expectations and web standards",
+          "measurable_criteria": "Navigation-first layout goes against F-pattern reading"
+        },
+        "Would users expect the logo in this position?": {
+          "expected": "no",
+          "confidence_threshold": 0.9,
+          "reasoning": "Users expect logos on the left based on web conventions",
+          "measurable_criteria": "Violates established UX patterns"
+        }
+      },
+      "metadata": {
+        "intentional_issue": true,
+        "issue_type": "layout_conventions",
+        "example_type": "negative",
+        "difficulty": "easy",
+        "fix_required": "swap order values - logo order: 0, nav order: 1"
+      }
+    }
+  },
+  "validation_config": {
+    "confidence_thresholds": {
+      "high_confidence": 0.9,
+      "medium_confidence": 0.7,
+      "low_confidence": 0.5
+    },
+    "accuracy_target": 0.95,
+    "semantic_matching": {
+      "positive_indicators": ["yes", "correct", "proper", "good", "appropriate", "well"],
+      "negative_indicators": ["no", "incorrect", "wrong", "poor", "inappropriate", "misaligned", "violates"]
+    }
+  }
+}

@@ -1,0 +1,166 @@
+{
+  "benchmark_info": {
+    "category": "responsive_design",
+    "version": "1.0", 
+    "total_tests": 2,
+    "created": "2025-01-09",
+    "description": "Ground truth answers for responsive design test cases"
+  },
+  "test_cases": {
+    "mobile_friendly.html": {
+      "queries": {
+        "Does the layout work well on mobile devices?": {
+          "expected": "yes",
+          "confidence_threshold": 0.9,
+          "reasoning": "Layout adapts properly with mobile-first responsive design",
+          "measurable_criteria": "Media queries, flexible grid, appropriate touch targets",
+          "issue_severity": null
+        },
+        "Are touch targets appropriately sized for mobile?": {
+          "expected": "yes",
+          "confidence_threshold": 0.9,
+          "reasoning": "All interactive elements meet 44px minimum touch target size",
+          "measurable_criteria": "min-height: 44px on buttons and links"
+        },
+        "Is the text readable without horizontal scrolling?": {
+          "expected": "yes",
+          "confidence_threshold": 0.8,
+          "reasoning": "Responsive design prevents horizontal scroll on mobile viewports",
+          "measurable_criteria": "No fixed widths, proper viewport meta tag, flexible containers"
+        },
+        "Does the navigation adapt appropriately for mobile?": {
+          "expected": "yes", 
+          "confidence_threshold": 0.8,
+          "reasoning": "Navigation stacks vertically on mobile with larger touch targets",
+          "measurable_criteria": "flex-direction: column in mobile media query"
+        },
+        "Does the grid layout adjust for different screen sizes?": {
+          "expected": "yes",
+          "confidence_threshold": 0.8,
+          "reasoning": "CSS Grid auto-adjusts from 3 columns to 1 column on mobile",
+          "measurable_criteria": "grid-template-columns changes from auto-fit to 1fr on mobile"
+        }
+      },
+      "metadata": {
+        "intentional_issue": false,
+        "example_type": "positive",
+        "difficulty": "medium",
+        "responsive_features": [
+          "mobile_first_design",
+          "flexible_grid",
+          "appropriate_breakpoints",
+          "touch_friendly_targets",
+          "readable_font_sizes",
+          "adaptive_navigation"
+        ]
+      }
+    },
+    "mobile_broken.html": {
+      "queries": {
+        "Does the layout work well on mobile devices?": {
+          "expected": "no",
+          "confidence_threshold": 0.9,
+          "reasoning": "Fixed width layout causes horizontal scrolling and poor mobile experience",
+          "measurable_criteria": "Fixed 1200px width, no responsive breakpoints, tiny text",
+          "issue_severity": "critical"
+        },
+        "Are touch targets appropriately sized for mobile?": {
+          "expected": "no",
+          "confidence_threshold": 0.9,
+          "reasoning": "Interactive elements are far too small for reliable touch interaction",
+          "measurable_criteria": "Buttons: 16px height, links: 20px height (both well below 44px minimum)"
+        },
+        "Is the text readable without horizontal scrolling?": {
+          "expected": "no",
+          "confidence_threshold": 0.9,
+          "reasoning": "Fixed width container forces horizontal scrolling on mobile",
+          "measurable_criteria": "width: 1200px fixed container causes viewport overflow"
+        },
+        "Is the font size appropriate for mobile reading?": {
+          "expected": "no",
+          "confidence_threshold": 0.9,
+          "reasoning": "Font sizes are too small for comfortable mobile reading",
+          "measurable_criteria": "Body text: 12px, button text: 8px (below 16px mobile minimum)"
+        },
+        "Does the content adapt to smaller screens?": {
+          "expected": "no",
+          "confidence_threshold": 0.8,
+          "reasoning": "No responsive design - layout identical across all screen sizes",
+          "measurable_criteria": "No media queries, fixed grid columns, no adaptive behavior"
+        },
+        "Are interactive elements usable on touch devices?": {
+          "expected": "no",
+          "confidence_threshold": 0.9,
+          "reasoning": "Touch targets too small and closely spaced for accurate tapping",
+          "measurable_criteria": "Navigation links: 2px padding, buttons: 2px×4px padding"
+        }
+      },
+      "metadata": {
+        "intentional_issue": true,
+        "issue_type": "responsive_failures",
+        "example_type": "negative",
+        "difficulty": "easy",
+        "violations": [
+          "fixed_width_layout",
+          "no_media_queries", 
+          "tiny_touch_targets",
+          "unreadable_font_sizes",
+          "horizontal_scrolling",
+          "no_adaptive_behavior"
+        ],
+        "fixes_required": [
+          "replace fixed width with flexible containers (max-width + %)",
+          "add mobile breakpoints with media queries",
+          "increase touch targets to 44px minimum",
+          "increase font sizes to 16px minimum on mobile",
+          "implement responsive grid system",
+          "add mobile-specific navigation patterns"
+        ]
+      }
+    }
+  },
+  "viewport_specific_tests": {
+    "mobile_friendly.html": {
+      "mobile_portrait": {
+        "expected_layout": "single_column",
+        "navigation_style": "stacked_vertical",
+        "touch_targets": "44px_minimum",
+        "font_size": "16px_minimum"
+      },
+      "tablet_portrait": {
+        "expected_layout": "flexible_grid",
+        "navigation_style": "horizontal_compact", 
+        "content_adaptation": "moderate_scaling"
+      },
+      "desktop": {
+        "expected_layout": "multi_column_grid",
+        "navigation_style": "full_horizontal",
+        "content_density": "optimal"
+      }
+    },
+    "mobile_broken.html": {
+      "mobile_portrait": {
+        "expected_issues": ["horizontal_scroll", "tiny_text", "unusable_buttons"],
+        "usability_score": "poor"
+      },
+      "tablet_portrait": {
+        "expected_issues": ["content_overflow", "small_targets"],
+        "usability_score": "poor"
+      }
+    }
+  },
+  "validation_config": {
+    "confidence_thresholds": {
+      "high_confidence": 0.9,
+      "medium_confidence": 0.7,
+      "low_confidence": 0.5
+    },
+    "accuracy_target": 0.95,
+    "responsive_criteria": {
+      "touch_target_minimum": 44,
+      "mobile_font_minimum": 16,
+      "tablet_breakpoint": 768,
+      "desktop_breakpoint": 1024
+    }
+  }
+}

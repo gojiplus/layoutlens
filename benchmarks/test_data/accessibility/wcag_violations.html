@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WCAG Violations Example</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            color: #999999; /* Poor contrast: 2.85:1 - VIOLATION */ 
+            background: #ffffff;
+            margin: 2rem;
+        }
+        h1 { 
+            color: #cccccc; /* Very poor contrast: 1.61:1 - VIOLATION */ 
+        }
+        .form-group { margin: 1rem 0; }
+        /* Missing label styles - VIOLATION */
+        input[type="text"], input[type="email"] { 
+            width: 100%; 
+            padding: 4px; /* Too small - VIOLATION */
+            border: 1px solid #ddd; 
+            font-size: 12px; /* Too small for readability */
+            height: 20px; /* Below 44px minimum - VIOLATION */
+        }
+        /* No focus styles - VIOLATION */
+        .btn { 
+            background: #e0e0e0; /* Poor contrast button - VIOLATION */
+            color: #cccccc; /* Poor contrast text - VIOLATION */
+            padding: 4px 8px; /* Too small - VIOLATION */
+            border: none; 
+            font-size: 10px; /* Too small */
+            cursor: pointer;
+            height: 24px; /* Below minimum touch target */
+        }
+        img { 
+            width: 200px; 
+            height: 150px; 
+            /* No alt text will be provided - VIOLATION */
+        }
+    </style>
+</head>
+<body>
+    <!-- No skip link - VIOLATION -->
+    
+    <!-- Improper heading hierarchy - VIOLATION -->
+    <h3>Contact Form</h3> <!-- Should be h1 -->
+    
+    <form>
+        <!-- Unlabeled form fields - VIOLATION -->
+        <div class="form-group">
+            <input type="text" name="name" placeholder="Name"> <!-- No label - VIOLATION -->
+        </div>
+        
+        <div class="form-group">
+            <input type="email" name="email" placeholder="Email"> <!-- No label - VIOLATION -->
+        </div>
+        
+        <!-- Image without alt text - VIOLATION -->
+        <img src="contact-image.jpg">
+        
+        <button type="submit" class="btn">Submit</button>
+    </form>
+</body>
+</html>

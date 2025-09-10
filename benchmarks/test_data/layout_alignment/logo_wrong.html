@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wrong Logo Positioning</title>
+    <style>
+        .header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            padding: 1rem 2rem; 
+            background: #fff;
+            border-bottom: 1px solid #eee;
+        }
+        .logo { 
+            font-size: 1.5rem; 
+            font-weight: bold; 
+            color: #2c3e50; 
+            order: 1; /* Logo second (right side) - WRONG! */
+        }
+        .nav { 
+            order: 0; /* Navigation first (left side) - violates conventions */
+        }
+        .nav a { 
+            margin: 0 1rem; 
+            text-decoration: none; 
+            color: #333; 
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <nav class="nav">
+            <a href="#home">Home</a>
+            <a href="#about">About</a>
+            <a href="#contact">Contact</a>
+        </nav>
+        <div class="logo">CompanyLogo</div>
+    </header>
+    <main>
+        <h1>Incorrect Logo Placement</h1>
+        <p>Logo is incorrectly positioned on the right side, violating web conventions.</p>
+    </main>
+</body>
+</html>

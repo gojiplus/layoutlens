@@ -1,0 +1,100 @@
+{
+  "benchmark_info": {
+    "category": "ui_components",
+    "version": "1.0",
+    "total_tests": 1,
+    "created": "2025-01-09",
+    "description": "Ground truth answers for UI component design test cases"
+  },
+  "test_cases": {
+    "form_well_designed.html": {
+      "queries": {
+        "Is this form well-designed and user-friendly?": {
+          "expected": "yes",
+          "confidence_threshold": 0.9,
+          "reasoning": "Form follows best practices for UX, accessibility, and visual design",
+          "measurable_criteria": "Proper labels, clear hierarchy, adequate spacing, visual feedback",
+          "issue_severity": null
+        },
+        "Are all form fields properly labeled?": {
+          "expected": "yes",
+          "confidence_threshold": 0.9,
+          "reasoning": "Every input has an associated label with proper for/id relationships",
+          "measurable_criteria": "label[for] attributes match input[id] attributes"
+        },
+        "Is the visual hierarchy clear and logical?": {
+          "expected": "yes",
+          "confidence_threshold": 0.8,
+          "reasoning": "Form uses consistent typography, spacing, and visual weight to guide users",
+          "measurable_criteria": "H1 title, grouped form sections, clear button prominence"
+        },
+        "Are interactive elements appropriately sized?": {
+          "expected": "yes",
+          "confidence_threshold": 0.8,
+          "reasoning": "All inputs and buttons meet minimum size requirements for usability",
+          "measurable_criteria": "Input min-height: 44px, button min-height: 48px"
+        },
+        "Does the form provide helpful user guidance?": {
+          "expected": "yes",
+          "confidence_threshold": 0.8,
+          "reasoning": "Help text and visual cues guide users through form completion",
+          "measurable_criteria": "Help text under inputs, required field indicators, clear button text"
+        },
+        "Is the form accessible to users with disabilities?": {
+          "expected": "yes",
+          "confidence_threshold": 0.9,
+          "reasoning": "Form implements accessibility best practices for screen readers and keyboard users",
+          "measurable_criteria": "Proper labels, focus indicators, color contrast, keyboard navigation"
+        },
+        "Does the form have appropriate visual feedback?": {
+          "expected": "yes",
+          "confidence_threshold": 0.8,
+          "reasoning": "Clear focus states and hover effects provide visual feedback for interactions",
+          "measurable_criteria": "Focus outlines, border color changes, hover states on buttons"
+        },
+        "Is the form layout clean and organized?": {
+          "expected": "yes",
+          "confidence_threshold": 0.8,
+          "reasoning": "Consistent spacing, alignment, and visual grouping create clean layout",
+          "measurable_criteria": "Even margins, aligned form fields, logical content flow"
+        }
+      },
+      "metadata": {
+        "intentional_issue": false,
+        "example_type": "positive",
+        "difficulty": "medium",
+        "design_principles": [
+          "clear_labeling",
+          "visual_hierarchy",
+          "accessibility",
+          "user_guidance",
+          "appropriate_sizing",
+          "visual_feedback",
+          "clean_layout"
+        ],
+        "accessibility_features": [
+          "proper_labels",
+          "focus_indicators",
+          "help_text",
+          "keyboard_navigation",
+          "color_contrast",
+          "required_field_indicators"
+        ]
+      }
+    }
+  },
+  "validation_config": {
+    "confidence_thresholds": {
+      "high_confidence": 0.9,
+      "medium_confidence": 0.7,
+      "low_confidence": 0.5
+    },
+    "accuracy_target": 0.95,
+    "design_criteria": {
+      "touch_target_minimum": 44,
+      "color_contrast_minimum": 4.5,
+      "focus_outline_minimum": 3,
+      "form_spacing_minimum": 16
+    }
+  }
+}

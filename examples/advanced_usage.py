@@ -4,8 +4,10 @@ This module demonstrates advanced features and patterns for
 comprehensive UI testing scenarios.
 """
 
+import os
+import time
 from layoutlens import LayoutLens, Config
-from layoutlens.test_runner import TestRunner
+from layoutlens.config import ViewportConfig
 
 
 def custom_configuration_example():
@@ -29,26 +31,23 @@ def custom_configuration_example():
     config.test.max_workers = 6
     config.test.focus_areas = ["layout", "accessibility"]  # Focus on specific areas
     
-    # Custom viewports
-    config.add_viewport(ViewportConfig(
+    # Add custom viewport
+    ultrawide_viewport = ViewportConfig(
         name="ultrawide",
         width=3440,
         height=1440,
         device_scale_factor=1.0,
         is_mobile=False,
         has_touch=False
-    ))
+    )
+    config.viewports.append(ultrawide_viewport)
     
-    # Custom query libraries
-    config.add_custom_queries("e-commerce", [
-        "Is the shopping cart icon visible and accessible?",
-        "Are product prices clearly displayed?",
-        "Is the checkout process intuitive?",
-        "Are product images high quality and properly sized?"
-    ])
+    # Note: Custom query libraries can be handled in test logic
+    # as the current API doesn't have add_custom_queries method
+    print("Custom viewport added: ultrawide (3440x1440)")
     
-    # Save configuration for reuse
-    config.save_to_file("custom_config.yaml")
+    # Configuration can be saved manually to YAML
+    print("Configuration customized successfully")
     
     # Use the custom configuration
     tester = LayoutLens(config=config)

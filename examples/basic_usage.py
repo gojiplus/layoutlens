@@ -1,5 +1,6 @@
 """Basic usage examples for LayoutLens framework."""
 
+import os
 from layoutlens import LayoutLens
 
 # Example 1: Basic page testing
@@ -9,13 +10,13 @@ def basic_page_test():
     # Initialize LayoutLens
     tester = LayoutLens()
     
-    # Test a page with custom queries
+    # Test a page with custom queries using real benchmark file
     result = tester.test_page(
-        html_path="examples/sample_page.html",
+        html_path="benchmarks/test_data/layout_alignment/nav_centered.html",
         queries=[
-            "Is the navigation menu visible?",
-            "Is the logo properly positioned?",
-            "Are the buttons clearly visible?"
+            "Is the navigation menu properly centered?",
+            "Does the layout look professional?", 
+            "Are the navigation links evenly spaced?"
         ],
         viewports=["desktop", "mobile_portrait"]
     )
@@ -33,10 +34,10 @@ def compare_pages_example():
     
     tester = LayoutLens()
     
-    # Compare before and after versions
+    # Compare two real benchmark pages
     result = tester.compare_pages(
-        page_a_path="examples/before.html",
-        page_b_path="examples/after.html",
+        page_a_path="benchmarks/test_data/layout_alignment/nav_centered.html",
+        page_b_path="benchmarks/test_data/layout_alignment/nav_misaligned.html", 
         query="Are the layouts visually consistent?"
     )
     
@@ -54,7 +55,7 @@ def auto_query_test():
     
     # Let LayoutLens analyze the page and generate appropriate queries
     result = tester.test_page(
-        html_path="examples/sample_page.html",
+        html_path="benchmarks/test_data/ui_components/form_well_designed.html",
         auto_generate_queries=True,  # This is the default
         viewports=["desktop"]
     )
@@ -77,22 +78,22 @@ def test_suite_example():
         description="Comprehensive homepage testing",
         test_cases=[
             {
-                "name": "Desktop Homepage",
-                "html_path": "examples/homepage.html",
+                "name": "Desktop Navigation",
+                "html_path": "benchmarks/test_data/layout_alignment/nav_centered.html",
                 "queries": [
-                    "Is the header navigation clearly visible?",
-                    "Is the hero section prominent?",
-                    "Are the call-to-action buttons visible?"
+                    "Is the navigation properly centered?",
+                    "Does the layout look professional?",
+                    "Are navigation elements well-spaced?"
                 ],
                 "viewports": ["desktop"]
             },
             {
-                "name": "Mobile Homepage",
-                "html_path": "examples/homepage.html",
+                "name": "Mobile Form",
+                "html_path": "benchmarks/test_data/ui_components/form_well_designed.html", 
                 "queries": [
-                    "Is the mobile menu accessible?",
-                    "Is the content readable on mobile?",
-                    "Are touch targets appropriately sized?"
+                    "Is the form mobile-friendly?",
+                    "Are touch targets appropriately sized?",
+                    "Is the content readable on mobile?"
                 ],
                 "viewports": ["mobile_portrait"]
             }

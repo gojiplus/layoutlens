@@ -1,90 +1,90 @@
 name: "Sample Website Test Suite"
-description: "Comprehensive testing for a sample website across multiple viewports"
+description: "Comprehensive testing for clean benchmark test cases across multiple viewports"
 
 test_cases:
-  - name: "Homepage Desktop"
-    html_path: "html/sample_homepage.html"
+  - name: "Navigation Alignment Desktop"
+    html_path: "benchmarks/test_data/layout_alignment/nav_centered.html"
     queries:
-      - "Is the main navigation menu clearly visible at the top?"
-      - "Is the company logo prominently displayed?"
-      - "Are the hero section call-to-action buttons visible?"
-      - "Is the footer content properly organized?"
+      - "Is the navigation menu properly centered?"
+      - "Does the layout look professional and polished?"
+      - "Are navigation elements evenly spaced?"
+      - "Is the visual hierarchy clear?"
     viewports: ["desktop", "desktop_large"]
     expected_results:
-      "navigation": "visible"
-      "logo": "prominent"
-      "cta_buttons": "visible"
+      "navigation": "centered"
+      "professional": "yes"
+      "spacing": "even"
     metadata:
       priority: "high"
-      test_type: "smoke"
+      test_type: "layout_alignment"
 
-  - name: "Homepage Mobile"
-    html_path: "html/sample_homepage.html"
+  - name: "Navigation Alignment Mobile"
+    html_path: "benchmarks/test_data/layout_alignment/nav_centered.html"
     queries:
-      - "Is there a hamburger menu for mobile navigation?"
-      - "Is the content readable without horizontal scrolling?"
-      - "Are touch targets appropriately sized (at least 44px)?"
-      - "Is the mobile layout properly stacked vertically?"
-    viewports: ["mobile_portrait", "mobile_landscape"]
+      - "Does the navigation adapt well to mobile?"
+      - "Are touch targets appropriately sized?"
+      - "Is the content readable on mobile devices?"
+      - "Is the mobile layout properly organized?"
+    viewports: ["mobile_portrait", "tablet_portrait"]
     expected_results:
-      "mobile_menu": "present"
-      "readability": "good"
+      "mobile_nav": "adapted"
       "touch_targets": "appropriate"
+      "readability": "good"
     metadata:
       priority: "high"
       test_type: "responsive"
 
-  - name: "Product Page Desktop"
-    html_path: "html/product_page.html"
-    queries:
-      - "Are product images clearly displayed?"
-      - "Is the product description easily readable?"
-      - "Is the 'Add to Cart' button prominent?"
-      - "Are product reviews visible if present?"
-    viewports: ["desktop"]
-    expected_results:
-      "product_images": "clear"
-      "description": "readable"
-      "add_to_cart": "prominent"
-    metadata:
-      priority: "medium"
-      test_type: "functional"
-
-  - name: "Contact Form"
-    html_path: "html/contact_form.html"
+  - name: "Well-Designed Form"
+    html_path: "benchmarks/test_data/ui_components/form_well_designed.html"
     queries:
       - "Are all form fields properly labeled?"
-      - "Is the submit button clearly visible?"
-      - "Are required field indicators present?"
       - "Is the form layout clean and organized?"
+      - "Are required fields clearly indicated?"
+      - "Is the submit button prominent and accessible?"
     viewports: ["desktop", "tablet_portrait"]
     expected_results:
       "form_labels": "proper"
-      "submit_button": "visible"
+      "layout": "clean"
       "required_fields": "indicated"
+    metadata:
+      priority: "high"
+      test_type: "ui_components"
+
+  - name: "Accessibility Compliance"
+    html_path: "benchmarks/test_data/accessibility/wcag_compliant.html"
+    queries:
+      - "Does the page meet accessibility standards?"
+      - "Is the color contrast sufficient?"
+      - "Are focus indicators visible?"
+      - "Is keyboard navigation supported?"
+    viewports: ["desktop", "mobile_portrait"]
+    expected_results:
+      "accessibility": "compliant"
+      "contrast": "sufficient"
+      "focus": "visible"
     metadata:
       priority: "high"
       test_type: "accessibility"
 
-  - name: "About Page Content"
-    html_path: "html/about_page.html"
+  - name: "Responsive Design Test"
+    html_path: "benchmarks/test_data/responsive_design/mobile_friendly.html"
     queries:
-      - "Is the page heading clearly visible?"
-      - "Is the text content well-formatted and readable?"
-      - "Are any images properly aligned with text?"
-      - "Is the page layout consistent with other pages?"
-    viewports: ["desktop", "tablet_portrait"]
+      - "Does the layout adapt to different screen sizes?"
+      - "Are touch targets sized appropriately?"
+      - "Is the content readable without zooming?"
+      - "Does the design work well on mobile?"
+    viewports: ["mobile_portrait", "tablet_portrait", "desktop"]
     expected_results:
-      "heading": "clear"
-      "text_formatting": "good"
-      "image_alignment": "proper"
+      "responsive": "adaptive"
+      "touch_targets": "appropriate"
+      "mobile_friendly": "yes"
     metadata:
-      priority: "low"
-      test_type: "content"
+      priority: "medium"
+      test_type: "responsive_design"
 
 metadata:
-  version: "1.0"
-  created_by: "LayoutLens Framework"
-  test_environment: "staging"
+  version: "2.0"
+  created_by: "LayoutLens Framework v2"
+  test_environment: "clean_benchmark_suite"
   browser_requirements: "Chrome, Firefox, Safari"
-  notes: "This is a sample test suite demonstrating various test scenarios"
+  notes: "Updated test suite using clean benchmark structure with paired good/bad examples"

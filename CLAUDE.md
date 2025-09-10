@@ -25,13 +25,13 @@ export OPENAI_API_KEY="your_key_here"
 python -c "
 from layoutlens import LayoutLens
 tester = LayoutLens()
-result = tester.test_page('benchmarks/ecommerce_product.html', 
+result = tester.test_page('benchmarks/test_data/layout_alignment/nav_centered.html', 
                          queries=['Is the navigation properly aligned?'])
 print(f'Success rate: {result.success_rate:.1%}')
 "
 
 # Run ground truth benchmark evaluation
-python scripts/testing/ground_truth_evaluator.py --output-report results.json
+python benchmarks/evaluation/evaluator.py --answer-keys benchmarks/answer_keys --results layoutlens_output/results
 ```
 
 ### CLI Usage
@@ -45,8 +45,10 @@ layoutlens --help
 - **`layoutlens/core.py`**: Main LayoutLens class with user-friendly API
 - **`layoutlens/config.py`**: Configuration management (YAML + env vars)
 - **`layoutlens/cli.py`**: Command-line interface
-- **`scripts/testing/`**: Testing infrastructure (PageTester, ScreenshotManager, QueryGenerator)
-- **`scripts/benchmark/`**: Benchmark generation tools
+- **`layoutlens/vision/`**: PageTester and visual analysis components
+- **`layoutlens/capture/`**: Screenshot capture with Playwright
+- **`layoutlens/analysis/`**: Query generation and DOM analysis
+- **`benchmarks/`**: Clean benchmark structure with test data and evaluation
 
 ### Key Features Implemented
 - ✅ **Multi-viewport screenshot capture** (desktop, mobile, tablet)
@@ -85,8 +87,9 @@ The package includes a comprehensive benchmark with objectively measurable test 
   - Calculated contrast ratios (1.07:1, 1.61:1, 1.92:1, etc.)
 
 ### Benchmark Files Location
-- **`benchmarks/ground_truth_tests/`**: Test cases with embedded ground truth metadata
-- **`benchmarks/ground_truth_tests/GROUND_TRUTH_ANSWERS.md`**: Expected answers documentation
+- **`benchmarks/test_data/`**: Clean HTML test files organized by category
+- **`benchmarks/answer_keys/`**: JSON files with expected answers and evaluation criteria
+- **`benchmarks/evaluation/`**: Automated evaluation framework with semantic answer matching
 
 ## Testing and Development
 
@@ -99,7 +102,7 @@ pip install pytest
 pytest tests/unit/test_config.py tests/unit/test_core.py -v
 
 # Run ground truth evaluation
-python scripts/testing/ground_truth_evaluator.py
+python benchmarks/evaluation/evaluator.py
 ```
 
 ### Example Test Cases
@@ -127,11 +130,15 @@ layoutlens/
 ├── layoutlens/           # Core package
 │   ├── core.py          # Main LayoutLens class  
 │   ├── config.py        # Configuration system
-│   └── cli.py           # Command line interface
-├── scripts/             # Testing utilities
-│   ├── testing/         # Page testing infrastructure
-│   └── benchmark/       # Benchmark generation
-├── benchmarks/          # HTML test files + ground truth
+│   ├── cli.py           # Command line interface
+│   ├── vision/          # PageTester and visual analysis
+│   ├── capture/         # Screenshot capture
+│   └── analysis/        # Query generation
+├── benchmarks/          # Clean benchmark structure
+│   ├── generators/      # Scripts to create test data
+│   ├── test_data/       # HTML test files by category
+│   ├── answer_keys/     # Expected answers in JSON
+│   └── evaluation/      # Evaluation framework
 ├── docs/               # Documentation
 ├── examples/           # Usage examples
 └── tests/              # Test suite

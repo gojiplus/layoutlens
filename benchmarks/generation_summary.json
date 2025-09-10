@@ -1,0 +1,20 @@
+{
+  "generated": 9,
+  "categories": {
+    "layout_alignment": 4,
+    "accessibility": 2,
+    "responsive_design": 2,
+    "ui_components": 1
+  },
+  "files": [
+    "benchmarks_new/test_data/layout_alignment/nav_centered.html",
+    "benchmarks_new/test_data/layout_alignment/nav_misaligned.html",
+    "benchmarks_new/test_data/layout_alignment/logo_correct.html",
+    "benchmarks_new/test_data/layout_alignment/logo_wrong.html",
+    "benchmarks_new/test_data/accessibility/wcag_compliant.html",
+    "benchmarks_new/test_data/accessibility/wcag_violations.html",
+    "benchmarks_new/test_data/responsive_design/mobile_friendly.html",
+    "benchmarks_new/test_data/responsive_design/mobile_broken.html",
+    "benchmarks_new/test_data/ui_components/form_well_designed.html"
+  ]
+}

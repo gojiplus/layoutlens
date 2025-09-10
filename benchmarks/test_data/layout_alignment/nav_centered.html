@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Centered Navigation - Good Example</title>
+    <style>
+        .header { 
+            background: #f0f0f0; 
+            padding: 1rem; 
+            text-align: center; 
+        }
+        .nav { 
+            display: inline-block; 
+            position: relative;
+            left: 50%;
+            transform: translateX(-50%); /* Perfect centering */
+        }
+        .nav a { 
+            margin: 0 1rem; 
+            text-decoration: none; 
+            color: #333; 
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <nav class="nav">
+            <a href="#home">Home</a>
+            <a href="#about">About</a>
+            <a href="#services">Services</a>
+            <a href="#contact">Contact</a>
+        </nav>
+    </header>
+    <main>
+        <h1>Perfect Navigation Centering</h1>
+        <p>This navigation is precisely centered using transform: translateX(-50%)</p>
+    </main>
+</body>
+</html>

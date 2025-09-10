@@ -46,8 +46,12 @@ class TestPageTestingWorkflow:
         mock_openai.OpenAI.return_value = mock_client
         
         # Mock OpenAI response
+        mock_choice = Mock()
+        mock_message = Mock()
+        mock_message.content = "Yes, the layout looks correct."
+        mock_choice.message = mock_message
         mock_response = Mock()
-        mock_response.choices[0].message.content = "Yes, the layout looks correct."
+        mock_response.choices = [mock_choice]
         mock_client.chat.completions.create.return_value = mock_response
         
         mock_screenshot_manager = Mock()
@@ -97,8 +101,12 @@ class TestPageTestingWorkflow:
         mock_openai.OpenAI.return_value = mock_client
         
         # Mock OpenAI response
+        mock_choice = Mock()
+        mock_message = Mock()
+        mock_message.content = "The layout is responsive."
+        mock_choice.message = mock_message
         mock_response = Mock()
-        mock_response.choices[0].message.content = "The layout is responsive."
+        mock_response.choices = [mock_choice]
         mock_client.chat.completions.create.return_value = mock_response
         
         mock_screenshot_manager = Mock()
@@ -158,8 +166,12 @@ class TestPageTestingWorkflow:
         mock_openai.OpenAI.return_value = mock_client
         
         # Mock OpenAI response
+        mock_choice = Mock()
+        mock_message = Mock()
+        mock_message.content = "The element looks correct."
+        mock_choice.message = mock_message
         mock_response = Mock()
-        mock_response.choices[0].message.content = "The element looks correct."
+        mock_response.choices = [mock_choice]
         mock_client.chat.completions.create.return_value = mock_response
         
         mock_screenshot_manager = Mock()
@@ -213,8 +225,12 @@ class TestPageTestingWorkflow:
         mock_openai.OpenAI.return_value = mock_client
         
         # Mock OpenAI response
+        mock_choice = Mock()
+        mock_message = Mock()
+        mock_message.content = "The layouts look very similar with minor differences."
+        mock_choice.message = mock_message
         mock_response = Mock()
-        mock_response.choices[0].message.content = "The layouts look very similar with minor differences."
+        mock_response.choices = [mock_choice]
         mock_client.chat.completions.create.return_value = mock_response
         
         mock_screenshot_manager = Mock()
@@ -378,18 +394,18 @@ class TestLayoutLensEndToEnd:
         # Verify result
         assert result["answer"] == "The layouts are substantially different."
     
-    @patch('layoutlens.core.TestRunner')
-    def test_layoutlens_run_test_suite_integration(self, mock_runner_class, temp_dir):
+    @patch('layoutlens.core.PageTester')
+    def test_layoutlens_run_test_suite_integration(self, mock_page_tester_class, temp_dir):
         """Test LayoutLens run_test_suite integration."""
-        mock_runner = Mock()
-        mock_runner_class.return_value = mock_runner
+        mock_page_tester = Mock()
+        mock_page_tester_class.return_value = mock_page_tester
         
-        # Mock test session result
-        mock_session = Mock()
-        mock_session.success_rate = 0.9
-        mock_session.total_tests = 50
-        mock_session.total_passed = 45
-        mock_runner.run_test_suite.return_value = mock_session
+        # Mock test results
+        mock_result = Mock()
+        mock_result.success_rate = 0.9
+        mock_result.total_tests = 10
+        mock_result.passed_tests = 9
+        mock_page_tester.test_page.return_value = mock_result
         
         # Create test suite file
         test_suite_content = """
@@ -409,13 +425,12 @@ class TestLayoutLensEndToEnd:
         tester = LayoutLens(api_key="test-key")
         results = tester.run_test_suite(str(suite_file))
         
-        # Verify TestRunner was used
-        mock_runner_class.assert_called_once_with(tester.config)
-        mock_runner.run_test_suite.assert_called_once_with(str(suite_file))
+        # Verify PageTester was used
+        mock_page_tester.test_page.assert_called_once()
         
         # Verify results
-        assert len(results) == 1  # Should return list of results
-        assert results[0] == mock_session
+        assert len(results) == 1  # Should return list of PageTestResult
+        assert results[0].success_rate == 0.9
     
     @patch('layoutlens.vision.page_tester.openai.OpenAI', side_effect=Exception("API Error"))
     def test_error_handling_in_integration(self, mock_openai_client, temp_dir, sample_html_file):
@@ -428,7 +443,7 @@ class TestLayoutLensEndToEnd:
         )
         
         # Should not raise exception during initialization
-        assert page_tester.layout_lens is None
+        assert page_tester.openai_client is None
         
         # Should handle testing without LLM
         with patch('layoutlens.vision.page_tester.ScreenshotManager') as mock_screenshot_class:
