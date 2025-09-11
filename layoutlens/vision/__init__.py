@@ -1,9 +1,17 @@
-"""AI vision integration for LayoutLens.
+"""
+Enhanced vision analysis components for LayoutLens.
 
-This module provides OpenAI vision integration for visual validation
-and page testing orchestration.
+This module provides the core vision analysis capabilities including
+screenshot analysis, URL capture, and layout comparison.
 """
 
-from .page_tester import PageTester, PageTestResult, TestResult
+from .analyzer import VisionAnalyzer
+from .capture import URLCapture, BatchCapture
+from .comparator import LayoutComparator
 
-__all__ = ["PageTester", "PageTestResult", "TestResult"]
+__all__ = [
+    "VisionAnalyzer",
+    "URLCapture", 
+    "BatchCapture",
+    "LayoutComparator"
+]
