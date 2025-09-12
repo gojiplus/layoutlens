@@ -5,10 +5,11 @@ This directory contains working examples demonstrating LayoutLens usage patterns
 ## 📁 File Organization
 
 ### Core Examples
-- **`basic_usage.py`** - Essential patterns for getting started
-- **`advanced_usage.py`** - Complex testing scenarios and patterns  
+- **`basic_usage.py`** - Essential patterns for getting started with the LayoutLens API
+- **`advanced_usage.py`** - Complex analysis scenarios and patterns
+- **`simple_api_usage.py`** - Quick examples of common use cases  
 - **`layoutlens_config.yaml`** - Complete configuration reference
-- **`sample_test_suite.yaml`** - Working test suite using clean benchmark files
+- **`sample_test_suite.yaml`** - Sample test configuration
 
 ## 🚀 Quick Start
 
@@ -22,61 +23,84 @@ cd examples/
 python basic_usage.py
 ```
 
-### 2. Test Suite Execution
+### 2. Simple API Examples
 ```bash
-# Run the sample test suite
-python -c "
-from layoutlens import LayoutLens
-tester = LayoutLens()
-results = tester.run_test_suite('examples/sample_test_suite.yaml')
-print(f'Suite completed: {len(results)} test cases')
-"
+# Quick API demonstrations
+python simple_api_usage.py
 ```
 
+### 3. Advanced Scenarios
+```bash
+# Complex analysis workflows
+python advanced_usage.py
+```
 
 ## 📋 Example Categories
 
 ### Basic Examples (`basic_usage.py`)
-1. **Single Page Testing** - Test HTML files with custom queries
-2. **Page Comparison** - Compare two pages visually  
-3. **Auto-Generated Queries** - Let LayoutLens generate appropriate test queries
-4. **Test Suite Creation** - Programmatically create and run test suites
+1. **Single Page Analysis** - Analyze HTML files or URLs with natural language queries
+2. **Website Analysis** - Test live websites
+3. **Design Comparison** - Compare two different layouts
+4. **Batch Analysis** - Analyze multiple pages efficiently
+5. **Built-in Checks** - Use specialized accessibility and mobile-friendly checks
 
-### Advanced Examples (`advanced_usage.py`)  
-1. **Custom Configuration** - Advanced configuration options
-2. **Multi-Page Workflows** - Test related pages together
-3. **Accessibility Focus** - Accessibility-specific testing patterns
-4. **Responsive Design Validation** - Multi-viewport testing strategies
-5. **Performance Testing** - Performance-aware visual testing
-6. **Brand Consistency** - Brand guideline compliance testing
+### Simple API Examples (`simple_api_usage.py`)
+1. **URL Analysis** - Basic website analysis
+2. **Mobile Analysis** - Mobile-specific checks
+3. **Accessibility Checks** - WCAG compliance validation
+4. **Before/After Comparisons** - Design change analysis
+5. **Batch Processing** - Multiple page analysis
+6. **Context-Aware Analysis** - Analysis with specific context
 
+### Advanced Examples (`advanced_usage.py`)
+1. **Context-Rich Analysis** - Analysis with detailed context information
+2. **Multi-Viewport Testing** - Test across different screen sizes
+3. **Specialized Workflows** - Accessibility, mobile, and conversion optimization
+4. **Performance Optimization** - Efficient large-scale testing
+5. **Error Handling** - Robust error handling patterns
 
 ## 🔧 Configuration
 
-The `layoutlens_config.yaml` file demonstrates all available configuration options:
+The examples demonstrate various ways to configure LayoutLens:
 
-- **LLM Settings** - Model selection, API configuration, temperature
-- **Screenshot Options** - Format, quality, viewport settings
-- **Test Execution** - Parallel execution, focus areas, error handling  
-- **Output Configuration** - Directory structure, format options
-- **Viewport Definitions** - Mobile, tablet, desktop configurations
-- **Custom Query Libraries** - Pre-defined query sets by category
+```python
+from layoutlens import LayoutLens
 
-## 📊 Real Test Data
+# Basic initialization
+lens = LayoutLens()
 
-All examples use **real benchmark HTML files** from the clean `benchmarks/` structure:
+# With custom API key
+lens = LayoutLens(api_key="your-key")
 
-- `benchmarks/test_data/layout_alignment/nav_centered.html` - Perfect navigation centering
-- `benchmarks/test_data/accessibility/wcag_compliant.html` - WCAG AA compliance
-- `benchmarks/test_data/ui_components/form_well_designed.html` - Professional form design
-- `benchmarks/test_data/responsive_design/mobile_friendly.html` - Mobile-first responsive design
+# With custom model
+lens = LayoutLens(model="gpt-4o")
+
+# With custom output directory
+lens = LayoutLens(output_dir="custom_output")
+```
+
+## 📊 API Methods Demonstrated
+
+All examples use the actual LayoutLens API methods:
+
+### Core Analysis
+- `analyze(source, query, viewport="desktop", context=None)` - Analyze a page or screenshot
+- `compare(sources, query, context=None)` - Compare multiple pages
+- `analyze_batch(sources, queries, viewport="desktop", context=None)` - Batch analysis
+
+### Built-in Checks  
+- `check_accessibility(source)` - Accessibility compliance
+- `check_mobile_friendly(source)` - Mobile usability
+- `check_conversion_optimization(source)` - Conversion optimization
 
 ## ⚡ Running Examples
 
 ### Prerequisites
 ```bash
-# Install LayoutLens in development mode
-pip install -e .
+# Install LayoutLens
+pip install layoutlens
+
+# Install browser for screenshots
 playwright install chromium
 
 # Set required environment variable
@@ -88,71 +112,77 @@ export OPENAI_API_KEY="your-openai-api-key"
 # Basic patterns
 python examples/basic_usage.py
 
-# Advanced scenarios  
-python examples/advanced_usage.py
+# Simple API usage
+python examples/simple_api_usage.py
 
-# CI/CD integration
-python examples/ci_cd_integration_simple.py
+# Advanced scenarios
+python examples/advanced_usage.py
 ```
 
-### Test Suite Example
-```bash
-# Using the sample test suite
-python -c "
+### Example Analysis
+```python
 from layoutlens import LayoutLens
-tester = LayoutLens()
 
-# Load and run the sample suite
-results = tester.run_test_suite('examples/sample_test_suite.yaml')
+# Initialize
+lens = LayoutLens()
 
-# Display results
-if results:
-    total_tests = sum(r.total_tests for r in results)
-    total_passed = sum(r.passed_tests for r in results)
-    success_rate = total_passed / total_tests
-    print(f'Test suite completed: {success_rate:.1%} success rate')
-else:
-    print('Test suite execution failed')
-"
+# Analyze a page
+result = lens.analyze(
+    source="https://example.com",
+    query="Is this page user-friendly and accessible?"
+)
+
+print(f"Answer: {result.answer}")
+print(f"Confidence: {result.confidence:.1%}")
 ```
 
 ## 🛠️ Customization
 
 ### Adding New Examples
 
-1. **Use Real Files**: Reference actual files from `benchmarks/` directory
-2. **Working Imports**: Only import modules that exist in the current codebase
-3. **Error Handling**: Include proper error handling and status reporting
-4. **Documentation**: Add clear docstrings and comments
+1. **Use Real Sources**: Reference actual URLs or files
+2. **Proper Error Handling**: Include try/catch blocks
+3. **Clear Documentation**: Add descriptive docstrings
+4. **API Compliance**: Use only existing API methods
 
-### Configuration Customization
-
-The examples use the default configuration, but you can customize:
-
+### Custom Analysis Context
 ```python
-from layoutlens import LayoutLens, Config
+# Add context for more targeted analysis
+context = {
+    "user_type": "elderly_users", 
+    "purpose": "accessibility_audit",
+    "business_context": "healthcare_website"
+}
 
-# Load custom configuration
-tester = LayoutLens(config="examples/layoutlens_config.yaml")
-
-# Or create configuration programmatically
-config = Config()
-config.llm.model = "gpt-4o"  # Use more powerful model
-tester = LayoutLens(config=config)
+result = lens.analyze(
+    source="https://example.com",
+    query="Is this suitable for elderly users?",
+    context=context
+)
 ```
 
 ## 📈 Expected Results
 
-When running these examples with the provided benchmark files, you should see:
+When running these examples, you should see:
 
-- **High success rates** on well-formed HTML files
-- **Detailed AI analysis** with specific feedback
-- **Multi-viewport screenshots** captured successfully
-- **Performance metrics** showing processing time and confidence scores
+- **AI-powered analysis** with natural language feedback
+- **Confidence scores** indicating reliability
+- **Detailed reasoning** explaining the assessment
+- **Screenshots** automatically captured and stored
+- **Multi-viewport support** for responsive testing
 
 The examples demonstrate LayoutLens's ability to:
-- ✅ Detect layout alignment issues
-- ✅ Validate accessibility compliance
-- ✅ Analyze responsive design effectiveness  
-- ✅ Generate relevant test queries automatically
+- ✅ Analyze layouts with natural language queries
+- ✅ Compare different designs objectively
+- ✅ Check accessibility and mobile-friendliness
+- ✅ Process multiple pages efficiently
 - ✅ Provide actionable feedback for UI improvements
+
+## 🔗 Real-World Usage
+
+These examples can be adapted for:
+- **CI/CD Integration** - Automated UI testing in pipelines
+- **Design Reviews** - Systematic design evaluation
+- **Accessibility Audits** - WCAG compliance checking
+- **A/B Testing** - Comparing design variations
+- **Quality Assurance** - UI regression testing

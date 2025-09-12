@@ -252,7 +252,7 @@ def cmd_info(args) -> None:
     import os
     api_key = os.getenv('OPENAI_API_KEY')
     if api_key:
-        print(f"API Key: Set (***{api_key[-4:]})")
+        print("API Key: Set")
     else:
         print("API Key: Not set (set OPENAI_API_KEY environment variable)")
     

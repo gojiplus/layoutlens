@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "layoutlens"
-version = "1.0.1"
+version = "1.0.2"
 description = "AI-powered UI testing framework with natural language visual validation"
 readme = "README.md"
 license = "MIT"
