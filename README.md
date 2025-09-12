@@ -2,7 +2,7 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Build Status](https://github.com/gojiplus/layoutlens/workflows/tests/badge.svg)](https://github.com/gojiplus/layoutlens/actions)
+[![Test](https://github.com/gojiplus/layoutlens/actions/workflows/test.yml/badge.svg)](https://github.com/gojiplus/layoutlens/actions/workflows/test.yml)
 [![Documentation Status](https://readthedocs.org/projects/layoutlens/badge/?version=latest)](https://layoutlens.readthedocs.io/en/latest/?badge=latest)
 [![PyPI version](https://badge.fury.io/py/layoutlens.svg)](https://badge.fury.io/py/layoutlens)
 
