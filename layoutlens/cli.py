@@ -61,21 +61,27 @@ def cmd_test(args) -> None:
 
 def cmd_compare(args) -> None:
     """Execute compare command."""
-    config_path = args.config if args.config else None
-    tester = LayoutLens(config=config_path, api_key=args.api_key, output_dir=args.output)
+    try:
+        tester = LayoutLens(api_key=args.api_key, output_dir=args.output)
+    except Exception as e:
+        print(f"Error initializing LayoutLens: {e}")
+        sys.exit(1)
     
     print(f"Comparing: {args.page_a} vs {args.page_b}")
-    result = tester.compare_pages(
-        page_a_path=args.page_a,
-        page_b_path=args.page_b,
-        viewport=args.viewport,
-        query=args.query
-    )
     
-    if result:
-        print(f"Comparison result: {result['answer']}")
-    else:
-        print("Comparison failed")
+    try:
+        result = tester.compare(
+            sources=[args.page_a, args.page_b],
+            query=args.query
+        )
+        
+        print(f"Comparison result: {result.answer}")
+        print(f"Confidence: {result.confidence:.1%}")
+        if hasattr(result, 'reasoning'):
+            print(f"Reasoning: {result.reasoning}")
+            
+    except Exception as e:
+        print(f"Comparison failed: {e}")
         sys.exit(1)
 
 
@@ -134,7 +140,8 @@ def cmd_generate(args) -> None:
 def cmd_regression(args) -> None:
     """Execute regression testing command."""
     import glob
-    from .core import TestCase, TestSuite
+    # Test suite functionality not implemented yet
+    # from .api.core import LayoutLens
     
     config_path = args.config if args.config else None
     tester = LayoutLens(config=config_path)
@@ -257,7 +264,7 @@ def cmd_info(args) -> None:
     
     # Test basic functionality
     try:
-        from .core import LayoutLens
+        from .api.core import LayoutLens
         tester = LayoutLens()
         print("✓ LayoutLens initialization: OK")
     except Exception as e:

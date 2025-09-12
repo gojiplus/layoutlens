@@ -45,13 +45,17 @@ jobs:
         
     - name: Run unit tests
       run: |
-        xvfb-run -a pytest tests/unit/ -v --cov=layoutlens --cov=scripts --cov-report=xml --cov-report=term-missing
+        xvfb-run -a pytest tests/unit/ tests/test_comprehensive.py -v --cov=layoutlens --cov-report=xml --cov-report=term-missing
       env:
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY_TEST }}
 
     - name: Run integration tests
       run: |
-        xvfb-run -a pytest tests/integration/ -v -m "not slow" --maxfail=5
+        if [ -n "$(find tests/integration/ -name '*.py' -type f 2>/dev/null)" ]; then
+          xvfb-run -a pytest tests/integration/ -v -m "not slow" --maxfail=5
+        else
+          echo "No integration tests found, skipping..."
+        fi
       env:
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY_TEST }}
         

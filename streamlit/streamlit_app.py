@@ -200,11 +200,11 @@ def main():
 
 def analyze_screenshot(tester: LayoutLens, uploaded_file, custom_questions: list, question_method: str):
     """Analyze an uploaded screenshot"""
-    # For uploaded screenshots, we'll use the ask method for direct image analysis
-    # Since we don't have an HTML file, we'll create a temporary image file
+    # For uploaded screenshots, create a temporary image file for analysis
     
     with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as temp_file:
         temp_file.write(uploaded_file.getvalue())
+        temp_file.flush()  # Ensure data is written to disk
         temp_path = temp_file.name
     
     try:
