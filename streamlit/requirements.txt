@@ -1,5 +1,5 @@
 # LayoutLens package (will be installed from PyPI)
-layoutlens>=1.0.3
+layoutlens>=1.0.4
 
 # Streamlit dependencies  
 streamlit>=1.40.0
