@@ -96,7 +96,7 @@ def main():
             )
             
             if input_file:
-                st.image(input_file, caption="Uploaded Screenshot", use_column_width=True)
+                st.image(input_file, caption="Uploaded Screenshot", use_container_width=True)
         
         elif input_method == "Enter URL":
             input_url = st.text_input(
@@ -212,10 +212,11 @@ def analyze_screenshot(tester: LayoutLens, uploaded_file, custom_questions: list
             # Ask each custom question
             results = []
             for question in custom_questions:
-                answer = tester.ask([temp_path], question)
+                result = tester.analyze(source=temp_path, query=question)
                 results.append({
                     'query': question,
-                    'answer': answer,
+                    'answer': result.answer,
+                    'confidence': result.confidence,
                     'screenshot_path': temp_path
                 })
             
@@ -237,10 +238,11 @@ def analyze_screenshot(tester: LayoutLens, uploaded_file, custom_questions: list
             
             results = []
             for question in default_questions:
-                answer = tester.ask([temp_path], question)
+                result = tester.analyze(source=temp_path, query=question)
                 results.append({
                     'query': question,
-                    'answer': answer,
+                    'answer': result.answer,
+                    'confidence': result.confidence,
                     'screenshot_path': temp_path
                 })
             
@@ -260,45 +262,57 @@ def analyze_screenshot(tester: LayoutLens, uploaded_file, custom_questions: list
             pass
 
 def analyze_url(tester: LayoutLens, url: str, viewport: str, custom_questions: list, question_method: str):
-    """Analyze a URL by capturing it and testing"""
-    
-    # Create a temporary HTML file that redirects to the URL
-    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix=".html") as temp_file:
-        html_content = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="utf-8">
-            <title>Redirecting...</title>
-            <meta http-equiv="refresh" content="0; url={url}">
-        </head>
-        <body>
-            <p>Redirecting to <a href="{url}">{url}</a>...</p>
-        </body>
-        </html>
-        """
-        temp_file.write(html_content)
-        temp_html_path = temp_file.name
+    """Analyze a URL directly"""
     
     try:
-        queries = custom_questions if question_method == "Custom Questions" and custom_questions else None
-        auto_generate = question_method == "Auto-generate"
-        
-        result = tester.test_page(
-            html_path=temp_html_path,
-            queries=queries,
-            viewports=[viewport],
-            auto_generate_queries=auto_generate
-        )
-        
-        return result
+        if question_method == "Custom Questions" and custom_questions:
+            # Ask each custom question
+            results = []
+            for question in custom_questions:
+                result = tester.analyze(source=url, query=question, viewport=viewport)
+                results.append({
+                    'query': question,
+                    'answer': result.answer,
+                    'confidence': result.confidence,
+                    'screenshot_path': None  # URL analysis doesn't have screenshot path in this context
+                })
+            
+            return {
+                'type': 'custom_questions',
+                'results': results,
+                'success_rate': 1.0,  # Simplified for Streamlit display
+                'total_tests': len(results)
+            }
+            
+        else:  # Auto-generate questions
+            # Use a general analysis query for auto-generated analysis
+            default_questions = [
+                "Is this webpage well-designed and user-friendly?",
+                "Are the navigation elements clear and accessible?", 
+                "Does the layout appear responsive and well-organized?",
+                "Are the colors and contrast appropriate for readability?"
+            ]
+            
+            results = []
+            for question in default_questions:
+                result = tester.analyze(source=url, query=question, viewport=viewport)
+                results.append({
+                    'query': question,
+                    'answer': result.answer,
+                    'confidence': result.confidence,
+                    'screenshot_path': None
+                })
+            
+            return {
+                'type': 'auto_generated',
+                'results': results,
+                'success_rate': 1.0,
+                'total_tests': len(results)
+            }
     
-    finally:
-        # Clean up temporary file
-        try:
-            os.unlink(temp_html_path)
-        except:
-            pass
+    except Exception as e:
+        st.error(f"Error analyzing URL: {str(e)}")
+        return None
 
 def display_results(result):
     """Display analysis results in the Streamlit interface"""
@@ -326,7 +340,7 @@ def display_results(result):
                 
                 if 'screenshot_path' in test_result:
                     if os.path.exists(test_result['screenshot_path']):
-                        st.image(test_result['screenshot_path'], caption="Screenshot", use_column_width=True)
+                        st.image(test_result['screenshot_path'], caption="Screenshot", use_container_width=True)
                 
                 # Display confidence if available
                 if 'confidence' in test_result:
