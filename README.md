@@ -2,7 +2,7 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Build Status](https://github.com/matmulai/layoutlens/workflows/tests/badge.svg)](https://github.com/matmulai/layoutlens/actions)
+[![Build Status](https://github.com/gojiplus/layoutlens/workflows/tests/badge.svg)](https://github.com/gojiplus/layoutlens/actions)
 [![Documentation Status](https://readthedocs.org/projects/layoutlens/badge/?version=latest)](https://layoutlens.readthedocs.io/en/latest/?badge=latest)
 [![PyPI version](https://badge.fury.io/py/layoutlens.svg)](https://badge.fury.io/py/layoutlens)
 
@@ -212,15 +212,14 @@ from layoutlens import LayoutLens
 # Initialize the testing framework
 tester = LayoutLens()
 
-# Test a single page with auto-generated queries
-result = tester.test_page(
+# Analyze a single page with natural language
+result = tester.analyze(
     "homepage.html",
-    viewports=["mobile_portrait", "desktop"],
-    auto_generate_queries=True
+    query="Is the page layout user-friendly and professional?"
 )
 
-print(f"Success rate: {result.success_rate:.2%}")
-print(f"Tests passed: {result.passed_tests}/{result.total_tests}")
+print(f"Answer: {result.answer}")
+print(f"Confidence: {result.confidence:.1%}")
 ```
 
 ### CLI Usage
@@ -269,7 +268,7 @@ Test LayoutLens with our comprehensive benchmark suite:
 
 ```bash
 # Clone the repository
-git clone https://github.com/matmulai/layoutlens.git
+git clone https://github.com/gojiplus/layoutlens.git
 cd layoutlens
 
 # Set up environment
@@ -360,7 +359,7 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 
 ```bash
 # Clone and set up development environment
-git clone https://github.com/matmulai/layoutlens.git
+git clone https://github.com/gojiplus/layoutlens.git
 cd layoutlens
 python -m venv venv
 source venv/bin/activate
@@ -390,9 +389,9 @@ LayoutLens is released under the [MIT License](LICENSE).
 ## 📧 Support
 
 - 📖 [Documentation](https://layoutlens.readthedocs.io/)
-- 🐛 [Bug Reports](https://github.com/matmulai/layoutlens/issues)
-- 💬 [Discussions](https://github.com/matmulai/layoutlens/discussions)
-- 🔗 [Homepage](https://github.com/matmulai/layoutlens)
+- 🐛 [Bug Reports](https://github.com/gojiplus/layoutlens/issues)
+- 💬 [Discussions](https://github.com/gojiplus/layoutlens/discussions)
+- 🔗 [Homepage](https://github.com/gojiplus/layoutlens)
 
 ---
 

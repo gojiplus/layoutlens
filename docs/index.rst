@@ -6,7 +6,7 @@ LayoutLens Documentation
    :alt: PyPI Version
 
 .. image:: https://img.shields.io/github/license/matmulai/layoutlens
-   :target: https://github.com/matmulai/layoutlens/blob/main/LICENSE
+   :target: https://github.com/gojiplus/layoutlens/blob/main/LICENSE
    :alt: License
 
 .. image:: https://readthedocs.org/projects/layoutlens/badge/?version=latest

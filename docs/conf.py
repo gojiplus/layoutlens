@@ -120,7 +120,7 @@ html_css_files = []
 # GitHub integration
 html_context = {
     "display_github": True,
-    "github_user": "matmulai",
+    "github_user": "gojiplus",
     "github_repo": "layoutlens", 
     "github_version": "main",
     "conf_py_path": "/docs/",
