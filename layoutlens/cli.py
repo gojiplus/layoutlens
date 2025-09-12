@@ -16,45 +16,44 @@ from .api.core import LayoutLens
 def cmd_test(args) -> None:
     """Execute test command."""
     # Initialize LayoutLens
-    config_path = args.config if args.config else None
-    tester = LayoutLens(config=config_path, api_key=args.api_key, output_dir=args.output)
+    try:
+        tester = LayoutLens(api_key=args.api_key, output_dir=args.output)
+    except Exception as e:
+        print(f"Error initializing LayoutLens: {e}")
+        sys.exit(1)
     
     if args.page:
         # Test single page
-        queries = args.queries.split(',') if args.queries else None
-        viewports = args.viewports.split(',') if args.viewports else None
+        queries = args.queries.split(',') if args.queries else ["Is this page well-designed and user-friendly?"]
+        viewport = args.viewports.split(',')[0] if args.viewports else "desktop"
         
-        print(f"Testing page: {args.page}")
-        result = tester.test_page(
-            html_path=args.page,
-            queries=queries,
-            viewports=viewports,
-            auto_generate_queries=not args.no_auto_queries
-        )
+        print(f"Analyzing page: {args.page}")
         
-        if result:
-            print(f"Result: {result.passed_tests}/{result.total_tests} tests passed ({result.success_rate:.2%})")
-        else:
-            print("Test execution failed")
+        try:
+            results = []
+            for query in queries:
+                result = tester.analyze(source=args.page, query=query.strip(), viewport=viewport)
+                results.append({
+                    'query': query.strip(),
+                    'answer': result.answer,
+                    'confidence': result.confidence
+                })
+                print(f"Query: {query.strip()}")
+                print(f"Answer: {result.answer}")
+                print(f"Confidence: {result.confidence:.1%}")
+                print("-" * 50)
+            
+            avg_confidence = sum(r['confidence'] for r in results) / len(results)
+            print(f"Analysis complete. Average confidence: {avg_confidence:.1%}")
+            
+        except Exception as e:
+            print(f"Analysis failed: {e}")
             sys.exit(1)
     
     elif args.suite:
-        # Test suite
-        results = tester.run_test_suite(args.suite)
-        
-        if results:
-            # Calculate overall success rate
-            total_tests = sum(r.total_tests for r in results)
-            total_passed = sum(r.passed_tests for r in results)
-            success_rate = total_passed / total_tests if total_tests > 0 else 0
-            
-            print(f"Suite completed: {success_rate:.2%} success rate")
-            if success_rate < 0.8:
-                sys.exit(1)
-        else:
-            print("Test suite execution failed")
-            sys.exit(1)
-    
+        print("Error: Test suite functionality not yet implemented.")
+        print("Use individual page analysis with --page instead.")
+        sys.exit(1)
     else:
         print("Error: Either --page or --suite must be specified")
         sys.exit(1)
