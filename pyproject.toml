@@ -7,7 +7,7 @@ name = "layoutlens"
 version = "1.0.0"
 description = "AI-powered UI testing framework with natural language visual validation"
 readme = "README.md"
-license = {text = "MIT"}
+license = "MIT"
 authors = [
     {name = "Gaurav Sood", email = "contact@gsood.com"}
 ]
@@ -74,7 +74,12 @@ test = [
 layoutlens = "layoutlens.cli:main"
 
 [tool.setuptools]
-packages = ["layoutlens"]
+packages = [
+    "layoutlens",
+    "layoutlens.api", 
+    "layoutlens.vision",
+    "layoutlens.integrations"
+]
 include-package-data = true
 
 [tool.setuptools.package-data]
