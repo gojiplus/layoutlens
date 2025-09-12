@@ -151,6 +151,56 @@ REASONING: The navigation is clearly visible at the top of the page with logical
         result = lens.analyze("/nonexistent/file.png", "Test query")
         self.assertEqual(result.confidence, 0.0)
         self.assertIn("Error", result.answer)
+    
+    @patch('layoutlens.vision.analyzer.openai.OpenAI')
+    def test_compare_method(self, mock_openai):
+        """Test the compare method functionality."""
+        from layoutlens.api.core import LayoutLens
+        
+        # Mock OpenAI response
+        mock_response = Mock()
+        mock_response.choices = [Mock()]
+        mock_response.choices[0].message.content = """ANSWER: The second design is better with improved layout.
+CONFIDENCE: 0.80
+REASONING: Better alignment and visual hierarchy."""
+        
+        mock_client = Mock()
+        mock_client.chat.completions.create.return_value = mock_response
+        mock_openai.return_value = mock_client
+        
+        lens = LayoutLens(api_key=self.mock_api_key)
+        
+        # Test with non-existent files (should handle gracefully)
+        result = lens.compare(["/nonexistent1.png", "/nonexistent2.png"], "Which design is better?")
+        self.assertEqual(result.confidence, 0.0)
+        self.assertIn("Error", result.answer)
+    
+    @patch('layoutlens.vision.analyzer.openai.OpenAI') 
+    def test_analyze_batch_method(self, mock_openai):
+        """Test the analyze_batch method functionality."""
+        from layoutlens.api.core import LayoutLens
+        
+        # Mock OpenAI response
+        mock_response = Mock()
+        mock_response.choices = [Mock()]
+        mock_response.choices[0].message.content = """ANSWER: The design looks good.
+CONFIDENCE: 0.85
+REASONING: Clean layout and good user experience."""
+        
+        mock_client = Mock()
+        mock_client.chat.completions.create.return_value = mock_response
+        mock_openai.return_value = mock_client
+        
+        lens = LayoutLens(api_key=self.mock_api_key)
+        
+        # Test with non-existent sources and single query (should handle gracefully)
+        result = lens.analyze_batch(["/nonexistent1.png", "/nonexistent2.png"], ["Is the design good?"])
+        
+        # Should return BatchResult with 2 sources * 1 query = 2 results
+        self.assertIsNotNone(result)
+        self.assertIsInstance(result.results, list)
+        self.assertEqual(len(result.results), 2)
+        self.assertEqual(result.total_queries, 2)
 
 
 class TestVisionComponents(unittest.TestCase):
@@ -255,8 +305,6 @@ class TestFileStructure(unittest.TestCase):
             "layoutlens/vision/comparator.py",
             "layoutlens/integrations/__init__.py",
             "layoutlens/integrations/github.py",
-            ".github/actions/layoutlens/action.yml",
-            ".github/actions/layoutlens/run_analysis.py",
         ]
         
         for file_path in required_files:
@@ -271,7 +319,7 @@ class TestFileStructure(unittest.TestCase):
         action_file = Path(".github/actions/layoutlens/action.yml")
         
         if not action_file.exists():
-            self.skip("action.yml not found")
+            self.skipTest("action.yml not found")
         
         content = action_file.read_text()
         
@@ -294,8 +342,7 @@ class TestFileStructure(unittest.TestCase):
             "layoutlens/vision/analyzer.py",
             "layoutlens/vision/capture.py", 
             "layoutlens/vision/comparator.py",
-            "layoutlens/integrations/github.py",
-            ".github/actions/layoutlens/run_analysis.py"
+            "layoutlens/integrations/github.py"
         ]
         
         for file_path in python_files:

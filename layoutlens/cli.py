@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from .config import Config, create_default_config
-from .core import LayoutLens
+from .api.core import LayoutLens
 
 
 def cmd_test(args) -> None:
