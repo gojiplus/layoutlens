@@ -83,6 +83,8 @@ jobs:
         layoutlens --help
         layoutlens --output test_config.yaml generate config
         layoutlens validate --config test_config.yaml
+      env:
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY_TEST }}
 
   test-examples:
     runs-on: ubuntu-latest
