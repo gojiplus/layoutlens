@@ -1,10 +1,11 @@
 {
   "benchmark_info": {
     "category": "responsive_design",
-    "version": "1.0", 
-    "total_tests": 2,
+    "version": "1.1", 
+    "total_tests": 5,
     "created": "2025-01-09",
-    "description": "Ground truth answers for responsive design test cases"
+    "updated": "2025-01-12",
+    "description": "Ground truth answers for responsive design test cases including modern CSS techniques"
   },
   "test_cases": {
     "mobile_friendly.html": {
@@ -116,6 +117,113 @@
           "implement responsive grid system",
           "add mobile-specific navigation patterns"
         ]
+      }
+    },
+    "container_queries_good.html": {
+      "queries": {
+        "Does the layout use modern container-based responsive design?": {
+          "expected": "yes",
+          "confidence_threshold": 0.8,
+          "reasoning": "Uses CSS container queries to adapt components based on container width rather than viewport",
+          "measurable_criteria": "container-type: inline-size and @container queries present",
+          "issue_severity": null
+        },
+        "Do the card components adapt appropriately to their available space?": {
+          "expected": "yes",
+          "confidence_threshold": 0.9,
+          "reasoning": "Cards change layout and styling based on their container size, not just viewport",
+          "measurable_criteria": "Different layouts at container widths 250px, 400px with proper fallbacks"
+        },
+        "Is there proper fallback support for older browsers?": {
+          "expected": "yes",
+          "confidence_threshold": 0.8,
+          "reasoning": "Includes @supports feature queries with media query fallbacks",
+          "measurable_criteria": "@supports not (container-type) with traditional media queries"
+        }
+      },
+      "metadata": {
+        "intentional_issue": false,
+        "example_type": "positive",
+        "difficulty": "hard",
+        "css_features": ["container_queries", "feature_queries", "progressive_enhancement"],
+        "browser_support": "modern_with_fallbacks"
+      }
+    },
+    "viewport_units_broken.html": {
+      "queries": {
+        "Does the layout handle viewport units correctly on mobile?": {
+          "expected": "no",
+          "confidence_threshold": 0.9,
+          "reasoning": "Uses 100vh which causes issues on mobile Safari due to dynamic address bar",
+          "measurable_criteria": "100vh creates content cutoff, vw units cause horizontal scrolling",
+          "issue_severity": "high"
+        },
+        "Is the typography scaling appropriate across devices?": {
+          "expected": "no",
+          "confidence_threshold": 0.9,
+          "reasoning": "Text sized with viewport units becomes unreadable on some screens",
+          "measurable_criteria": "vw-based font sizing without min/max constraints"
+        },
+        "Would the layout work reliably across different browsers and devices?": {
+          "expected": "no",
+          "confidence_threshold": 0.8,
+          "reasoning": "Viewport unit issues are particularly problematic on mobile browsers",
+          "measurable_criteria": "No consideration for browser UI changes, dynamic viewports"
+        }
+      },
+      "metadata": {
+        "intentional_issue": true,
+        "issue_type": "viewport_unit_problems",
+        "example_type": "negative",
+        "difficulty": "medium",
+        "violations": [
+          "100vh_mobile_issues",
+          "vw_horizontal_scroll",
+          "no_text_scaling_limits",
+          "browser_ui_conflicts"
+        ],
+        "fixes_required": [
+          "replace 100vh with min-height and JavaScript viewport calculation",
+          "use clamp() for text sizing with viewport units",
+          "implement proper mobile viewport height handling",
+          "add min/max constraints for viewport-based sizing"
+        ]
+      }
+    },
+    "fluid_typography_good.html": {
+      "queries": {
+        "Does the typography scale smoothly and appropriately across all screen sizes?": {
+          "expected": "yes",
+          "confidence_threshold": 0.9,
+          "reasoning": "Uses CSS clamp() functions for perfect fluid typography with min/max constraints",
+          "measurable_criteria": "clamp() functions provide smooth scaling with readable limits",
+          "issue_severity": null
+        },
+        "Are viewport height issues handled properly for mobile?": {
+          "expected": "yes",
+          "confidence_threshold": 0.8,
+          "reasoning": "Includes JavaScript solution for mobile viewport height with CSS custom properties",
+          "measurable_criteria": "JavaScript updates --vh custom property, safer viewport calculations"
+        },
+        "Is the text hierarchy maintained across different screen sizes?": {
+          "expected": "yes",
+          "confidence_threshold": 0.9,
+          "reasoning": "Proportional scaling maintains visual hierarchy at all viewport sizes",
+          "measurable_criteria": "Consistent size relationships between headings and body text"
+        },
+        "Does the spacing system scale proportionally with typography?": {
+          "expected": "yes",
+          "confidence_threshold": 0.8,
+          "reasoning": "Uses fluid spacing variables that scale harmoniously with text",
+          "measurable_criteria": "CSS custom properties for consistent fluid spacing system"
+        }
+      },
+      "metadata": {
+        "intentional_issue": false,
+        "example_type": "positive", 
+        "difficulty": "hard",
+        "css_features": ["css_clamp", "custom_properties", "fluid_typography", "viewport_fixes"],
+        "browser_support": "modern_with_graceful_degradation"
       }
     }
   },

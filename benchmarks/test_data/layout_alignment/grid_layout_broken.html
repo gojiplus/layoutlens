@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSS Grid Layout - Broken Implementation</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body { 
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; 
+            background: #f8f9fa;
+            padding: 2rem;
+        }
+        
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 250px 1fr; /* Fixed sidebar, flexible main */
+            grid-template-rows: auto 1fr auto; /* Header, content, footer */
+            /* MISSING: grid-template-areas - creates layout confusion */
+            gap: 1.5rem;
+            min-height: 100vh;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .sidebar {
+            /* Without grid-area, elements don't align properly */
+            background: #2c3e50;
+            color: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            /* Sidebar will be in wrong position without grid-area */
+        }
+        
+        .header {
+            /* No grid-area: header - causes misalignment */
+            background: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .main-content {
+            /* No grid-area: main - content positioning is unpredictable */
+            background: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;
+            /* Will appear in wrong order due to missing grid areas */
+        }
+        
+        .footer {
+            /* No grid-area: footer - footer positioning breaks */
+            background: #6c757d;
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .card {
+            background: #f8f9fa;
+            padding: 1.5rem;
+            border-radius: 6px;
+            border-left: 4px solid #007bff;
+        }
+        
+        .nav-item {
+            padding: 0.75rem 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        /* Responsive behavior is broken without proper grid areas */
+        @media (max-width: 768px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+                /* Missing proper responsive grid-template-areas */
+                /* Layout becomes chaotic on mobile */
+            }
+            
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-grid">
+        <!-- Without grid-template-areas, DOM order doesn't match visual intention -->
+        <aside class="sidebar">
+            <h2>Navigation</h2>
+            <div class="nav-item">Dashboard</div>
+            <div class="nav-item">Analytics</div>
+            <div class="nav-item">Users</div>
+            <div class="nav-item">Settings</div>
+        </aside>
+        
+        <header class="header">
+            <h1>Dashboard - Broken Grid Layout</h1>
+            <p>This layout lacks grid-template-areas, causing positioning and responsive issues.</p>
+        </header>
+        
+        <main class="main-content">
+            <div class="card">
+                <h3>Revenue</h3>
+                <p>Without proper grid areas, elements don't maintain semantic layout order.</p>
+            </div>
+            <div class="card">
+                <h3>Users</h3>
+                <p>Responsive behavior becomes unpredictable and breaks user expectations.</p>
+            </div>
+            <div class="card">
+                <h3>Performance</h3>
+                <p>Grid positioning relies on DOM order instead of semantic structure.</p>
+            </div>
+        </main>
+        
+        <footer class="footer">
+            <p>Footer positioning is unreliable without grid-area definition</p>
+        </footer>
+    </div>
+</body>
+</html>

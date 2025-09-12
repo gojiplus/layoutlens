@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fluid Typography - Modern Responsive Text</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        :root {
+            /* Fluid typography using clamp() for perfect scaling */
+            --text-xs: clamp(0.75rem, 0.7rem + 0.25vw, 0.875rem);
+            --text-sm: clamp(0.875rem, 0.8rem + 0.375vw, 1rem);
+            --text-base: clamp(1rem, 0.9rem + 0.5vw, 1.125rem);
+            --text-lg: clamp(1.125rem, 1rem + 0.625vw, 1.375rem);
+            --text-xl: clamp(1.25rem, 1.1rem + 0.75vw, 1.625rem);
+            --text-2xl: clamp(1.5rem, 1.3rem + 1vw, 2rem);
+            --text-3xl: clamp(1.875rem, 1.6rem + 1.375vw, 2.5rem);
+            --text-4xl: clamp(2.25rem, 1.9rem + 1.75vw, 3rem);
+            
+            /* Fluid spacing */
+            --space-xs: clamp(0.5rem, 0.4rem + 0.5vw, 0.75rem);
+            --space-sm: clamp(0.75rem, 0.6rem + 0.75vw, 1.125rem);
+            --space-md: clamp(1rem, 0.8rem + 1vw, 1.5rem);
+            --space-lg: clamp(1.5rem, 1.2rem + 1.5vw, 2.25rem);
+            --space-xl: clamp(2rem, 1.6rem + 2vw, 3rem);
+            --space-2xl: clamp(3rem, 2.4rem + 3vw, 4.5rem);
+            
+            /* Safe viewport height for mobile */
+            --vh: 1vh;
+        }
+        
+        body { 
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; 
+            line-height: 1.6; 
+            color: #333;
+            font-size: var(--text-base);
+        }
+        
+        /* Use safer viewport height calculation */
+        .hero-section {
+            min-height: calc(100 * var(--vh));
+            height: auto;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: var(--space-xl);
+        }
+        
+        .hero-content {
+            color: white;
+            max-width: 600px;
+        }
+        
+        .hero-content h1 {
+            font-size: var(--text-4xl);
+            margin-bottom: var(--space-md);
+            font-weight: 700;
+            line-height: 1.2;
+        }
+        
+        .hero-content p {
+            font-size: var(--text-lg);
+            margin-bottom: var(--space-lg);
+            opacity: 0.9;
+        }
+        
+        .cta-button {
+            background: white;
+            color: #667eea;
+            padding: var(--space-sm) var(--space-lg);
+            border: none;
+            border-radius: 50px;
+            font-size: var(--text-base);
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.3s;
+            min-height: 44px; /* Accessible touch target */
+        }
+        
+        .cta-button:hover {
+            transform: translateY(-2px);
+        }
+        
+        .cta-button:focus {
+            outline: 2px solid #ffc107;
+            outline-offset: 2px;
+        }
+        
+        .content-section {
+            padding: var(--space-2xl) var(--space-md);
+            background: #f8f9fa;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .content-section h2 {
+            font-size: var(--text-3xl);
+            text-align: center;
+            margin-bottom: var(--space-xl);
+            color: #2c3e50;
+        }
+        
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: var(--space-lg);
+        }
+        
+        .feature-card {
+            background: white;
+            padding: var(--space-lg);
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        
+        .feature-card h3 {
+            font-size: var(--text-xl);
+            margin-bottom: var(--space-sm);
+            color: #2c3e50;
+        }
+        
+        .feature-card p {
+            font-size: var(--text-base);
+            color: #666;
+            line-height: 1.8;
+        }
+        
+        .typography-demo {
+            background: white;
+            padding: var(--space-xl);
+            margin: var(--space-xl) 0;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        .text-scale h1 { font-size: var(--text-4xl); margin-bottom: var(--space-sm); }
+        .text-scale h2 { font-size: var(--text-3xl); margin-bottom: var(--space-sm); }
+        .text-scale h3 { font-size: var(--text-2xl); margin-bottom: var(--space-sm); }
+        .text-scale h4 { font-size: var(--text-xl); margin-bottom: var(--space-sm); }
+        .text-scale p { font-size: var(--text-base); margin-bottom: var(--space-md); }
+        .text-scale small { font-size: var(--text-sm); color: #666; }
+        
+        .footer {
+            background: #2c3e50;
+            color: white;
+            text-align: center;
+            padding: var(--space-2xl) var(--space-md);
+        }
+        
+        .footer h2 {
+            font-size: var(--text-2xl);
+            margin-bottom: var(--space-md);
+        }
+        
+        .footer p {
+            font-size: var(--text-base);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        /* JavaScript to fix viewport height on mobile */
+        @media (max-width: 768px) {
+            :root {
+                --vh: 1vh; /* Will be updated by JavaScript */
+            }
+        }
+    </style>
+</head>
+<body>
+    <section class="hero-section">
+        <div class="hero-content">
+            <h1>Perfect Fluid Typography</h1>
+            <p>This layout uses CSS clamp() functions for typography that scales beautifully across all devices without breaking.</p>
+            <button class="cta-button">Perfectly Scaled</button>
+        </div>
+    </section>
+    
+    <section class="content-section">
+        <div class="container">
+            <h2>Why This Works</h2>
+            
+            <div class="typography-demo">
+                <div class="text-scale">
+                    <h1>Heading 1 - Scales Perfectly</h1>
+                    <h2>Heading 2 - Always Readable</h2>
+                    <h3>Heading 3 - Responsive</h3>
+                    <h4>Heading 4 - Fluid Scaling</h4>
+                    <p>Body text maintains perfect readability at all screen sizes using clamp() functions. The text never gets too small on mobile or too large on desktop.</p>
+                    <small>Small text remains accessible and proportional.</small>
+                </div>
+            </div>
+            
+            <div class="features-grid">
+                <div class="feature-card">
+                    <h3>CSS Clamp() Function</h3>
+                    <p>Uses minimum, preferred, and maximum values to create perfectly scaling typography that maintains readability.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>Safe Viewport Heights</h3>
+                    <p>Avoids 100vh issues on mobile Safari by using JavaScript-calculated viewport height with fallbacks.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>Fluid Spacing</h3>
+                    <p>Consistent spacing system that scales proportionally with typography for perfect visual harmony.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>Performance Optimized</h3>
+                    <p>CSS custom properties enable efficient typography scaling without complex calculations or media queries.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <footer class="footer">
+        <div>
+            <h2>Modern Typography</h2>
+            <p>This approach provides consistent, beautiful typography across all devices while maintaining accessibility and performance.</p>
+        </div>
+    </footer>
+    
+    <script>
+        // Fix viewport height issues on mobile
+        function setVH() {
+            const vh = window.innerHeight * 0.01;
+            document.documentElement.style.setProperty('--vh', `${vh}px`);
+        }
+        
+        // Set initial value
+        setVH();
+        
+        // Update on resize and orientation change
+        window.addEventListener('resize', setVH);
+        window.addEventListener('orientationchange', () => {
+            setTimeout(setVH, 100); // Small delay for orientation change
+        });
+    </script>
+</body>
+</html>

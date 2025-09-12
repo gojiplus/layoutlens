@@ -1,10 +1,11 @@
 {
   "benchmark_info": {
     "category": "accessibility",
-    "version": "1.0",
-    "total_tests": 2,
+    "version": "1.1",
+    "total_tests": 4,
     "created": "2025-01-09",
-    "description": "Ground truth answers for accessibility compliance test cases"
+    "updated": "2025-01-12",
+    "description": "Ground truth answers for accessibility compliance test cases including focus management"
   },
   "test_cases": {
     "wcag_compliant.html": {
@@ -131,6 +132,101 @@
           "fix heading hierarchy (h1 → h2 → h3)",
           "add alt text to all images",
           "add skip link for keyboard users"
+        ]
+      }
+    },
+    "focus_management_good.html": {
+      "queries": {
+        "Does the modal implement proper focus management?": {
+          "expected": "yes",
+          "confidence_threshold": 0.9,
+          "reasoning": "Modal includes focus trapping, restoration, and proper keyboard navigation",
+          "measurable_criteria": "Focus moves to modal on open, traps inside modal, restores on close",
+          "issue_severity": null
+        },
+        "Are all interactive elements keyboard accessible?": {
+          "expected": "yes",
+          "confidence_threshold": 0.9,
+          "reasoning": "All buttons, inputs, and modal have proper focus indicators and keyboard support",
+          "measurable_criteria": "Tab navigation works, Enter/Space activate buttons, Escape closes modal"
+        },
+        "Does the modal meet ARIA standards for dialogs?": {
+          "expected": "yes",
+          "confidence_threshold": 0.8,
+          "reasoning": "Modal uses role='dialog', aria-modal='true', and aria-labelledby properly",
+          "measurable_criteria": "Proper ARIA attributes present and correctly associated"
+        },
+        "Is focus restoration implemented correctly?": {
+          "expected": "yes",
+          "confidence_threshold": 0.9,
+          "reasoning": "Focus returns to the trigger button when modal is closed",
+          "measurable_criteria": "previousFocus element is stored and restored on modal close"
+        }
+      },
+      "metadata": {
+        "intentional_issue": false,
+        "example_type": "positive",
+        "difficulty": "hard",
+        "wcag_level": "meets_AA",
+        "accessibility_features": [
+          "focus_trapping",
+          "focus_restoration", 
+          "keyboard_navigation",
+          "aria_dialog",
+          "skip_links",
+          "proper_focus_indicators"
+        ]
+      }
+    },
+    "focus_management_broken.html": {
+      "queries": {
+        "Does the modal implement proper focus management?": {
+          "expected": "no",
+          "confidence_threshold": 0.9,
+          "reasoning": "Modal lacks focus trapping, restoration, and allows focus to escape to background",
+          "measurable_criteria": "No focus management JavaScript, no focus trapping implementation",
+          "issue_severity": "critical"
+        },
+        "Are all interactive elements keyboard accessible?": {
+          "expected": "no",
+          "confidence_threshold": 0.9,
+          "reasoning": "Missing focus indicators, no keyboard support for modal, tab can escape modal",
+          "measurable_criteria": "No focus styles, no Escape key handler, no tab trapping"
+        },
+        "Does the modal meet ARIA standards for dialogs?": {
+          "expected": "no", 
+          "confidence_threshold": 0.8,
+          "reasoning": "Missing role='dialog', aria-modal, and aria-labelledby attributes",
+          "measurable_criteria": "No ARIA attributes for modal accessibility"
+        },
+        "Would screen reader users be able to use this modal effectively?": {
+          "expected": "no",
+          "confidence_threshold": 0.9,
+          "reasoning": "Screen readers can access background content, modal not properly announced",
+          "measurable_criteria": "Background content remains accessible, no modal state announcements"
+        }
+      },
+      "metadata": {
+        "intentional_issue": true,
+        "issue_type": "focus_management_violations",
+        "example_type": "negative",
+        "difficulty": "hard",
+        "wcag_level": "fails_AA",
+        "violations": [
+          "no_focus_trapping",
+          "no_focus_restoration",
+          "missing_aria_attributes",
+          "no_keyboard_support",
+          "background_accessible",
+          "no_focus_indicators"
+        ],
+        "fixes_required": [
+          "implement focus trapping with event listeners",
+          "store and restore previous focus",
+          "add role='dialog' and aria-modal='true'",
+          "add Escape key support",
+          "prevent background interaction",
+          "add proper focus indicators"
         ]
       }
     }

@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Container Queries - Modern Responsive Design</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body { 
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; 
+            line-height: 1.6; 
+            background: #f8f9fa;
+            padding: 1rem;
+        }
+        
+        .layout-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .card-container {
+            container-type: inline-size;
+            container-name: card;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        .card-content {
+            padding: 1.5rem;
+        }
+        
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 0.75rem;
+        }
+        
+        .card-text {
+            color: #6c757d;
+            margin-bottom: 1.5rem;
+        }
+        
+        .card-image {
+            width: 100%;
+            height: 200px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+        }
+        
+        .card-actions {
+            display: flex;
+            gap: 0.75rem;
+        }
+        
+        .btn {
+            padding: 0.625rem 1.25rem;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            min-height: 44px;
+            transition: transform 0.2s;
+        }
+        
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+        
+        .btn-secondary {
+            background: #e9ecef;
+            color: #495057;
+        }
+        
+        .btn:hover {
+            transform: translateY(-1px);
+        }
+        
+        .btn:focus {
+            outline: 2px solid #ffc107;
+            outline-offset: 2px;
+        }
+        
+        /* Container queries - respond to container width, not viewport */
+        @container card (max-width: 250px) {
+            .card-content {
+                padding: 1rem;
+            }
+            
+            .card-title {
+                font-size: 1rem;
+            }
+            
+            .card-actions {
+                flex-direction: column;
+            }
+            
+            .card-image {
+                height: 120px;
+                font-size: 0.875rem;
+            }
+        }
+        
+        @container card (min-width: 400px) {
+            .card {
+                display: grid;
+                grid-template-columns: 200px 1fr;
+            }
+            
+            .card-image {
+                height: auto;
+                min-height: 250px;
+            }
+            
+            .card-title {
+                font-size: 1.5rem;
+            }
+            
+            .card-actions {
+                justify-content: flex-end;
+            }
+        }
+        
+        /* Fallback for browsers without container query support */
+        @supports not (container-type: inline-size) {
+            @media (max-width: 300px) {
+                .card-actions {
+                    flex-direction: column;
+                }
+                
+                .card-title {
+                    font-size: 1rem;
+                }
+            }
+            
+            @media (min-width: 500px) {
+                .card-actions {
+                    justify-content: flex-end;
+                }
+            }
+        }
+        
+        .info-banner {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 2rem;
+            text-align: center;
+            color: #155724;
+        }
+        
+        .info-banner h1 {
+            margin-bottom: 0.5rem;
+            color: #155724;
+        }
+    </style>
+</head>
+<body>
+    <div class="info-banner">
+        <h1>Container Queries Demo</h1>
+        <p>These cards adapt based on their container width, not just viewport size - resize your browser to see the magic!</p>
+    </div>
+    
+    <div class="layout-grid">
+        <article class="card-container">
+            <div class="card">
+                <div class="card-image">
+                    <span>Responsive Image</span>
+                </div>
+                <div class="card-content">
+                    <h2 class="card-title">Smart Container Adaptation</h2>
+                    <p class="card-text">This card uses container queries to adapt its layout based on available space, creating truly responsive components.</p>
+                    <div class="card-actions">
+                        <button class="btn btn-primary">Learn More</button>
+                        <button class="btn btn-secondary">Share</button>
+                    </div>
+                </div>
+            </div>
+        </article>
+        
+        <article class="card-container">
+            <div class="card">
+                <div class="card-image">
+                    <span>Adaptive Layout</span>
+                </div>
+                <div class="card-content">
+                    <h2 class="card-title">Component-Level Responsive</h2>
+                    <p class="card-text">When narrow, buttons stack vertically. When wide, the layout switches to horizontal with image on the side.</p>
+                    <div class="card-actions">
+                        <button class="btn btn-primary">Try It</button>
+                        <button class="btn btn-secondary">Info</button>
+                    </div>
+                </div>
+            </div>
+        </article>
+        
+        <article class="card-container">
+            <div class="card">
+                <div class="card-image">
+                    <span>Modern CSS</span>
+                </div>
+                <div class="card-content">
+                    <h2 class="card-title">Future-Proof Design</h2>
+                    <p class="card-text">Includes fallback support for browsers without container queries, ensuring universal compatibility.</p>
+                    <div class="card-actions">
+                        <button class="btn btn-primary">Explore</button>
+                        <button class="btn btn-secondary">Details</button>
+                    </div>
+                </div>
+            </div>
+        </article>
+    </div>
+</body>
+</html>

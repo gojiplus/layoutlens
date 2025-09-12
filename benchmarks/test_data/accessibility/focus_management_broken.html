@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Focus Management - Broken Modal</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body { 
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; 
+            line-height: 1.6; 
+            color: #212529; 
+            background: #f8f9fa;
+            padding: 2rem;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 2rem;
+        }
+        
+        .btn {
+            background: #007bff;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 4px;
+            font-size: 1rem;
+            cursor: pointer;
+            min-height: 44px;
+            margin: 0.5rem;
+        }
+        
+        /* VIOLATION: No focus indicators */
+        .btn:hover {
+            background: #0056b3;
+        }
+        
+        /* Modal styles - missing accessibility features */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+        }
+        
+        .modal-overlay.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            max-width: 500px;
+            width: 90%;
+            position: relative;
+        }
+        
+        .modal h2 {
+            margin-bottom: 1rem;
+            color: #2c3e50;
+        }
+        
+        .modal-close {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            /* VIOLATION: No focus indicator */
+        }
+        
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: #2c3e50;
+        }
+        
+        input[type="text"], 
+        input[type="email"] {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #dee2e6;
+            border-radius: 4px;
+            font-size: 1rem;
+            min-height: 44px;
+            /* VIOLATION: No focus indicators */
+        }
+        
+        /* VIOLATION: No skip link provided */
+    </style>
+</head>
+<body>
+    <!-- VIOLATION: Missing skip link -->
+    
+    <div class="container">
+        <main id="main">
+            <h1>Broken Focus Management Demo</h1>
+            <p>This page demonstrates poor focus management with accessibility violations in modal dialogs.</p>
+            
+            <button class="btn" onclick="openModal()" id="open-modal-btn">
+                Open Contact Form
+            </button>
+            
+            <button class="btn" onclick="alert('Normal button works')" style="background: #28a745;">
+                Regular Button
+            </button>
+        </main>
+    </div>
+    
+    <!-- Modal with broken focus management - VIOLATIONS -->
+    <div class="modal-overlay" id="modal-overlay">
+        <!-- VIOLATIONS: 
+             - Missing role="dialog" 
+             - Missing aria-modal="true"
+             - Missing aria-labelledby
+        -->
+        <div class="modal">
+            <!-- VIOLATION: Close button missing aria-label -->
+            <button class="modal-close" onclick="closeModal()">×</button>
+            <h2 id="modal-title">Contact Form</h2>
+            <form onsubmit="submitForm(event)">
+                <div class="form-group">
+                    <label for="modal-name">Name (required)</label>
+                    <input type="text" id="modal-name" name="name" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="modal-email">Email (required)</label>
+                    <input type="email" id="modal-email" name="email" required>
+                </div>
+                
+                <button type="submit" class="btn">Submit</button>
+                <button type="button" class="btn" onclick="closeModal()" style="background: #6c757d;">Cancel</button>
+            </form>
+        </div>
+    </div>
+    
+    <script>
+        // VIOLATIONS: Broken focus management implementation
+        const modalOverlay = document.getElementById('modal-overlay');
+        
+        function openModal() {
+            // VIOLATION: No previous focus storage
+            
+            // Show modal
+            modalOverlay.classList.add('active');
+            
+            // VIOLATION: No focus management - focus stays on background
+            // VIOLATION: No focus trap
+            // VIOLATION: Body scroll not prevented
+        }
+        
+        function closeModal() {
+            // Hide modal
+            modalOverlay.classList.remove('active');
+            
+            // VIOLATION: Focus is not restored to previous element
+            // VIOLATION: No cleanup of event listeners
+        }
+        
+        // VIOLATION: No keyboard support (Escape key)
+        // VIOLATION: Focus can escape the modal using Tab
+        // VIOLATION: No focus trap implementation
+        
+        function submitForm(e) {
+            e.preventDefault();
+            alert('Form submitted successfully!');
+            closeModal();
+        }
+        
+        // Close modal when clicking outside
+        modalOverlay.addEventListener('click', function(e) {
+            if (e.target === modalOverlay) {
+                closeModal();
+            }
+        });
+        
+        // VIOLATION: Screen readers can access background content
+        // VIOLATION: Keyboard users can tab to background elements
+        // VIOLATION: No announcement of modal state changes
+    </script>
+</body>
+</html>

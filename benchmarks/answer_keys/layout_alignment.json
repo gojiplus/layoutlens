@@ -1,10 +1,11 @@
 {
   "benchmark_info": {
     "category": "layout_alignment",
-    "version": "1.0",
-    "total_tests": 4,
+    "version": "1.1",
+    "total_tests": 8,
     "created": "2025-01-09",
-    "description": "Ground truth answers for layout alignment test cases"
+    "updated": "2025-01-12",
+    "description": "Ground truth answers for layout alignment test cases including modern CSS patterns"
   },
   "test_cases": {
     "nav_centered.html": {
@@ -121,6 +122,126 @@
         "example_type": "negative",
         "difficulty": "easy",
         "fix_required": "swap order values - logo order: 0, nav order: 1"
+      }
+    },
+    "flexbox_center_correct.html": {
+      "queries": {
+        "Is the hero content properly centered vertically and horizontally?": {
+          "expected": "yes",
+          "confidence_threshold": 0.9,
+          "reasoning": "Uses modern flexbox centering with both align-items: center and justify-content: center",
+          "measurable_criteria": "Perfect center alignment in both axes using flexbox properties",
+          "issue_severity": null
+        },
+        "Does the layout demonstrate modern CSS centering techniques?": {
+          "expected": "yes",
+          "confidence_threshold": 0.8,
+          "reasoning": "Flexbox is the modern standard for centering content",
+          "measurable_criteria": "Uses display: flex with proper alignment properties"
+        },
+        "Is the centering responsive and reliable across devices?": {
+          "expected": "yes",
+          "confidence_threshold": 0.9,
+          "reasoning": "Flexbox centering works consistently across all viewport sizes",
+          "measurable_criteria": "No dependency on fixed positioning or manual adjustments"
+        }
+      },
+      "metadata": {
+        "intentional_issue": false,
+        "example_type": "positive",
+        "difficulty": "easy",
+        "css_pattern": "flexbox_centering"
+      }
+    },
+    "flexbox_center_broken.html": {
+      "queries": {
+        "Is the hero content properly centered vertically and horizontally?": {
+          "expected": "no",
+          "confidence_threshold": 0.9,
+          "reasoning": "Missing align-items: center causes content to stick to top instead of vertical center",
+          "measurable_criteria": "Content positioned at top with manual padding instead of flex centering",
+          "issue_severity": "high"
+        },
+        "Does the layout use proper flexbox centering techniques?": {
+          "expected": "no",
+          "confidence_threshold": 0.8,
+          "reasoning": "Uses manual padding-top instead of flexbox align-items property",
+          "measurable_criteria": "Relies on padding-top: 15vh instead of align-items: center"
+        },
+        "Would this centering work reliably across different screen sizes?": {
+          "expected": "no",
+          "confidence_threshold": 0.8,
+          "reasoning": "Manual padding approach fails on different viewport heights",
+          "measurable_criteria": "Fixed padding values don't adapt to content or screen size"
+        }
+      },
+      "metadata": {
+        "intentional_issue": true,
+        "issue_type": "flexbox_implementation",
+        "example_type": "negative",
+        "difficulty": "medium",
+        "fix_required": "add align-items: center to .hero-section and remove padding-top",
+        "css_pattern": "flexbox_centering"
+      }
+    },
+    "grid_layout_correct.html": {
+      "queries": {
+        "Is the CSS Grid layout properly structured with semantic areas?": {
+          "expected": "yes",
+          "confidence_threshold": 0.9,
+          "reasoning": "Uses grid-template-areas for semantic layout structure and proper element positioning",
+          "measurable_criteria": "Clear grid-area assignments create predictable layout behavior",
+          "issue_severity": null
+        },
+        "Does the responsive behavior work correctly across different screen sizes?": {
+          "expected": "yes",
+          "confidence_threshold": 0.8,
+          "reasoning": "Grid areas adapt properly from desktop 2-column to mobile single-column layout",
+          "measurable_criteria": "Media query properly restructures grid-template-areas for mobile"
+        },
+        "Is the layout semantic and accessible for screen readers?": {
+          "expected": "yes",
+          "confidence_threshold": 0.9,
+          "reasoning": "Grid areas maintain logical document structure regardless of visual positioning",
+          "measurable_criteria": "Header, sidebar, main, footer maintain semantic order"
+        }
+      },
+      "metadata": {
+        "intentional_issue": false,
+        "example_type": "positive",
+        "difficulty": "medium",
+        "css_pattern": "css_grid_areas"
+      }
+    },
+    "grid_layout_broken.html": {
+      "queries": {
+        "Is the CSS Grid layout properly structured with semantic areas?": {
+          "expected": "no",
+          "confidence_threshold": 0.9,
+          "reasoning": "Missing grid-template-areas causes unpredictable element positioning based on DOM order",
+          "measurable_criteria": "No grid-area properties or template-areas defined",
+          "issue_severity": "high"
+        },
+        "Does the responsive behavior work correctly across different screen sizes?": {
+          "expected": "no",
+          "confidence_threshold": 0.8,
+          "reasoning": "Without grid areas, mobile layout becomes chaotic and unpredictable",
+          "measurable_criteria": "Media query cannot properly restructure layout without grid-template-areas"
+        },
+        "Would this layout be reliable and maintainable?": {
+          "expected": "no",
+          "confidence_threshold": 0.8,
+          "reasoning": "Layout depends on DOM order instead of semantic structure, making it fragile",
+          "measurable_criteria": "Element positioning changes if HTML order is modified"
+        }
+      },
+      "metadata": {
+        "intentional_issue": true,
+        "issue_type": "grid_implementation",
+        "example_type": "negative",
+        "difficulty": "medium",
+        "fix_required": "add grid-template-areas and corresponding grid-area properties",
+        "css_pattern": "css_grid_areas"
       }
     }
   },

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flexbox Centering - Broken Implementation</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body { 
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; 
+            background: #f5f7fa;
+        }
+        
+        .hero-section {
+            height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            /* MISSING: align-items: center; - no vertical centering */
+            justify-content: center; /* Only horizontal centering */
+            padding-top: 15vh; /* Manual spacing instead of proper centering */
+        }
+        
+        .hero-content {
+            text-align: center;
+            color: white;
+            max-width: 600px;
+            padding: 2rem;
+            /* Content will stick to top due to missing vertical centering */
+        }
+        
+        .hero-content h1 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            font-weight: 700;
+        }
+        
+        .hero-content p {
+            font-size: 1.25rem;
+            margin-bottom: 2rem;
+            opacity: 0.9;
+        }
+        
+        .cta-button {
+            background: #fff;
+            color: #667eea;
+            padding: 1rem 2rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        .cta-button:hover {
+            transform: translateY(-2px);
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .hero-content h1 {
+                font-size: 2rem;
+            }
+            /* Centering problem becomes more obvious on mobile */
+            .hero-section {
+                padding-top: 10vh;
+            }
+        }
+    </style>
+</head>
+<body>
+    <section class="hero-section">
+        <div class="hero-content">
+            <h1>Broken Flexbox Centering</h1>
+            <p>This content lacks proper vertical centering and relies on manual padding instead of flexbox alignment.</p>
+            <button class="cta-button">Get Started</button>
+        </div>
+    </section>
+</body>
+</html>
