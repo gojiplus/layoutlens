@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Test](https://github.com/gojiplus/layoutlens/actions/workflows/test.yml/badge.svg)](https://github.com/gojiplus/layoutlens/actions/workflows/test.yml)
 [![PyPI version](https://badge.fury.io/py/layoutlens.svg)](https://badge.fury.io/py/layoutlens)
-[![Downloads](https://static.pepy.tech/badge/paper_voice)](https://pepy.tech/project/paper_voice)
+[![Downloads](https://static.pepy.tech/badge/layoutlens)](https://pepy.tech/project/layoutlens)
 
 
 Write visual UI tests using natural language to validate web layouts, accessibility compliance, and user interface consistency across devices. LayoutLens combines computer vision AI with automated screenshot testing to provide comprehensive UI validation.
