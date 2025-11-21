@@ -1,4 +1,5 @@
 # Pre-commit hooks configuration for LayoutLens
+# Mirrors the GitHub Actions CI pipeline as closely as possible
 # See https://pre-commit.com for more information
 
 repos:
@@ -66,6 +67,29 @@ repos:
     hooks:
       - id: pydocstyle
         args: [--convention=numpy, --add-ignore=D100,D101,D102,D103,D104,D105,D107,D200,D212]
+
+  # Local hooks that mirror CI pipeline
+  - repo: local
+    hooks:
+      # Fast tests (mirrors CI fast test subset)
+      - id: pytest-fast
+        name: pytest-fast
+        entry: pytest
+        language: system
+        args: [tests/, -v, -x, --tb=short, -m, "not slow"]
+        types: [python]
+        pass_filenames: false
+        stages: [pre-commit]
+      
+      # Package build check (mirrors CI build step)
+      - id: build-check
+        name: build-check
+        entry: python
+        language: system
+        args: [-m, build, --outdir, /tmp/build-check]
+        types: [python]
+        pass_filenames: false
+        stages: [pre-push]
 
 # Configuration
 ci:

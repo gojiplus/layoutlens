@@ -1,0 +1,14 @@
+# Act configuration file for local GitHub Actions testing
+# See: https://github.com/nektos/act
+
+# Use medium Ubuntu runner by default
+-P ubuntu-latest=catthehacker/ubuntu:act-latest
+
+# Set default secrets for local testing
+-s OPENAI_API_KEY_TEST=fake-test-key-for-act
+
+# Use specific architecture if needed
+--container-architecture linux/amd64
+
+# Enable verbose logging for debugging
+-v

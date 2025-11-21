@@ -1,6 +1,6 @@
 # LayoutLens Development Makefile
 
-.PHONY: help install install-dev test test-unit test-integration test-e2e test-coverage lint format clean build docs serve-docs
+.PHONY: help install install-dev test test-unit test-integration test-e2e test-coverage lint format clean build docs serve-docs act-test act-build act-docs act-all pre-commit-install pre-commit-run ci-local
 
 # Default target
 help:
@@ -33,14 +33,26 @@ help:
 	@echo "  make docs            Build documentation"
 	@echo "  make serve-docs      Serve docs locally"
 	@echo ""
+	@echo "Local CI/CD with act:"
+	@echo "  make install-act     Install act (GitHub Actions runner)"
+	@echo "  make act-test        Run GitHub Actions test workflow locally"
+	@echo "  make act-build       Run GitHub Actions CI workflow locally" 
+	@echo "  make act-docs        Run GitHub Actions docs workflow locally"
+	@echo "  make act-all         Run all workflows locally"
+	@echo ""
+	@echo "Pre-commit hooks:"
+	@echo "  make pre-commit-install  Install pre-commit hooks"
+	@echo "  make pre-commit-run      Run all pre-commit hooks"
+	@echo "  make ci-local           Run full local CI pipeline"
+	@echo ""
 
 # Installation targets
 install:
 	pip install -e .
 
 install-dev:
-	pip install -e .
-	pip install -r requirements-test.txt
+	pip install -e ".[dev,test,docs]"
+	playwright install chromium
 
 install-browsers:
 	playwright install chromium
@@ -196,3 +208,54 @@ env-info:
 	@echo "Playwright version: $$(playwright --version 2>/dev/null || echo 'Not installed')"
 	@echo "Working directory: $$(pwd)"
 	@echo "Git branch: $$(git branch --show-current 2>/dev/null || echo 'Not a git repo')"
+
+# Local GitHub Actions with act
+install-act:
+	@echo "Installing act (GitHub Actions runner)..."
+	@if command -v brew >/dev/null 2>&1; then \
+		brew install act; \
+	elif command -v curl >/dev/null 2>&1; then \
+		curl https://raw.githubusercontent.com/nektos/act/master/install.sh | sudo bash; \
+	else \
+		echo "Please install act manually: https://github.com/nektos/act#installation"; \
+	fi
+
+act-test:
+	@echo "Running GitHub Actions test workflow locally with act..."
+	act -W .github/workflows/test.yml
+
+act-build:
+	@echo "Running GitHub Actions CI workflow locally with act..."
+	act -W .github/workflows/ci.yml
+
+act-docs:
+	@echo "Running GitHub Actions docs workflow locally with act..."
+	act -W .github/workflows/docs.yml
+
+act-all: act-build act-test act-docs
+	@echo "✅ All GitHub Actions workflows completed locally!"
+
+# Pre-commit integration
+pre-commit-install: install-dev
+	pre-commit install
+	pre-commit install --hook-type commit-msg
+
+pre-commit-run:
+	pre-commit run --all-files
+
+# Local CI pipeline that mirrors GitHub Actions
+ci-local: format lint test-coverage
+	@echo "🚀 Local CI pipeline completed successfully!"
+	@echo "This mirrors what runs in GitHub Actions."
+	@echo "Ready to push to GitHub!"
+
+# Development setup with all tools
+dev-setup-full: install-dev install-act pre-commit-install
+	@echo "🎉 Complete development environment setup finished!"
+	@echo ""
+	@echo "Available commands:"
+	@echo "  make ci-local     - Run full local CI (like GitHub Actions)"
+	@echo "  make act-all      - Test all GitHub workflows locally"
+	@echo "  make pre-commit-run - Run pre-commit hooks manually"
+	@echo ""
+	@echo "Now you can develop with confidence! 🚀"
