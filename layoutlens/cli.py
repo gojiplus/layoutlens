@@ -11,6 +11,7 @@ from typing import List, Optional
 
 from .config import Config, create_default_config
 from .api.core import LayoutLens
+from .api.test_suite import TestCase, TestSuite, TestResult
 
 
 def cmd_test(args) -> None:
@@ -51,9 +52,50 @@ def cmd_test(args) -> None:
             sys.exit(1)
     
     elif args.suite:
-        print("Error: Test suite functionality not yet implemented.")
-        print("Use individual page analysis with --page instead.")
-        sys.exit(1)
+        # Load and run test suite
+        try:
+            suite = TestSuite.load(Path(args.suite))
+            print(f"Running test suite: {suite.name}")
+            print(f"Description: {suite.description}")
+            print(f"Test cases: {len(suite.test_cases)}")
+            print("-" * 50)
+            
+            # Run the test suite
+            results = tester.run_test_suite(suite)
+            
+            # Display results
+            total_tests = 0
+            total_passed = 0
+            
+            for result in results:
+                print(f"\nTest Case: {result.test_case_name}")
+                print(f"  Tests: {result.total_tests}")
+                print(f"  Passed: {result.passed_tests}")
+                print(f"  Failed: {result.failed_tests}")
+                print(f"  Success Rate: {result.success_rate:.1%}")
+                print(f"  Duration: {result.duration_seconds:.2f}s")
+                
+                total_tests += result.total_tests
+                total_passed += result.passed_tests
+            
+            # Overall summary
+            overall_rate = total_passed / total_tests if total_tests > 0 else 0
+            print("\n" + "=" * 50)
+            print(f"Overall Results:")
+            print(f"  Total Tests: {total_tests}")
+            print(f"  Total Passed: {total_passed}")
+            print(f"  Success Rate: {overall_rate:.1%}")
+            
+            # Exit with error if below threshold
+            if overall_rate < 0.8:  # 80% threshold
+                sys.exit(1)
+                
+        except FileNotFoundError:
+            print(f"Error: Test suite file not found: {args.suite}")
+            sys.exit(1)
+        except Exception as e:
+            print(f"Error running test suite: {e}")
+            sys.exit(1)
     else:
         print("Error: Either --page or --suite must be specified")
         sys.exit(1)
@@ -140,8 +182,6 @@ def cmd_generate(args) -> None:
 def cmd_regression(args) -> None:
     """Execute regression testing command."""
     import glob
-    # Test suite functionality not implemented yet
-    # from .api.core import LayoutLens
     
     config_path = args.config if args.config else None
     tester = LayoutLens(config=config_path)

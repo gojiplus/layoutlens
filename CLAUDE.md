@@ -1,4 +1,4 @@
-# CLAUDE.md - LayoutLens v1.0.0
+# CLAUDE.md - LayoutLens v1.0.2
 
 This file provides guidance to Claude Code (claude.ai/code) when working with the LayoutLens codebase.
 
@@ -6,14 +6,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with th
 
 LayoutLens is a production-ready AI-powered UI testing framework that enables natural language visual testing. It captures screenshots using Playwright and analyzes them with OpenAI's GPT-4o Vision API to validate layouts, accessibility, responsive design, and visual consistency.
 
-**Key Achievement:** 95.2% accuracy on professional ground truth benchmark suite.
+**Current Version:** v1.0.2 (includes critical security fix for API key logging)
 
 ## Quick Start Commands
 
 ### Installation
 ```bash
-pip install -e .
-playwright install
+pip install layoutlens>=1.0.2
+playwright install chromium
 ```
 
 ### Basic Usage
@@ -21,151 +21,219 @@ playwright install
 # Set API key
 export OPENAI_API_KEY="your_key_here"
 
-# Test a single page
+# Basic analysis
 python -c "
 from layoutlens import LayoutLens
-tester = LayoutLens()
-result = tester.test_page('benchmarks/test_data/layout_alignment/nav_centered.html', 
-                         queries=['Is the navigation properly aligned?'])
-print(f'Success rate: {result.success_rate:.1%}')
+lens = LayoutLens()
+result = lens.analyze('https://example.com', 'Is the navigation user-friendly?')
+print(f'Answer: {result.answer}')
+print(f'Confidence: {result.confidence:.1%}')
 "
-
-# Run ground truth benchmark evaluation
-python benchmarks/evaluation/evaluator.py --answer-keys benchmarks/answer_keys --results layoutlens_output/results
 ```
 
-### CLI Usage
+### CLI Usage (Current Implementation)
 ```bash
-layoutlens --help
+# Show system info and check setup
+layoutlens info
+
+# Analyze a single page
+layoutlens test --page https://example.com --queries "Is this page accessible?,Is the design professional?"
+
+# Compare two pages
+layoutlens compare page1.html page2.html --query "Which design is better?"
+
+# Generate configuration file
+layoutlens generate config --output my_config.yaml
+
+# Validate configuration
+layoutlens validate --config my_config.yaml
 ```
 
-## Release v1.0.0 Architecture
+## Current API Structure (v1.0.2)
 
-### Core Package Structure
-- **`layoutlens/core.py`**: Main LayoutLens class with user-friendly API
-- **`layoutlens/config.py`**: Configuration management (YAML + env vars)
-- **`layoutlens/cli.py`**: Command-line interface
-- **`layoutlens/vision/`**: PageTester and visual analysis components
-- **`layoutlens/capture/`**: Screenshot capture with Playwright
-- **`layoutlens/analysis/`**: Query generation and DOM analysis
-- **`benchmarks/`**: Clean benchmark structure with test data and evaluation
-
-### Key Features Implemented
-- ✅ **Multi-viewport screenshot capture** (desktop, mobile, tablet)
-- ✅ **OpenAI GPT-4o Vision integration** for visual analysis
-- ✅ **Ground truth benchmark suite** with objective test cases
-- ✅ **Natural language query processing** 
-- ✅ **Configuration system** with YAML and environment variables
-- ✅ **CLI interface** for automation and CI/CD
-- ✅ **Professional documentation** and examples
-
-## Ground Truth Benchmark Suite
-
-The package includes a comprehensive benchmark with objectively measurable test cases:
-
-### Test Categories (95.2% Overall Accuracy)
-- **Layout Alignment Issues**: 100.0% accuracy (6/6 tests)
-  - Navigation centering (2% offset detection)
-  - Logo positioning (wrong side detection)  
-  - Button alignment (margin inconsistencies)
-
-- **Responsive Design Problems**: 100.0% accuracy (4/4 tests)
-  - Mobile viewport overflow
-  - Touch target sizing (below 44px minimum)
-  - Text readability (below 14px mobile standard)
-
-- **Accessibility (WCAG) Violations**: 100.0% accuracy (6/6 tests)
-  - Missing alt text
-  - Form label associations
-  - Keyboard navigation
-  - Heading hierarchy
-  - Table structure
-  - Color-only information
-
-- **Color Contrast Violations**: 80.0% accuracy (4/5 tests)
-  - WCAG AA compliance (4.5:1 ratio requirements)
-  - Calculated contrast ratios (1.07:1, 1.61:1, 1.92:1, etc.)
-
-### Benchmark Files Location
-- **`benchmarks/test_data/`**: Clean HTML test files organized by category
-- **`benchmarks/answer_keys/`**: JSON files with expected answers and evaluation criteria
-- **`benchmarks/evaluation/`**: Automated evaluation framework with semantic answer matching
-
-## Testing and Development
-
-### Running Tests
-```bash
-# Install test dependencies
-pip install pytest
-
-# Run core functionality tests  
-pytest tests/unit/test_config.py tests/unit/test_core.py -v
-
-# Run ground truth evaluation
-python benchmarks/evaluation/evaluator.py
-```
-
-### Example Test Cases
+### Core LayoutLens Class
 ```python
 from layoutlens import LayoutLens
 
-# Initialize with API key
-tester = LayoutLens(api_key="your_key")
-
-# Test single page
-result = tester.test_page("page.html", queries=[
-    "Is the navigation menu properly aligned?",
-    "Are the button sizes appropriate for mobile?"
-])
-
-# Compare two pages
-comparison = tester.compare_pages("before.html", "after.html")
-print(comparison['answer'])
+# Initialize
+lens = LayoutLens(
+    api_key="your-key",        # Optional if OPENAI_API_KEY env var set
+    model="gpt-4o-mini",       # Model to use
+    output_dir="custom_dir"    # Output directory for screenshots
+)
 ```
 
-## Package Structure (Post-Cleanup)
+### Main API Methods
+```python
+# Single page analysis
+result = lens.analyze(
+    source="https://example.com",  # URL or file path
+    query="Is this page user-friendly?",
+    viewport="desktop",            # "desktop", "mobile_portrait", "tablet_landscape"
+    context={"user_type": "elderly"}  # Optional context
+)
+
+# Compare multiple sources
+result = lens.compare(
+    sources=["page1.html", "page2.html"],
+    query="Which layout is better?",
+    context={"focus": "accessibility"}
+)
+
+# Batch analysis
+results = lens.analyze_batch(
+    sources=["page1.html", "page2.html"],
+    queries=["Is it accessible?", "Is it mobile-friendly?"],
+    viewport="desktop"
+)
+
+# Built-in checks
+result = lens.check_accessibility("https://example.com")
+result = lens.check_mobile_friendly("https://example.com")  
+result = lens.check_conversion_optimization("https://example.com")
+```
+
+### Result Objects
+All analysis methods return objects with these properties:
+```python
+result.answer      # String: Natural language answer
+result.confidence  # Float: Confidence score (0.0-1.0)
+result.reasoning   # String: Detailed explanation
+result.metadata    # Dict: Additional information
+```
+
+## Package Structure (Current)
 
 ```
 layoutlens/
-├── layoutlens/           # Core package
-│   ├── core.py          # Main LayoutLens class  
-│   ├── config.py        # Configuration system
-│   ├── cli.py           # Command line interface
-│   ├── vision/          # PageTester and visual analysis
-│   ├── capture/         # Screenshot capture
-│   └── analysis/        # Query generation
-├── benchmarks/          # Clean benchmark structure
-│   ├── generators/      # Scripts to create test data
-│   ├── test_data/       # HTML test files by category
-│   ├── answer_keys/     # Expected answers in JSON
-│   └── evaluation/      # Evaluation framework
-├── docs/               # Documentation
-├── examples/           # Usage examples
-└── tests/              # Test suite
+├── __init__.py           # Main exports
+├── api/
+│   ├── __init__.py
+│   └── core.py          # LayoutLens class
+├── vision/
+│   ├── __init__.py
+│   ├── analyzer.py      # VisionAnalyzer class
+│   ├── capture.py       # URLCapture class
+│   └── comparator.py    # LayoutComparator class
+├── integrations/
+│   ├── __init__.py
+│   └── github.py        # GitHub Actions integration
+├── config.py            # Configuration management
+└── cli.py              # Command-line interface
 ```
 
-## Performance Characteristics
+## CLI Commands (Working Implementation)
 
-- **Processing Time**: ~23 seconds average per test
-- **Accuracy**: 95.2% on objective ground truth benchmark
-- **Package Size**: ~50MB (cleaned from 300MB+ development version)
-- **Dependencies**: OpenAI, Playwright, BeautifulSoup4, PyYAML, Pillow
-- **Python Compatibility**: 3.8+
+### test command
+```bash
+# Analyze single page with custom queries
+layoutlens test --page https://example.com --queries "Is it accessible?,Is it responsive?"
+
+# Analyze with specific viewport
+layoutlens test --page mypage.html --queries "How's the mobile layout?" --viewports mobile_portrait
+```
+
+### compare command  
+```bash
+# Compare two pages
+layoutlens compare before.html after.html --query "Which design is more user-friendly?"
+```
+
+### info command
+```bash
+# Check system setup and dependencies
+layoutlens info
+```
+
+### generate command
+```bash
+# Generate default configuration
+layoutlens generate config
+
+# Generate test suite template  
+layoutlens generate suite
+```
+
+### validate command
+```bash
+# Validate configuration file
+layoutlens validate --config layoutlens.yaml
+```
+
+## Examples and Testing
+
+### Running Examples
+```bash
+# Basic usage patterns
+python examples/basic_usage.py
+
+# Advanced scenarios
+python examples/advanced_usage.py
+
+# Simple API demonstrations
+python examples/simple_api_usage.py
+```
+
+### Benchmark Evaluation  
+```bash
+# The package includes a benchmark system
+python benchmarks/evaluation/evaluator.py
+```
+
+## Configuration
+
+### Environment Variables
+- `OPENAI_API_KEY` - Required for OpenAI Vision API access
+
+### Custom Configuration
+```python
+# Pass parameters during initialization
+lens = LayoutLens(
+    model="gpt-4o",           # Use more powerful model
+    output_dir="screenshots"   # Custom output directory
+)
+```
+
+## Security Notes (v1.0.2)
+
+- ✅ **API key logging fixed** - CLI no longer exposes API keys in logs
+- ✅ **Secure by default** - No sensitive information logged
+- ⚠️ **Always use v1.0.2+** - Previous versions had security vulnerabilities
+
+## Limitations and Notes
+
+### Current Limitations
+- **Test suites**: CLI test suite functionality not yet implemented (use individual page analysis)
+- **Parallel processing**: Not yet available in CLI (use Python API for batch operations)
+- **Advanced configuration**: Limited CLI configuration options
+
+### Architecture Notes
+- **Screenshot capture**: Uses Playwright for reliable browser automation
+- **AI Analysis**: OpenAI GPT-4o Vision API for visual understanding
+- **Output format**: Natural language responses with confidence scores
+- **File support**: URLs, local HTML files, and image files
 
 ## Development Notes
 
-### What Was Removed for v1.0.0 Release
-- ❌ Legacy framework files (moved to clean v1.0 API)
-- ❌ Development virtual environments (~200MB)
-- ❌ Test output files and screenshots (~50MB)
-- ❌ Build artifacts and caches (~5MB)
-- ❌ Development-specific .md files
+### What Works (v1.0.2)
+- ✅ Core analysis API (`analyze`, `compare`, `analyze_batch`)
+- ✅ Built-in checks (accessibility, mobile-friendly, conversion)
+- ✅ CLI basic commands (test, compare, info, generate, validate)
+- ✅ Screenshot capture and analysis
+- ✅ Multiple viewport support
+- ✅ Context-aware analysis
+- ✅ Examples and documentation
 
-### What Was Fixed
-- ✅ OpenAI Vision API integration in PageTester
-- ✅ Screenshot capture using Playwright
-- ✅ Ground truth evaluation system
-- ✅ Package dependencies and structure
-- ✅ Configuration and CLI systems
+### What's Not Implemented
+- ❌ CLI test suite execution
+- ❌ Advanced parallel processing in CLI
+- ❌ Some legacy methods referenced in old docs
 
-This codebase is release-ready with professional-grade accuracy measurement and comprehensive documentation.
+## Performance Characteristics
+
+- **Processing Time**: ~15-30 seconds per analysis
+- **Accuracy**: High confidence on well-formed pages
+- **Dependencies**: OpenAI, Playwright, BeautifulSoup4, PyYAML, Pillow
+- **Python Compatibility**: 3.10+
+
+This codebase is production-ready with the core analysis functionality fully implemented and tested.

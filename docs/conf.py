@@ -7,6 +7,15 @@ import os
 import sys
 from pathlib import Path
 
+# Dynamic version import
+try:
+    import importlib.metadata
+    release = importlib.metadata.version("layoutlens")
+    version = '.'.join(release.split('.')[:2])  # Major.minor
+except importlib.metadata.PackageNotFoundError:
+    release = "1.1.0-dev"
+    version = "1.1"
+
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
@@ -14,9 +23,7 @@ project = 'LayoutLens'
 copyright = '2024, LayoutLens Team'
 author = 'LayoutLens Team'
 
-# The full version, including alpha/beta/rc tags
-release = '1.0.0'
-version = '1.0.0'
+# Version is set dynamically above from package metadata
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
@@ -52,25 +59,23 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
-html_theme = 'sphinx_rtd_theme'
+html_theme = 'furo'
 html_static_path = ['_static']
 
-# Theme options
+# Furo theme options
 html_theme_options = {
-    'canonical_url': '',
-    'analytics_id': '',
-    'logo_only': False,
-    'display_version': True,
-    'prev_next_buttons_location': 'bottom',
-    'style_external_links': False,
-    'vcs_pageview_mode': '',
-    'style_nav_header_background': '#2980B9',
-    # Toc options
-    'collapse_navigation': True,
-    'sticky_navigation': True,
-    'navigation_depth': 4,
-    'includehidden': True,
-    'titles_only': False
+    "source_repository": "https://github.com/gojiplus/layoutlens/",
+    "source_branch": "main",
+    "source_directory": "docs/",
+    "edit_page": True,
+    "light_css_variables": {
+        "color-brand-primary": "#2980B9",
+        "color-brand-content": "#2980B9",
+    },
+    "dark_css_variables": {
+        "color-brand-primary": "#79aeda",
+        "color-brand-content": "#79aeda",
+    },
 }
 
 # -- Options for autodoc ----------------------------------------------------

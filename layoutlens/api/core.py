@@ -11,13 +11,23 @@ import os
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Union, Any
+from typing import Any
 from urllib.parse import urlparse
 
 # Import vision components
 from ..vision.analyzer import VisionAnalyzer
 from ..vision.capture import URLCapture
 from ..vision.comparator import LayoutComparator
+
+# Import custom exceptions
+from ..exceptions import (
+    LayoutLensError, APIError, ScreenshotError, ValidationError,
+    AnalysisError, AuthenticationError, NetworkError, LayoutFileNotFoundError, 
+    handle_api_error, wrap_exception
+)
+
+# Import caching
+from ..cache import AnalysisCache, create_cache
 
 
 @dataclass
@@ -29,34 +39,34 @@ class AnalysisResult:
     answer: str
     confidence: float
     reasoning: str
-    screenshot_path: Optional[str] = None
+    screenshot_path: str | None = None
     viewport: str = "desktop"
     timestamp: str = field(default_factory=lambda: time.strftime("%Y-%m-%d %H:%M:%S"))
     execution_time: float = 0.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass  
 class ComparisonResult:
     """Result from comparing multiple sources."""
     
-    sources: List[str]
+    sources: list[str]
     query: str
     answer: str
     confidence: float
     reasoning: str
-    individual_analyses: List[AnalysisResult] = field(default_factory=list)
-    screenshot_paths: List[str] = field(default_factory=list)
+    individual_analyses: list[AnalysisResult] = field(default_factory=list)
+    screenshot_paths: list[str] = field(default_factory=list)
     timestamp: str = field(default_factory=lambda: time.strftime("%Y-%m-%d %H:%M:%S"))
     execution_time: float = 0.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class BatchResult:
     """Result from batch analysis."""
     
-    results: List[AnalysisResult]
+    results: list[AnalysisResult]
     total_queries: int
     successful_queries: int
     average_confidence: float
@@ -87,9 +97,12 @@ class LayoutLens:
     
     def __init__(
         self,
-        api_key: Optional[str] = None,
+        api_key: str | None = None,
         model: str = "gpt-4o-mini",
-        output_dir: str = "layoutlens_output"
+        output_dir: str = "layoutlens_output",
+        cache_enabled: bool = True,
+        cache_type: str = "memory",
+        cache_ttl: int = 3600
     ):
         """
         Initialize LayoutLens with OpenAI credentials.
@@ -102,10 +115,16 @@ class LayoutLens:
             OpenAI model to use for analysis
         output_dir : str, default "layoutlens_output"
             Directory for storing screenshots and results
+        cache_enabled : bool, default True
+            Whether to enable result caching for performance
+        cache_type : str, default "memory"
+            Type of cache backend: "memory" or "file"
+        cache_ttl : int, default 3600
+            Cache time-to-live in seconds (1 hour default)
         """
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         if not self.api_key:
-            raise ValueError("OpenAI API key required. Set OPENAI_API_KEY env var or pass api_key parameter.")
+            raise AuthenticationError("OpenAI API key required. Set OPENAI_API_KEY env var or pass api_key parameter.")
         
         self.model = model
         self.output_dir = Path(output_dir)
@@ -122,13 +141,22 @@ class LayoutLens:
         self.comparator = LayoutComparator(
             analyzer=self.analyzer
         )
+        
+        # Initialize cache
+        cache_dir = self.output_dir / "cache" if cache_type == "file" else None
+        self.cache = create_cache(
+            cache_type=cache_type,
+            cache_dir=cache_dir,
+            default_ttl=cache_ttl,
+            enabled=cache_enabled
+        )
     
     def analyze(
         self,
-        source: Union[str, Path],
+        source: str | Path,
         query: str,
         viewport: str = "desktop",
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> AnalysisResult:
         """
         Analyze a URL or screenshot with a natural language query.
@@ -156,30 +184,64 @@ class LayoutLens:
         """
         start_time = time.time()
         
+        # Input validation
+        if not query or not query.strip():
+            raise ValidationError("Query cannot be empty", field="query", value=query)
+        
+        # Check cache first
+        cache_key = self.cache.get_analysis_key(
+            source=str(source),
+            query=query,
+            viewport=viewport,
+            context=context
+        )
+        
+        cached_result = self.cache.get(cache_key)
+        if cached_result:
+            # Update execution time and return cached result
+            cached_result.execution_time = time.time() - start_time
+            cached_result.metadata["cache_hit"] = True
+            return cached_result
+        
         try:
             # Determine if source is URL or image file
             if self._is_url(source):
                 # Capture screenshot from URL
-                screenshot_path = self.capture.capture_url(
-                    url=str(source),
-                    viewport=viewport
-                )
+                try:
+                    screenshot_path = self.capture.capture_url(
+                        url=str(source),
+                        viewport=viewport
+                    )
+                except Exception as e:
+                    raise ScreenshotError(
+                        f"Failed to capture screenshot from URL: {str(e)}", 
+                        source=str(source), 
+                        viewport=viewport
+                    )
             else:
                 # Use existing image file
                 screenshot_path = str(source)
                 if not Path(screenshot_path).exists():
-                    raise FileNotFoundError(f"Screenshot file not found: {screenshot_path}")
+                    raise LayoutFileNotFoundError(f"Screenshot file not found: {screenshot_path}", file_path=screenshot_path)
             
             # Analyze with vision model
-            analysis = self.analyzer.analyze_screenshot(
-                screenshot_path=screenshot_path,
-                query=query,
-                context=context or {}
-            )
+            try:
+                analysis = self.analyzer.analyze_screenshot(
+                    screenshot_path=screenshot_path,
+                    query=query,
+                    context=context or {}
+                )
+            except Exception as e:
+                raise AnalysisError(
+                    f"Failed to analyze screenshot: {str(e)}", 
+                    query=query, 
+                    source=str(source),
+                    confidence=0.0
+                )
             
             execution_time = time.time() - start_time
             
-            return AnalysisResult(
+            result = AnalysisResult(
                 source=str(source),
                 query=query,
                 answer=analysis['answer'],
@@ -191,31 +253,31 @@ class LayoutLens:
                 metadata=analysis.get('metadata', {})
             )
             
+            # Cache the result
+            self.cache.set(cache_key, result)
+            
+            return result
+            
+        except LayoutLensError:
+            # Re-raise our custom exceptions
+            raise
         except Exception as e:
-            execution_time = time.time() - start_time
-            return AnalysisResult(
-                source=str(source),
-                query=query,
-                answer=f"Error during analysis: {str(e)}",
-                confidence=0.0,
-                reasoning="Analysis failed due to error",
-                execution_time=execution_time,
-                metadata={"error": str(e)}
-            )
+            # Wrap other exceptions
+            raise wrap_exception(e, "Analysis failed")
     
     def compare(
         self,
-        sources: List[Union[str, Path]],
+        sources: list[str | Path],
         query: str = "Are these layouts consistent?",
         viewport: str = "desktop",
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> ComparisonResult:
         """
         Compare multiple URLs or screenshots.
         
         Parameters
         ----------
-        sources : List[str or Path]
+        sources : list[str or Path]
             List of URLs or screenshot paths to compare
         query : str, default "Are these layouts consistent?"
             Natural language question for comparison
@@ -290,19 +352,19 @@ class LayoutLens:
     
     def analyze_batch(
         self,
-        sources: List[Union[str, Path]],
-        queries: List[str],
+        sources: list[str | Path],
+        queries: list[str],
         viewport: str = "desktop",
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> BatchResult:
         """
         Analyze multiple sources with multiple queries efficiently.
         
         Parameters
         ----------
-        sources : List[str or Path]
+        sources : list[str or Path]
             List of URLs or screenshot paths
-        queries : List[str]
+        queries : list[str]
             List of natural language queries
         viewport : str, default "desktop"
             Viewport size for URL captures
@@ -334,7 +396,7 @@ class LayoutLens:
             total_execution_time=total_execution_time
         )
     
-    def _is_url(self, source: Union[str, Path]) -> bool:
+    def _is_url(self, source: str | Path) -> bool:
         """Check if source is a URL or file path."""
         if isinstance(source, Path):
             return False
@@ -345,7 +407,7 @@ class LayoutLens:
     # Developer convenience methods
     def check_accessibility(
         self,
-        source: Union[str, Path],
+        source: str | Path,
         viewport: str = "desktop"
     ) -> AnalysisResult:
         """Quick accessibility check with common WCAG queries."""
@@ -363,7 +425,7 @@ class LayoutLens:
     
     def check_mobile_friendly(
         self,
-        source: Union[str, Path]
+        source: str | Path
     ) -> AnalysisResult:
         """Quick mobile responsiveness check."""
         query = """
@@ -380,7 +442,7 @@ class LayoutLens:
     
     def check_conversion_optimization(
         self,
-        source: Union[str, Path],
+        source: str | Path,
         viewport: str = "desktop"
     ) -> AnalysisResult:
         """Check for conversion-focused design elements."""
@@ -395,3 +457,20 @@ class LayoutLens:
         Provide specific recommendations to improve conversions.
         """
         return self.analyze(source, query, viewport)
+    
+    # Cache management methods
+    def get_cache_stats(self) -> dict[str, Any]:
+        """Get cache performance statistics."""
+        return self.cache.stats()
+    
+    def clear_cache(self) -> None:
+        """Clear all cached analysis results."""
+        self.cache.clear()
+    
+    def enable_cache(self) -> None:
+        """Enable caching."""
+        self.cache.enabled = True
+    
+    def disable_cache(self) -> None:
+        """Disable caching."""
+        self.cache.enabled = False

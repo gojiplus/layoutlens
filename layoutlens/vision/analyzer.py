@@ -46,8 +46,8 @@ class VisionAnalyzer:
         self,
         screenshot_path: str,
         query: str,
-        context: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        context: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """
         Analyze a screenshot with a natural language query.
         
@@ -133,7 +133,7 @@ class VisionAnalyzer:
         with open(image_path, "rb") as image_file:
             return base64.b64encode(image_file.read()).decode('utf-8')
     
-    def _build_system_prompt(self, context: Optional[Dict[str, Any]] = None) -> str:
+    def _build_system_prompt(self, context: dict[str, Any] | None = None) -> str:
         """Build context-aware system prompt."""
         base_prompt = """You are an expert UI/UX analyst specializing in visual design evaluation. 
 
@@ -171,7 +171,7 @@ REASONING: [Detailed explanation of your analysis]"""
         
         return base_prompt
     
-    def _build_user_prompt(self, query: str, context: Optional[Dict[str, Any]] = None) -> str:
+    def _build_user_prompt(self, query: str, context: dict[str, Any] | None = None) -> str:
         """Build user query prompt."""
         prompt = f"Please analyze this UI screenshot and answer: {query}"
         
@@ -182,7 +182,7 @@ REASONING: [Detailed explanation of your analysis]"""
         
         return prompt
     
-    def _parse_response(self, raw_response: str) -> Dict[str, Any]:
+    def _parse_response(self, raw_response: str) -> dict[str, Any]:
         """Parse structured response from the model."""
         try:
             lines = raw_response.strip().split('\n')
@@ -241,16 +241,16 @@ REASONING: [Detailed explanation of your analysis]"""
     
     def analyze_multiple_screenshots(
         self,
-        screenshot_paths: List[str],
+        screenshot_paths: list[str],
         query: str,
-        context: Optional[Dict[str, Any]] = None
-    ) -> List[Dict[str, Any]]:
+        context: dict[str, Any] | None = None
+    ) -> list[dict[str, Any]]:
         """
         Analyze multiple screenshots with the same query.
         
         Parameters
         ----------
-        screenshot_paths : List[str]
+        screenshot_paths : list[str]
             List of screenshot file paths
         query : str
             Natural language question
@@ -259,7 +259,7 @@ REASONING: [Detailed explanation of your analysis]"""
             
         Returns
         -------
-        List[dict]
+        list[dict]
             List of analysis results
         """
         results = []

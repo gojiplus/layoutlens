@@ -57,8 +57,8 @@ class URLCapture:
         self,
         url: str,
         viewport: str = "desktop",
-        wait_for_selector: Optional[str] = None,
-        wait_time: Optional[int] = None
+        wait_for_selector: str | None = None,
+        wait_time: int | None = None
     ) -> str:
         """
         Capture screenshot from a URL.
@@ -85,8 +85,8 @@ class URLCapture:
         self,
         url: str,
         viewport: str,
-        wait_for_selector: Optional[str],
-        wait_time: Optional[int]
+        wait_for_selector: str | None,
+        wait_time: int | None
     ) -> str:
         """Async implementation of URL capture."""
         
@@ -151,8 +151,8 @@ class URLCapture:
     def capture_multiple_viewports(
         self,
         url: str,
-        viewports: Optional[list] = None
-    ) -> Dict[str, str]:
+        viewports: list | None = None
+    ) -> dict[str, str]:
         """
         Capture screenshots from multiple viewports.
         
@@ -214,9 +214,9 @@ class BatchCapture:
     def capture_url_list(
         self,
         urls: list,
-        viewports: Optional[list] = None,
+        viewports: list | None = None,
         max_concurrent: int = 3
-    ) -> Dict[str, Dict[str, str]]:
+    ) -> dict[str, dict[str, str]]:
         """
         Capture multiple URLs with multiple viewports.
         
@@ -239,9 +239,9 @@ class BatchCapture:
     async def _batch_capture_async(
         self,
         urls: list,
-        viewports: Optional[list],
+        viewports: list | None,
         max_concurrent: int
-    ) -> Dict[str, Dict[str, str]]:
+    ) -> dict[str, dict[str, str]]:
         """Async batch capture implementation."""
         
         if viewports is None:

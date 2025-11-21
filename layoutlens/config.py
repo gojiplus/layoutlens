@@ -18,7 +18,7 @@ class ViewportConfig:
     device_scale_factor: float = 1.0
     is_mobile: bool = False
     has_touch: bool = False
-    user_agent: Optional[str] = None
+    user_agent: str | None = None
 
 
 @dataclass
@@ -26,25 +26,25 @@ class LLMConfig:
     """Configuration for Language Model providers."""
     provider: str = "openai"  # openai, anthropic, etc.
     model: str = "gpt-4o-mini"
-    api_key: Optional[str] = None
+    api_key: str | None = None
     api_key_env: str = "OPENAI_API_KEY"
     max_retries: int = 3
     timeout: int = 60
     temperature: float = 0.1
-    custom_params: Dict[str, Any] = field(default_factory=dict)
+    custom_params: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class ScreenshotConfig:
     """Configuration for screenshot capture."""
     format: str = "png"  # png, jpeg
-    quality: Optional[int] = None  # for jpeg
+    quality: int | None = None  # for jpeg
     full_page: bool = True
     omit_background: bool = False
     animations: str = "disabled"  # disabled, allow
     wait_timeout: int = 30000  # milliseconds
-    wait_for_selector: Optional[str] = None
-    mask_selectors: List[str] = field(default_factory=list)
+    wait_for_selector: str | None = None
+    mask_selectors: list[str] = field(default_factory=list)
     mask_color: str = "#FF0000"
 
 
@@ -52,7 +52,7 @@ class ScreenshotConfig:
 class TestConfig:
     """Configuration for test execution."""
     auto_generate_queries: bool = True
-    focus_areas: List[str] = field(default_factory=lambda: ["typography", "layout", "color", "accessibility"])
+    focus_areas: list[str] = field(default_factory=lambda: ["typography", "layout", "color", "accessibility"])
     parallel_execution: bool = False
     max_workers: int = 4
     continue_on_error: bool = True
@@ -91,7 +91,7 @@ class Config:
         ViewportConfig("desktop_large", 1920, 1080, 1.0, False, False)
     ]
     
-    def __init__(self, config_path: Optional[str] = None):
+    def __init__(self, config_path: str | None = None):
         """Initialize configuration.
         
         Parameters
@@ -105,7 +105,7 @@ class Config:
         self.test = TestConfig()
         self.output = OutputConfig()
         self.viewports = self.DEFAULT_VIEWPORTS.copy()
-        self.custom_queries: Dict[str, List[str]] = {}
+        self.custom_queries: dict[str, list[str]] = {}
         
         # Load from file if provided
         if config_path:
@@ -307,7 +307,7 @@ class Config:
         else:
             return base_path / subdir
     
-    def get_viewport_by_name(self, name: str) -> Optional[ViewportConfig]:
+    def get_viewport_by_name(self, name: str) -> ViewportConfig | None:
         """Get viewport configuration by name.
         
         Parameters
@@ -337,26 +337,26 @@ class Config:
         self.viewports = [v for v in self.viewports if v.name != viewport.name]
         self.viewports.append(viewport)
     
-    def add_custom_queries(self, category: str, queries: List[str]) -> None:
+    def add_custom_queries(self, category: str, queries: list[str]) -> None:
         """Add custom queries for a category.
         
         Parameters
         ----------
         category : str
             Category name for the queries
-        queries : List[str]
+        queries : list[str]
             List of query strings
         """
         if category not in self.custom_queries:
             self.custom_queries[category] = []
         self.custom_queries[category].extend(queries)
     
-    def validate(self) -> List[str]:
+    def validate(self) -> list[str]:
         """Validate configuration and return any issues.
         
         Returns
         -------
-        List[str]
+        list[str]
             List of validation errors (empty if valid)
         """
         errors = []

@@ -33,16 +33,16 @@ class LayoutComparator:
     
     def compare_layouts(
         self,
-        screenshot_paths: List[str],
+        screenshot_paths: list[str],
         query: str = "Are these layouts consistent?",
-        context: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        context: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """
         Compare multiple screenshots with a natural language query.
         
         Parameters
         ----------
-        screenshot_paths : List[str]
+        screenshot_paths : list[str]
             List of screenshot file paths to compare
         query : str, default "Are these layouts consistent?"
             Natural language question for comparison
@@ -137,8 +137,8 @@ class LayoutComparator:
         self,
         before_path: str,
         after_path: str,
-        context: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        context: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """
         Compare before/after screenshots for changes.
         
@@ -172,18 +172,18 @@ class LayoutComparator:
     
     def check_cross_browser_consistency(
         self,
-        screenshot_paths: List[str],
-        browser_names: List[str],
-        context: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        screenshot_paths: list[str],
+        browser_names: list[str],
+        context: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """
         Check consistency across different browsers.
         
         Parameters
         ----------
-        screenshot_paths : List[str]
+        screenshot_paths : list[str]
             Screenshots from different browsers
-        browser_names : List[str]
+        browser_names : list[str]
             Names of browsers corresponding to screenshots
         context : dict, optional
             Additional context
@@ -217,18 +217,18 @@ class LayoutComparator:
     
     def check_responsive_consistency(
         self,
-        screenshot_paths: List[str],
-        viewport_names: List[str],
-        context: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        screenshot_paths: list[str],
+        viewport_names: list[str],
+        context: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """
         Check responsive design consistency across viewports.
         
         Parameters
         ----------
-        screenshot_paths : List[str]
+        screenshot_paths : list[str]
             Screenshots from different viewports
-        viewport_names : List[str]
+        viewport_names : list[str]
             Names of viewports corresponding to screenshots
         context : dict, optional
             Additional context
@@ -261,7 +261,7 @@ class LayoutComparator:
         
         return self.compare_layouts(screenshot_paths, query, enhanced_context)
     
-    def _build_comparison_system_prompt(self, context: Optional[Dict[str, Any]] = None) -> str:
+    def _build_comparison_system_prompt(self, context: dict[str, Any] | None = None) -> str:
         """Build system prompt for comparison analysis."""
         
         base_prompt = """You are an expert UI/UX analyst specializing in comparative visual design analysis.
@@ -303,7 +303,7 @@ REASONING: [Detailed explanation comparing the screenshots]"""
         self, 
         query: str, 
         image_count: int, 
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> str:
         """Build user prompt for comparison."""
         

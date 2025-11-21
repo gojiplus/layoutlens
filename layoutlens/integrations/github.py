@@ -16,16 +16,16 @@ from ..api.core import LayoutLens, AnalysisResult
 class GitHubIntegration:
     """Helper class for GitHub Actions integration."""
     
-    def __init__(self, api_key: Optional[str] = None, model: str = "gpt-4o-mini"):
+    def __init__(self, api_key: str | None = None, model: str = "gpt-4o-mini"):
         """Initialize GitHub integration."""
         self.lens = LayoutLens(api_key=api_key, model=model)
     
     def analyze_pr_preview(
         self,
         preview_url: str,
-        queries: Optional[List[str]] = None,
-        viewports: Optional[List[str]] = None
-    ) -> Dict[str, Any]:
+        queries: list[str] | None = None,
+        viewports: list[str] | None = None
+    ) -> dict[str, Any]:
         """
         Analyze a pull request preview URL.
         
@@ -33,9 +33,9 @@ class GitHubIntegration:
         ----------
         preview_url : str
             URL of the preview deployment
-        queries : List[str], optional
+        queries : list[str], optional
             Custom queries, defaults to common PR checks
-        viewports : List[str], optional
+        viewports : list[str], optional
             Viewports to test, defaults to ["desktop", "mobile"]
             
         Returns
@@ -77,7 +77,7 @@ class GitHubIntegration:
         before_url: str,
         after_url: str,
         viewport: str = "desktop"
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Compare before/after URLs for a deployment.
         
@@ -106,7 +106,7 @@ class GitHubIntegration:
             "recommendation": self._generate_deployment_recommendation(result)
         }
     
-    def generate_pr_comment(self, analysis_results: Dict[str, Any]) -> str:
+    def generate_pr_comment(self, analysis_results: dict[str, Any]) -> str:
         """
         Generate a formatted PR comment from analysis results.
         
@@ -160,7 +160,7 @@ class GitHubIntegration:
         
         return comment
     
-    def _generate_summary(self, results: List[AnalysisResult], overall_score: float) -> str:
+    def _generate_summary(self, results: list[AnalysisResult], overall_score: float) -> str:
         """Generate a summary of analysis results."""
         high_confidence = len([r for r in results if r.confidence >= 0.8])
         total = len(results)
