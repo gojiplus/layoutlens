@@ -37,7 +37,7 @@ jobs:
 
     - name: Verify version consistency
       run: |
-        VERSION=$(python -c "import tomli; print(tomli.load(open('pyproject.toml', 'rb'))['project']['version'])")
+        VERSION=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
         echo "Version from pyproject.toml: $VERSION"
 
         if [ -n "${{ github.event.inputs.version }}" ]; then
