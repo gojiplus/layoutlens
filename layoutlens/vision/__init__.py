@@ -6,12 +6,7 @@ screenshot analysis, URL capture, and layout comparison.
 """
 
 from .analyzer import VisionAnalyzer
-from .capture import URLCapture, BatchCapture
+from .capture import BatchCapture, URLCapture
 from .comparator import LayoutComparator
 
-__all__ = [
-    "VisionAnalyzer",
-    "URLCapture", 
-    "BatchCapture",
-    "LayoutComparator"
-]
+__all__ = ["VisionAnalyzer", "URLCapture", "BatchCapture", "LayoutComparator"]

@@ -1,7 +1,7 @@
 {
   "benchmark_info": {
     "category": "responsive_design",
-    "version": "1.1", 
+    "version": "1.1",
     "total_tests": 5,
     "created": "2025-01-09",
     "updated": "2025-01-12",
@@ -30,7 +30,7 @@
           "measurable_criteria": "No fixed widths, proper viewport meta tag, flexible containers"
         },
         "Does the navigation adapt appropriately for mobile?": {
-          "expected": "yes", 
+          "expected": "yes",
           "confidence_threshold": 0.8,
           "reasoning": "Navigation stacks vertically on mobile with larger touch targets",
           "measurable_criteria": "flex-direction: column in mobile media query"
@@ -103,7 +103,7 @@
         "difficulty": "easy",
         "violations": [
           "fixed_width_layout",
-          "no_media_queries", 
+          "no_media_queries",
           "tiny_touch_targets",
           "unreadable_font_sizes",
           "horizontal_scrolling",
@@ -220,7 +220,7 @@
       },
       "metadata": {
         "intentional_issue": false,
-        "example_type": "positive", 
+        "example_type": "positive",
         "difficulty": "hard",
         "css_features": ["css_clamp", "custom_properties", "fluid_typography", "viewport_fixes"],
         "browser_support": "modern_with_graceful_degradation"
@@ -237,7 +237,7 @@
       },
       "tablet_portrait": {
         "expected_layout": "flexible_grid",
-        "navigation_style": "horizontal_compact", 
+        "navigation_style": "horizontal_compact",
         "content_adaptation": "moderate_scaling"
       },
       "desktop": {

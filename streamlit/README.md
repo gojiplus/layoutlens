@@ -36,7 +36,7 @@ streamlit run streamlit_app.py
    - **Enter URL**: Provide any website URL
 
 5. Configure your analysis:
-   - Choose the model (gpt-4o or gpt-4o-mini)  
+   - Choose the model (gpt-4o or gpt-4o-mini)
    - Select viewport for URL testing
 
 6. Add your questions:
@@ -69,9 +69,9 @@ python test_streamlit.py
 
 ### Viewports
 Available viewport options:
-- **Desktop**: 1920x1080 
+- **Desktop**: 1920x1080
 - **Mobile Portrait**: 375x667
-- **Mobile Landscape**: 667x375  
+- **Mobile Landscape**: 667x375
 - **Tablet**: 768x1024
 
 ## Architecture

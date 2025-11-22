@@ -6,12 +6,12 @@
     <title>Flexbox Centering - Broken Implementation</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        
-        body { 
-            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; 
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
             background: #f5f7fa;
         }
-        
+
         .hero-section {
             height: 100vh;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -20,7 +20,7 @@
             justify-content: center; /* Only horizontal centering */
             padding-top: 15vh; /* Manual spacing instead of proper centering */
         }
-        
+
         .hero-content {
             text-align: center;
             color: white;
@@ -28,19 +28,19 @@
             padding: 2rem;
             /* Content will stick to top due to missing vertical centering */
         }
-        
+
         .hero-content h1 {
             font-size: 3rem;
             margin-bottom: 1rem;
             font-weight: 700;
         }
-        
+
         .hero-content p {
             font-size: 1.25rem;
             margin-bottom: 2rem;
             opacity: 0.9;
         }
-        
+
         .cta-button {
             background: #fff;
             color: #667eea;
@@ -52,11 +52,11 @@
             cursor: pointer;
             transition: transform 0.2s;
         }
-        
+
         .cta-button:hover {
             transform: translateY(-2px);
         }
-        
+
         /* Responsive adjustments */
         @media (max-width: 768px) {
             .hero-content h1 {

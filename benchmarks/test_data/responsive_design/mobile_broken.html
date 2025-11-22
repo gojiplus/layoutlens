@@ -5,55 +5,55 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mobile-Broken Responsive Design</title>
     <style>
-        body { 
-            font-family: Arial, sans-serif; 
-            margin: 0; 
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
             font-size: 12px; /* Too small for mobile - VIOLATION */
         }
-        .container { 
+        .container {
             width: 1200px; /* Fixed width causes horizontal scroll - VIOLATION */
-            margin: 0 auto; 
-            padding: 1rem; 
+            margin: 0 auto;
+            padding: 1rem;
         }
-        .header { 
-            background: #2c3e50; 
-            color: white; 
-            padding: 1rem; 
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 1rem;
             width: 100%;
         }
-        .nav { 
-            display: flex; 
+        .nav {
+            display: flex;
             gap: 0.2rem; /* Too small gaps */
         }
-        .nav a { 
-            color: white; 
-            text-decoration: none; 
+        .nav a {
+            color: white;
+            text-decoration: none;
             padding: 2px 4px; /* Tiny touch targets - VIOLATION */
             font-size: 10px; /* Too small */
             height: 20px; /* Below 44px minimum - VIOLATION */
         }
-        .grid { 
-            display: grid; 
+        .grid {
+            display: grid;
             grid-template-columns: repeat(3, 1fr); /* Never changes - VIOLATION */
-            gap: 0.5rem; 
-            margin: 2rem 0; 
+            gap: 0.5rem;
+            margin: 2rem 0;
         }
-        .card { 
-            border: 1px solid #ddd; 
-            padding: 0.5rem; 
-            background: #f9f9f9; 
+        .card {
+            border: 1px solid #ddd;
+            padding: 0.5rem;
+            background: #f9f9f9;
             min-width: 300px; /* Causes overflow on mobile - VIOLATION */
         }
-        .btn { 
-            background: #007bff; 
-            color: white; 
+        .btn {
+            background: #007bff;
+            color: white;
             padding: 2px 4px; /* Too small for touch - VIOLATION */
-            border: none; 
+            border: none;
             font-size: 8px; /* Unreadable on mobile */
             height: 16px; /* Too small - VIOLATION */
             cursor: pointer;
         }
-        
+
         /* No mobile media queries - VIOLATION */
         /* Content will overflow and be unusable on mobile */
     </style>
@@ -70,7 +70,7 @@
             </nav>
         </div>
     </header>
-    
+
     <main class="container">
         <div class="grid">
             <div class="card">

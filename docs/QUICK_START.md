@@ -63,7 +63,7 @@ result = lens.compare([
 result = lens.check_mobile_friendly("https://your-site.com")
 ```
 
-### Accessibility Check  
+### Accessibility Check
 ```python
 result = lens.check_accessibility("https://your-site.com")
 ```
@@ -89,7 +89,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Test UI Quality
         uses: your-org/layoutlens/.github/actions/layoutlens@v1
         with:
@@ -110,7 +110,7 @@ jobs:
 
 The action will automatically:
 - ✅ Capture screenshots from your preview URL
-- 🤖 Analyze with AI using your queries  
+- 🤖 Analyze with AI using your queries
 - 💬 Comment on the PR with results
 - ❌ Fail the check if quality is below threshold
 
@@ -190,7 +190,7 @@ result = lens.analyze(
 - "Is the pricing clear and competitive-looking?"
 - "Are trust signals visible (security, reviews, guarantees)?"
 
-**SaaS:**  
+**SaaS:**
 - "Would new users understand how to get started?"
 - "Are upgrade prompts balanced (not annoying)?"
 - "Is the feature hierarchy clear?"

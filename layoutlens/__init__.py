@@ -1,32 +1,42 @@
 """LayoutLens: AI-Enabled UI Test System
 
-A production-ready AI-powered UI testing framework that enables natural language visual testing.
+A production-ready AI-powered UI testing framework that enables
+natural language visual testing.
 """
 
 # Import the main API
-from .api.core import LayoutLens, AnalysisResult, ComparisonResult, BatchResult
-from .api.test_suite import TestCase, TestSuite, TestResult
+from .api.core import AnalysisResult, BatchResult, ComparisonResult, LayoutLens
+from .api.test_suite import UITestCase, UITestResult, UITestSuite
+from .cache import AnalysisCache, create_cache
 from .config import Config
 from .exceptions import (
-    LayoutLensError, APIError, ScreenshotError, ConfigurationError, 
-    ValidationError, AnalysisError, TestSuiteError, AuthenticationError,
-    RateLimitError, TimeoutError, LayoutFileNotFoundError, NetworkError
+    AnalysisError,
+    APIError,
+    AuthenticationError,
+    ConfigurationError,
+    LayoutFileNotFoundError,
+    LayoutLensError,
+    NetworkError,
+    RateLimitError,
+    ScreenshotError,
+    TestSuiteError,
+    TimeoutError,
+    ValidationError,
 )
-from .cache import AnalysisCache, create_cache
 
 __all__ = [
-    "LayoutLens", 
-    "AnalysisResult", 
-    "ComparisonResult", 
+    "LayoutLens",
+    "AnalysisResult",
+    "ComparisonResult",
     "BatchResult",
-    "TestCase",
-    "TestSuite",
-    "TestResult",
+    "UITestCase",
+    "UITestSuite",
+    "UITestResult",
     "Config",
     # Exceptions
     "LayoutLensError",
     "APIError",
-    "ScreenshotError", 
+    "ScreenshotError",
     "ConfigurationError",
     "ValidationError",
     "AnalysisError",
@@ -38,15 +48,28 @@ __all__ = [
     "NetworkError",
     # Cache
     "AnalysisCache",
-    "create_cache"
+    "create_cache",
 ]
 
 # Import version dynamically from pyproject.toml
 try:
     import importlib.metadata
+
     __version__ = importlib.metadata.version("layoutlens")
-except importlib.metadata.PackageNotFoundError:
-    # Fallback for development/editable installs
-    __version__ = "1.1.0-dev"
+except (importlib.metadata.PackageNotFoundError, ImportError):
+    # Fallback for development/editable installs - read from pyproject.toml
+    try:
+        import tomllib
+        from pathlib import Path
+
+        pyproject_path = Path(__file__).parent.parent / "pyproject.toml"
+        if pyproject_path.exists():
+            with open(pyproject_path, "rb") as f:
+                data = tomllib.load(f)
+                __version__ = data["project"]["version"]
+        else:
+            __version__ = "1.2.0-dev"
+    except Exception:
+        __version__ = "1.2.0-dev"
 
 __author__ = "LayoutLens Team"

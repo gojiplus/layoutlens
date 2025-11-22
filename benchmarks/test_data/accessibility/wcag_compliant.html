@@ -5,43 +5,43 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WCAG Compliant Page</title>
     <style>
-        body { 
-            font-family: Arial, sans-serif; 
-            line-height: 1.6; 
-            color: #212529; /* High contrast: 16.9:1 */ 
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #212529; /* High contrast: 16.9:1 */
             background: #ffffff;
             margin: 2rem;
         }
-        h1 { 
-            color: #2c3e50; /* High contrast: 12.6:1 */ 
+        h1 {
+            color: #2c3e50; /* High contrast: 12.6:1 */
             margin-bottom: 1rem;
         }
         .form-group { margin: 1.5rem 0; }
-        label { 
-            display: block; 
-            font-weight: bold; 
-            margin-bottom: 0.5rem; 
+        label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
             color: #2c3e50;
         }
-        input[type="text"], input[type="email"] { 
-            width: 100%; 
-            padding: 0.75rem; 
-            border: 2px solid #6c757d; 
-            border-radius: 4px; 
+        input[type="text"], input[type="email"] {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #6c757d;
+            border-radius: 4px;
             font-size: 1rem;
             min-height: 44px; /* WCAG touch target minimum */
         }
-        input:focus { 
+        input:focus {
             outline: 3px solid #007bff; /* Clear focus indicator */
             outline-offset: 2px;
         }
-        .btn { 
-            background: #007bff; 
-            color: white; 
-            padding: 0.75rem 1.5rem; 
-            border: none; 
-            border-radius: 4px; 
-            font-size: 1rem; 
+        .btn {
+            background: #007bff;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 4px;
+            font-size: 1rem;
             cursor: pointer;
             min-height: 44px; /* Touch target */
         }
@@ -66,11 +66,11 @@
 </head>
 <body>
     <a href="#main" class="skip-link">Skip to main content</a>
-    
+
     <header>
         <h1>Accessible Contact Form</h1>
     </header>
-    
+
     <main id="main">
         <form>
             <div class="form-group">
@@ -78,13 +78,13 @@
                 <input type="text" id="name" name="name" required aria-describedby="name-help">
                 <small id="name-help">Enter your first and last name</small>
             </div>
-            
+
             <div class="form-group">
                 <label for="email">Email Address (required)</label>
                 <input type="email" id="email" name="email" required aria-describedby="email-help">
                 <small id="email-help">We'll never share your email address</small>
             </div>
-            
+
             <button type="submit" class="btn">Submit Form</button>
         </form>
     </main>

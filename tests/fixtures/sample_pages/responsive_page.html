@@ -8,20 +8,20 @@
         * {
             box-sizing: border-box;
         }
-        
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
             margin: 0;
             padding: 0;
             line-height: 1.6;
         }
-        
+
         .container {
             max-width: 1200px;
             margin: 0 auto;
             padding: 0 20px;
         }
-        
+
         /* Header */
         .header {
             background-color: #2c3e50;
@@ -31,18 +31,18 @@
             top: 0;
             z-index: 100;
         }
-        
+
         .nav {
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
-        
+
         .logo {
             font-size: 1.5rem;
             font-weight: bold;
         }
-        
+
         .nav-menu {
             display: flex;
             list-style: none;
@@ -50,17 +50,17 @@
             padding: 0;
             gap: 2rem;
         }
-        
+
         .nav-menu a {
             color: white;
             text-decoration: none;
             transition: opacity 0.3s;
         }
-        
+
         .nav-menu a:hover {
             opacity: 0.8;
         }
-        
+
         .menu-toggle {
             display: none;
             background: none;
@@ -69,7 +69,7 @@
             font-size: 1.5rem;
             cursor: pointer;
         }
-        
+
         /* Hero Section */
         .hero {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -77,17 +77,17 @@
             padding: 4rem 0;
             text-align: center;
         }
-        
+
         .hero h1 {
             font-size: 3rem;
             margin: 0 0 1rem 0;
         }
-        
+
         .hero p {
             font-size: 1.2rem;
             margin-bottom: 2rem;
         }
-        
+
         .cta-button {
             background-color: #e74c3c;
             color: white;
@@ -98,23 +98,23 @@
             cursor: pointer;
             transition: background-color 0.3s;
         }
-        
+
         .cta-button:hover {
             background-color: #c0392b;
         }
-        
+
         /* Content Grid */
         .content {
             padding: 4rem 0;
         }
-        
+
         .features {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 2rem;
             margin-bottom: 3rem;
         }
-        
+
         .feature-card {
             background: white;
             padding: 2rem;
@@ -122,7 +122,7 @@
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             text-align: center;
         }
-        
+
         .feature-icon {
             width: 60px;
             height: 60px;
@@ -135,7 +135,7 @@
             font-size: 1.5rem;
             color: white;
         }
-        
+
         /* Two Column Layout */
         .two-column {
             display: grid;
@@ -144,7 +144,7 @@
             align-items: center;
             margin: 3rem 0;
         }
-        
+
         .image-placeholder {
             background: linear-gradient(45deg, #f1f2f6, #ddd);
             height: 300px;
@@ -155,7 +155,7 @@
             color: #666;
             font-size: 1.2rem;
         }
-        
+
         /* Footer */
         .footer {
             background-color: #34495e;
@@ -163,39 +163,39 @@
             padding: 3rem 0 1rem 0;
             margin-top: 4rem;
         }
-        
+
         .footer-content {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
             gap: 2rem;
             margin-bottom: 2rem;
         }
-        
+
         .footer-section h3 {
             margin-bottom: 1rem;
         }
-        
+
         .footer-section ul {
             list-style: none;
             padding: 0;
         }
-        
+
         .footer-section ul li {
             margin-bottom: 0.5rem;
         }
-        
+
         .footer-section a {
             color: #bdc3c7;
             text-decoration: none;
         }
-        
+
         .footer-bottom {
             text-align: center;
             padding-top: 2rem;
             border-top: 1px solid #4a5f7a;
             color: #95a5a6;
         }
-        
+
         /* Responsive Design */
         @media (max-width: 768px) {
             .nav-menu {
@@ -208,51 +208,51 @@
                 background-color: #2c3e50;
                 padding: 1rem;
             }
-            
+
             .nav-menu.active {
                 display: flex;
             }
-            
+
             .menu-toggle {
                 display: block;
             }
-            
+
             .hero h1 {
                 font-size: 2rem;
             }
-            
+
             .two-column {
                 grid-template-columns: 1fr;
                 gap: 2rem;
             }
-            
+
             .features {
                 grid-template-columns: 1fr;
             }
-            
+
             .container {
                 padding: 0 15px;
             }
         }
-        
+
         @media (max-width: 480px) {
             .hero {
                 padding: 2rem 0;
             }
-            
+
             .hero h1 {
                 font-size: 1.8rem;
             }
-            
+
             .hero p {
                 font-size: 1rem;
             }
-            
+
             .cta-button {
                 padding: 0.8rem 1.5rem;
                 font-size: 1rem;
             }
-            
+
             .feature-card {
                 padding: 1.5rem;
             }
@@ -274,7 +274,7 @@
             </nav>
         </div>
     </header>
-    
+
     <section id="hero_section" class="hero">
         <div class="container">
             <h1 id="hero_title">Responsive Design Testing</h1>
@@ -282,7 +282,7 @@
             <button id="hero_cta" class="cta-button">Get Started</button>
         </div>
     </section>
-    
+
     <main class="content">
         <div class="container">
             <section id="features_section">
@@ -305,7 +305,7 @@
                     </div>
                 </div>
             </section>
-            
+
             <section id="content_section" class="two-column">
                 <div>
                     <h2>Adaptive Layouts</h2>
@@ -318,7 +318,7 @@
             </section>
         </div>
     </main>
-    
+
     <footer class="footer">
         <div class="container">
             <div class="footer-content">
@@ -352,7 +352,7 @@
             </div>
         </div>
     </footer>
-    
+
     <script>
         // Simple mobile menu toggle
         document.getElementById('menu_toggle').addEventListener('click', function() {

@@ -11,7 +11,7 @@ benchmarks_new/
 ├── test_data/              # Generated HTML test files (paired good/bad examples)
 │   ├── layout_alignment/   # Navigation centering, logo positioning
 │   ├── accessibility/      # WCAG compliance vs violations
-│   ├── responsive_design/  # Mobile-friendly vs broken layouts  
+│   ├── responsive_design/  # Mobile-friendly vs broken layouts
 │   └── ui_components/      # Well-designed forms and components
 ├── answer_keys/            # Expected answers in unified JSON format
 │   ├── layout_alignment.json
@@ -45,7 +45,7 @@ tester = LayoutLens()
 result = tester.test_page('benchmarks_new/test_data/layout_alignment/nav_centered.html')
 print(f'Navigation centered: {result.success_rate:.1%}')
 
-# Test negative example (should detect issues)  
+# Test negative example (should detect issues)
 result = tester.test_page('benchmarks_new/test_data/layout_alignment/nav_misaligned.html')
 print(f'Navigation misaligned: {result.success_rate:.1%}')
 "
@@ -64,11 +64,11 @@ python3 benchmarks_new/evaluation/evaluator.py \\
 
 ### Layout Alignment (4 tests)
 - **nav_centered.html** ✅ Perfect navigation centering
-- **nav_misaligned.html** ❌ 2% off-center (subtle issue)  
+- **nav_misaligned.html** ❌ 2% off-center (subtle issue)
 - **logo_correct.html** ✅ Logo on left (follows web conventions)
 - **logo_wrong.html** ❌ Logo on right (violates conventions)
 
-### Accessibility (2 tests)  
+### Accessibility (2 tests)
 - **wcag_compliant.html** ✅ Meets WCAG AA standards
 - **wcag_violations.html** ❌ Multiple accessibility violations
 
@@ -136,11 +136,11 @@ Categories Evaluated: 4
 
 ### ✅ **Clear Structure**
 - Scripts separate from data
-- Test files paired (good/bad examples)  
+- Test files paired (good/bad examples)
 - Unified answer key format
 - Dedicated evaluation framework
 
-### ✅ **Objective Testing** 
+### ✅ **Objective Testing**
 - Every test file has measurable criteria
 - Intentional issues with known causes
 - Semantic answer matching vs string matching
@@ -154,7 +154,7 @@ Categories Evaluated: 4
 
 ### ✅ **Better Coverage**
 - Paired positive/negative examples
-- Multiple difficulty levels  
+- Multiple difficulty levels
 - Real-world issue patterns
 - Comprehensive answer keys
 
@@ -184,7 +184,7 @@ python3 benchmarks_new/evaluation/evaluator.py
 
 ### Expected Benchmark Performance:
 - **Layout Alignment**: >95% accuracy (issues are measurable)
-- **Accessibility**: >90% accuracy (clear violations)  
+- **Accessibility**: >90% accuracy (clear violations)
 - **Responsive Design**: >85% accuracy (obvious mobile issues)
 - **UI Components**: >80% accuracy (design quality subjective)
 
@@ -197,6 +197,6 @@ The old `benchmarks/` folder can be migrated by:
 
 This new structure makes it crystal clear:
 - **What generates the data** (`generators/`)
-- **What the test data is** (`test_data/`)  
+- **What the test data is** (`test_data/`)
 - **What the right answers are** (`answer_keys/`)
 - **How to check if we're right** (`evaluation/`)

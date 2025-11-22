@@ -7,7 +7,7 @@ This directory contains working examples demonstrating LayoutLens usage patterns
 ### Core Examples
 - **`basic_usage.py`** - Essential patterns for getting started with the LayoutLens API
 - **`advanced_usage.py`** - Complex analysis scenarios and patterns
-- **`simple_api_usage.py`** - Quick examples of common use cases  
+- **`simple_api_usage.py`** - Quick examples of common use cases
 - **`layoutlens_config.yaml`** - Complete configuration reference
 - **`sample_test_suite.yaml`** - Sample test configuration
 
@@ -88,7 +88,7 @@ All examples use the actual LayoutLens API methods:
 - `compare(sources, query, context=None)` - Compare multiple pages
 - `analyze_batch(sources, queries, viewport="desktop", context=None)` - Batch analysis
 
-### Built-in Checks  
+### Built-in Checks
 - `check_accessibility(source)` - Accessibility compliance
 - `check_mobile_friendly(source)` - Mobile usability
 - `check_conversion_optimization(source)` - Conversion optimization
@@ -149,7 +149,7 @@ print(f"Confidence: {result.confidence:.1%}")
 ```python
 # Add context for more targeted analysis
 context = {
-    "user_type": "elderly_users", 
+    "user_type": "elderly_users",
     "purpose": "accessibility_audit",
     "business_context": "healthcare_website"
 }

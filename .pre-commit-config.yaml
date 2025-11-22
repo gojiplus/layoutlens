@@ -3,29 +3,13 @@
 # See https://pre-commit.com for more information
 
 repos:
-  # Python code formatting
-  - repo: https://github.com/psf/black
-    rev: 24.10.0
+  # Python code formatting and linting with Ruff (replaces black, isort, flake8)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.8
     hooks:
-      - id: black
-        args: [--line-length=88]
-
-  # Import sorting
-  - repo: https://github.com/pycqa/isort
-    rev: 5.13.2
-    hooks:
-      - id: isort
-        args: [--profile=black, --line-length=88]
-
-  # Python linting
-  - repo: https://github.com/pycqa/flake8
-    rev: 7.1.1
-    hooks:
-      - id: flake8
-        args: [--max-line-length=88, --extend-ignore=E203,E501,W503]
-        additional_dependencies:
-          - flake8-docstrings
-          - flake8-bugbear
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+      - id: ruff-format
 
   # Type checking
   - repo: https://github.com/pre-commit/mirrors-mypy
@@ -36,7 +20,7 @@ repos:
           - types-PyYAML
           - types-requests
           - types-pillow
-        args: [--ignore-missing-imports, --no-strict-optional]
+        args: [--config-file=pyproject.toml]
 
   # General code quality
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -61,30 +45,30 @@ repos:
       - id: bandit
         args: [--skip=B101,B601,B603,B607]
 
-  # Documentation
-  - repo: https://github.com/pycqa/pydocstyle
-    rev: 6.3.0
-    hooks:
-      - id: pydocstyle
-        args: [--convention=numpy, --add-ignore=D100,D101,D102,D103,D104,D105,D107,D200,D212]
+  # Documentation (disabled - using ruff for docstring checks)
+  # - repo: https://github.com/pycqa/pydocstyle
+  #   rev: 6.3.0
+  #   hooks:
+  #     - id: pydocstyle
+  #       args: [--convention=numpy, --add-ignore=D100,D101,D102,D103,D104,D105,D107,D200,D212]
 
   # Local hooks that mirror CI pipeline
   - repo: local
     hooks:
-      # Fast tests (mirrors CI fast test subset)
+      # Fast tests (mirrors CI fast test subset) - skip integration tests
       - id: pytest-fast
         name: pytest-fast
         entry: pytest
         language: system
-        args: [tests/, -v, -x, --tb=short, -m, "not slow"]
+        args: [tests/unit/, tests/test_comprehensive.py, tests/test_caching.py, tests/test_exceptions.py, tests/test_suite_functionality.py, -v, -x, --tb=short, -m, "not slow"]
         types: [python]
         pass_filenames: false
         stages: [pre-commit]
-      
+
       # Package build check (mirrors CI build step)
       - id: build-check
         name: build-check
-        entry: python
+        entry: python3
         language: system
         args: [-m, build, --outdir, /tmp/build-check]
         types: [python]

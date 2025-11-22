@@ -89,7 +89,7 @@ results = lens.analyze_batch(
 
 # Built-in checks
 result = lens.check_accessibility("https://example.com")
-result = lens.check_mobile_friendly("https://example.com")  
+result = lens.check_mobile_friendly("https://example.com")
 result = lens.check_conversion_optimization("https://example.com")
 ```
 
@@ -133,7 +133,7 @@ layoutlens test --page https://example.com --queries "Is it accessible?,Is it re
 layoutlens test --page mypage.html --queries "How's the mobile layout?" --viewports mobile_portrait
 ```
 
-### compare command  
+### compare command
 ```bash
 # Compare two pages
 layoutlens compare before.html after.html --query "Which design is more user-friendly?"
@@ -150,7 +150,7 @@ layoutlens info
 # Generate default configuration
 layoutlens generate config
 
-# Generate test suite template  
+# Generate test suite template
 layoutlens generate suite
 ```
 
@@ -174,7 +174,7 @@ python examples/advanced_usage.py
 python examples/simple_api_usage.py
 ```
 
-### Benchmark Evaluation  
+### Benchmark Evaluation
 ```bash
 # The package includes a benchmark system
 python benchmarks/evaluation/evaluator.py

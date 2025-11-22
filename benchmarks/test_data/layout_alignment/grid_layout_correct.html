@@ -6,18 +6,18 @@
     <title>CSS Grid Layout - Correct Implementation</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        
-        body { 
-            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; 
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
             background: #f8f9fa;
             padding: 2rem;
         }
-        
+
         .dashboard-grid {
             display: grid;
             grid-template-columns: 250px 1fr; /* Fixed sidebar, flexible main */
             grid-template-rows: auto 1fr auto; /* Header, content, footer */
-            grid-template-areas: 
+            grid-template-areas:
                 "sidebar header"
                 "sidebar main"
                 "sidebar footer";
@@ -26,7 +26,7 @@
             max-width: 1200px;
             margin: 0 auto;
         }
-        
+
         .sidebar {
             grid-area: sidebar;
             background: #2c3e50;
@@ -34,7 +34,7 @@
             padding: 1.5rem;
             border-radius: 8px;
         }
-        
+
         .header {
             grid-area: header;
             background: white;
@@ -42,7 +42,7 @@
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        
+
         .main-content {
             grid-area: main;
             background: white;
@@ -53,7 +53,7 @@
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 1rem;
         }
-        
+
         .footer {
             grid-area: footer;
             background: #6c757d;
@@ -62,30 +62,30 @@
             border-radius: 8px;
             text-align: center;
         }
-        
+
         .card {
             background: #f8f9fa;
             padding: 1.5rem;
             border-radius: 6px;
             border-left: 4px solid #007bff;
         }
-        
+
         .nav-item {
             padding: 0.75rem 0;
             border-bottom: 1px solid rgba(255,255,255,0.1);
         }
-        
+
         /* Responsive grid - collapses to single column on mobile */
         @media (max-width: 768px) {
             .dashboard-grid {
                 grid-template-columns: 1fr;
-                grid-template-areas: 
+                grid-template-areas:
                     "header"
                     "sidebar"
                     "main"
                     "footer";
             }
-            
+
             .main-content {
                 grid-template-columns: 1fr;
             }
@@ -101,12 +101,12 @@
             <div class="nav-item">Users</div>
             <div class="nav-item">Settings</div>
         </aside>
-        
+
         <header class="header">
             <h1>Dashboard - Perfect Grid Layout</h1>
             <p>This layout uses CSS Grid with proper template areas for semantic structure.</p>
         </header>
-        
+
         <main class="main-content">
             <div class="card">
                 <h3>Revenue</h3>
@@ -121,7 +121,7 @@
                 <p>Proper gap spacing creates consistent visual rhythm.</p>
             </div>
         </main>
-        
+
         <footer class="footer">
             <p>Footer stays properly positioned with grid-template-areas</p>
         </footer>

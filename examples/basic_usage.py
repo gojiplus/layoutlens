@@ -1,21 +1,23 @@
 """Basic usage examples for LayoutLens framework."""
 
 import os
+
 from layoutlens import LayoutLens
+
 
 # Example 1: Basic page analysis
 def basic_page_analysis():
     """Analyze a single HTML page with a natural language query."""
-    
+
     # Initialize LayoutLens
     tester = LayoutLens()
-    
+
     # Analyze a page with a custom query
     result = tester.analyze(
         source="benchmarks/test_data/layout_alignment/nav_centered.html",
-        query="Is the navigation menu properly centered and professional-looking?"
+        query="Is the navigation menu properly centered and professional-looking?",
     )
-    
+
     print(f"Analysis result: {result.answer}")
     print(f"Confidence: {result.confidence:.1%}")
     print(f"Reasoning: {result.reasoning[:200]}...")
@@ -24,16 +26,16 @@ def basic_page_analysis():
 # Example 2: Website analysis
 def website_analysis():
     """Analyze a live website."""
-    
+
     tester = LayoutLens()
-    
+
     # Analyze a live website (replace with actual URL)
     result = tester.analyze(
         source="https://example.com",
         query="Is this homepage user-friendly and accessible?",
-        viewport="desktop"
+        viewport="desktop",
     )
-    
+
     print(f"Website analysis: {result.answer}")
     print(f"Confidence: {result.confidence:.1%}")
 
@@ -41,18 +43,18 @@ def website_analysis():
 # Example 3: Compare two designs
 def compare_designs():
     """Compare two versions of a page."""
-    
+
     tester = LayoutLens()
-    
+
     # Compare two different layouts
     result = tester.compare(
         sources=[
             "benchmarks/test_data/layout_alignment/nav_centered.html",
-            "benchmarks/test_data/layout_alignment/nav_misaligned.html"
+            "benchmarks/test_data/layout_alignment/nav_misaligned.html",
         ],
-        query="Which layout has better navigation alignment?"
+        query="Which layout has better navigation alignment?",
     )
-    
+
     print(f"Comparison result: {result.answer}")
     print(f"Confidence: {result.confidence:.1%}")
 
@@ -60,35 +62,30 @@ def compare_designs():
 # Example 4: Batch analysis
 def batch_analysis():
     """Analyze multiple pages at once."""
-    
+
     tester = LayoutLens()
-    
+
     # Analyze multiple pages with the same query
     pages = [
         "benchmarks/test_data/layout_alignment/nav_centered.html",
-        "benchmarks/test_data/ui_components/form_well_designed.html"
+        "benchmarks/test_data/ui_components/form_well_designed.html",
     ]
-    
-    results = tester.analyze_batch(
-        sources=pages,
-        query="Is this page well-designed and user-friendly?"
-    )
-    
+
+    results = tester.analyze_batch(sources=pages, query="Is this page well-designed and user-friendly?")
+
     for i, result in enumerate(results):
-        print(f"Page {i+1}: {result.answer} (confidence: {result.confidence:.1%})")
+        print(f"Page {i + 1}: {result.answer} (confidence: {result.confidence:.1%})")
 
 
 # Example 5: Built-in accessibility check
 def accessibility_check():
     """Check accessibility compliance."""
-    
+
     tester = LayoutLens()
-    
+
     # Check accessibility of a page
-    result = tester.check_accessibility(
-        source="benchmarks/test_data/accessibility/good_contrast.html"
-    )
-    
+    result = tester.check_accessibility(source="benchmarks/test_data/accessibility/good_contrast.html")
+
     print(f"Accessibility assessment: {result.answer}")
     print(f"Confidence: {result.confidence:.1%}")
 
@@ -96,14 +93,12 @@ def accessibility_check():
 # Example 6: Mobile-friendly check
 def mobile_check():
     """Check mobile-friendliness."""
-    
+
     tester = LayoutLens()
-    
+
     # Check if page is mobile-friendly
-    result = tester.check_mobile_friendly(
-        source="benchmarks/test_data/responsive_design/mobile_optimized.html"
-    )
-    
+    result = tester.check_mobile_friendly(source="benchmarks/test_data/responsive_design/mobile_optimized.html")
+
     print(f"Mobile-friendly assessment: {result.answer}")
     print(f"Confidence: {result.confidence:.1%}")
 
@@ -111,22 +106,22 @@ def mobile_check():
 if __name__ == "__main__":
     print("LayoutLens Basic Usage Examples")
     print("=" * 40)
-    
+
     # Make sure to set your OpenAI API key
-    if not os.getenv('OPENAI_API_KEY'):
+    if not os.getenv("OPENAI_API_KEY"):
         print("Please set OPENAI_API_KEY environment variable")
         print("Example: export OPENAI_API_KEY='sk-your-key-here'")
         exit(1)
-    
+
     examples = [
         ("Basic page analysis", basic_page_analysis),
-        ("Website analysis", website_analysis), 
+        ("Website analysis", website_analysis),
         ("Compare designs", compare_designs),
         ("Batch analysis", batch_analysis),
         ("Accessibility check", accessibility_check),
-        ("Mobile-friendly check", mobile_check)
+        ("Mobile-friendly check", mobile_check),
     ]
-    
+
     for i, (name, func) in enumerate(examples, 1):
         print(f"\n{i}. {name}...")
         try:

@@ -6,7 +6,7 @@
       "confidence": "high"
     },
     {
-      "query": "Is the navigation menu visible?", 
+      "query": "Is the navigation menu visible?",
       "response": "Yes, the navigation menu is clearly visible at the top of the page. The menu items are well-spaced and have good contrast against the dark background.",
       "confidence": "high"
     },
@@ -67,7 +67,7 @@
       "error_type": "api_error"
     },
     {
-      "query": "Any query", 
+      "query": "Any query",
       "response": "The image appears to be corrupted or in an unsupported format. Please verify the image file.",
       "error_type": "image_error"
     },

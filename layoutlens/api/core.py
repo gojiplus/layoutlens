@@ -7,6 +7,7 @@ real-world developer workflows and live website testing.
 
 from __future__ import annotations
 
+import asyncio
 import os
 import time
 from dataclasses import dataclass, field
@@ -14,26 +15,32 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-# Import vision components
-from ..vision.analyzer import VisionAnalyzer
-from ..vision.capture import URLCapture
-from ..vision.comparator import LayoutComparator
+# Import caching
+from ..cache import create_cache
 
 # Import custom exceptions
 from ..exceptions import (
-    LayoutLensError, APIError, ScreenshotError, ValidationError,
-    AnalysisError, AuthenticationError, NetworkError, LayoutFileNotFoundError, 
-    handle_api_error, wrap_exception
+    AnalysisError,
+    AuthenticationError,
+    LayoutFileNotFoundError,
+    LayoutLensError,
+    ScreenshotError,
+    ValidationError,
+    wrap_exception,
 )
 
-# Import caching
-from ..cache import AnalysisCache, create_cache
+# Import provider components
+from ..providers import VisionProvider, create_provider
+
+# Import vision components
+from ..vision.capture import URLCapture
+from ..vision.comparator import LayoutComparator
 
 
 @dataclass
 class AnalysisResult:
     """Result from analyzing a single URL or screenshot."""
-    
+
     source: str
     query: str
     answer: str
@@ -46,10 +53,10 @@ class AnalysisResult:
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
-@dataclass  
+@dataclass
 class ComparisonResult:
     """Result from comparing multiple sources."""
-    
+
     sources: list[str]
     query: str
     answer: str
@@ -65,7 +72,7 @@ class ComparisonResult:
 @dataclass
 class BatchResult:
     """Result from batch analysis."""
-    
+
     results: list[AnalysisResult]
     total_queries: int
     successful_queries: int
@@ -77,42 +84,45 @@ class BatchResult:
 class LayoutLens:
     """
     Simple API for AI-powered UI testing with natural language.
-    
+
     This class provides an intuitive interface for analyzing websites and
     screenshots using natural language queries, designed for developer
     workflows and CI/CD integration.
-    
+
     Examples
     --------
     >>> lens = LayoutLens(api_key="sk-...")
     >>> result = lens.analyze("https://example.com", "Is the navigation clearly visible?")
     >>> print(result.answer)
-    
+
     >>> # Compare two designs
     >>> result = lens.compare(
-    ...     ["before.png", "after.png"], 
+    ...     ["before.png", "after.png"],
     ...     "Are these layouts consistent?"
     ... )
     """
-    
+
     def __init__(
         self,
         api_key: str | None = None,
         model: str = "gpt-4o-mini",
+        provider: str = "openrouter",
         output_dir: str = "layoutlens_output",
         cache_enabled: bool = True,
         cache_type: str = "memory",
-        cache_ttl: int = 3600
+        cache_ttl: int = 3600,
     ):
         """
-        Initialize LayoutLens with OpenAI credentials.
-        
+        Initialize LayoutLens with AI provider credentials.
+
         Parameters
         ----------
         api_key : str, optional
-            OpenAI API key. If not provided, will try OPENAI_API_KEY env var
+            API key for the provider. If not provided, will try OPENAI_API_KEY or OPENROUTER_API_KEY env vars
         model : str, default "gpt-4o-mini"
-            OpenAI model to use for analysis
+            Model to use for analysis (provider-specific naming)
+        provider : str, default "openrouter"
+            AI provider to use ("openrouter", "openai", "anthropic", "google")
         output_dir : str, default "layoutlens_output"
             Directory for storing screenshots and results
         cache_enabled : bool, default True
@@ -122,159 +132,198 @@ class LayoutLens:
         cache_ttl : int, default 3600
             Cache time-to-live in seconds (1 hour default)
         """
-        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
+        # Determine API key based on provider
+        self.api_key = api_key or self._get_api_key_for_provider(provider)
         if not self.api_key:
-            raise AuthenticationError("OpenAI API key required. Set OPENAI_API_KEY env var or pass api_key parameter.")
-        
+            raise AuthenticationError(
+                f"API key required for {provider} provider. "
+                f"Set OPENAI_API_KEY/OPENROUTER_API_KEY env var or pass api_key parameter."
+            )
+
         self.model = model
+        self.provider = provider
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(exist_ok=True)
-        
-        # Initialize components
-        self.analyzer = VisionAnalyzer(
+
+        # Initialize provider
+        self.vision_provider = create_provider(
+            provider_name=provider,
             api_key=self.api_key,
-            model=self.model
+            model=self.model,
         )
-        self.capture = URLCapture(
-            output_dir=str(self.output_dir / "screenshots")
-        )
-        self.comparator = LayoutComparator(
-            analyzer=self.analyzer
-        )
-        
+
+        # Initialize components
+        self.capture = URLCapture(output_dir=str(self.output_dir / "screenshots"))
+        self.comparator = LayoutComparator(vision_provider=self.vision_provider)
+
         # Initialize cache
-        cache_dir = self.output_dir / "cache" if cache_type == "file" else None
+        cache_dir = str(self.output_dir / "cache") if cache_type == "file" else "cache"
         self.cache = create_cache(
             cache_type=cache_type,
             cache_dir=cache_dir,
             default_ttl=cache_ttl,
-            enabled=cache_enabled
+            enabled=cache_enabled,
         )
-    
+
+    def _get_api_key_for_provider(self, provider: str) -> str | None:
+        """Get appropriate API key based on provider."""
+        if provider.lower() in (
+            "openrouter",
+            "openai",
+            "anthropic",
+            "google",
+            "gemini",
+        ):
+            # OpenRouter can be used for all providers
+            return os.getenv("OPENROUTER_API_KEY") or os.getenv("OPENAI_API_KEY")
+        return None
+
     def analyze(
         self,
         source: str | Path,
         query: str,
         viewport: str = "desktop",
-        context: dict[str, Any] | None = None
+        context: dict[str, Any] | None = None,
     ) -> AnalysisResult:
         """
         Analyze a URL or screenshot with a natural language query.
-        
+
         Parameters
         ----------
         source : str or Path
             URL to analyze or path to screenshot image
-        query : str  
+        query : str
             Natural language question about the UI
         viewport : str, default "desktop"
             Viewport size for URL capture ("desktop", "mobile", "tablet")
         context : dict, optional
             Additional context for analysis (user_type, browser, etc.)
-            
+
         Returns
         -------
         AnalysisResult
             Detailed analysis with answer, confidence, and reasoning
-            
+
         Examples
         --------
         >>> result = lens.analyze("https://github.com", "Is the search bar easy to find?")
         >>> result = lens.analyze("screenshot.png", "Are the buttons large enough for mobile?")
         """
         start_time = time.time()
-        
+
         # Input validation
         if not query or not query.strip():
             raise ValidationError("Query cannot be empty", field="query", value=query)
-        
+
         # Check cache first
-        cache_key = self.cache.get_analysis_key(
-            source=str(source),
-            query=query,
-            viewport=viewport,
-            context=context
-        )
-        
+        cache_key = self.cache.get_analysis_key(source=str(source), query=query, viewport=viewport, context=context)
+
         cached_result = self.cache.get(cache_key)
-        if cached_result:
+        if cached_result and isinstance(cached_result, AnalysisResult):
             # Update execution time and return cached result
             cached_result.execution_time = time.time() - start_time
             cached_result.metadata["cache_hit"] = True
             return cached_result
-        
+
         try:
             # Determine if source is URL or image file
             if self._is_url(source):
                 # Capture screenshot from URL
                 try:
-                    screenshot_path = self.capture.capture_url(
-                        url=str(source),
-                        viewport=viewport
-                    )
+                    screenshot_path = self.capture.capture_url(url=str(source), viewport=viewport)
                 except Exception as e:
                     raise ScreenshotError(
-                        f"Failed to capture screenshot from URL: {str(e)}", 
-                        source=str(source), 
-                        viewport=viewport
-                    )
+                        f"Failed to capture screenshot from URL: {str(e)}",
+                        source=str(source),
+                        viewport=viewport,
+                    ) from e
             else:
                 # Use existing image file
                 screenshot_path = str(source)
                 if not Path(screenshot_path).exists():
-                    raise LayoutFileNotFoundError(f"Screenshot file not found: {screenshot_path}", file_path=screenshot_path)
-            
-            # Analyze with vision model
+                    raise LayoutFileNotFoundError(
+                        f"Screenshot file not found: {screenshot_path}",
+                        file_path=screenshot_path,
+                    )
+
+            # Analyze with vision provider
             try:
-                analysis = self.analyzer.analyze_screenshot(
-                    screenshot_path=screenshot_path,
+                from ..providers import VisionAnalysisRequest
+
+                request = VisionAnalysisRequest(
+                    image_path=screenshot_path,
                     query=query,
-                    context=context or {}
+                    context=context,
+                    source_url=str(source) if self._is_url(source) else None,
+                    viewport=viewport,
                 )
+
+                vision_response = self.vision_provider.analyze_image(request)
+
+                analysis = {
+                    "answer": vision_response.answer,
+                    "confidence": vision_response.confidence,
+                    "reasoning": vision_response.reasoning,
+                    "metadata": vision_response.metadata,
+                }
+
             except Exception as e:
                 raise AnalysisError(
-                    f"Failed to analyze screenshot: {str(e)}", 
-                    query=query, 
+                    f"Failed to analyze screenshot: {str(e)}",
+                    query=query,
                     source=str(source),
-                    confidence=0.0
-                )
-            
+                    confidence=0.0,
+                ) from e
+
             execution_time = time.time() - start_time
-            
+
+            # Safe type conversion
+            confidence_value = analysis.get("confidence", 0.8)
+            confidence = float(confidence_value) if isinstance(confidence_value, int | float) else 0.8
+
+            metadata_dict = analysis.get("metadata", {})
+            if not isinstance(metadata_dict, dict):
+                metadata_dict = {}
+
             result = AnalysisResult(
                 source=str(source),
                 query=query,
-                answer=analysis['answer'],
-                confidence=analysis['confidence'],
-                reasoning=analysis['reasoning'],
+                answer=str(analysis.get("answer", "")),
+                confidence=confidence,
+                reasoning=str(analysis.get("reasoning", "")),
                 screenshot_path=screenshot_path,
                 viewport=viewport,
                 execution_time=execution_time,
-                metadata=analysis.get('metadata', {})
+                metadata={
+                    **metadata_dict,
+                    "cache_hit": False,
+                    "provider": self.provider,
+                    "model": self.model,
+                },
             )
-            
+
             # Cache the result
             self.cache.set(cache_key, result)
-            
+
             return result
-            
+
         except LayoutLensError:
             # Re-raise our custom exceptions
             raise
         except Exception as e:
             # Wrap other exceptions
-            raise wrap_exception(e, "Analysis failed")
-    
+            raise wrap_exception(e, "Analysis failed") from e
+
     def compare(
         self,
         sources: list[str | Path],
         query: str = "Are these layouts consistent?",
         viewport: str = "desktop",
-        context: dict[str, Any] | None = None
+        context: dict[str, Any] | None = None,
     ) -> ComparisonResult:
         """
         Compare multiple URLs or screenshots.
-        
+
         Parameters
         ----------
         sources : list[str or Path]
@@ -285,12 +334,12 @@ class LayoutLens:
             Viewport size for URL captures
         context : dict, optional
             Additional context for analysis
-            
+
         Returns
         -------
         ComparisonResult
             Comparison analysis with overall assessment
-            
+
         Examples
         --------
         >>> result = lens.compare([
@@ -299,45 +348,43 @@ class LayoutLens:
         ... ], "Did the redesign improve the user experience?")
         """
         start_time = time.time()
-        
+
         try:
             # Analyze each source individually first
             individual_results = []
             screenshot_paths = []
-            
+
             for source in sources:
                 if self._is_url(source):
                     screenshot_path = self.capture.capture_url(str(source), viewport)
                 else:
                     screenshot_path = str(source)
-                
+
                 screenshot_paths.append(screenshot_path)
-                
+
                 # Individual analysis
                 individual_result = self.analyze(source, query, viewport, context)
                 individual_results.append(individual_result)
-            
+
             # Comparative analysis
             comparison = self.comparator.compare_layouts(
-                screenshot_paths=screenshot_paths,
-                query=query,
-                context=context or {}
+                screenshot_paths=screenshot_paths, query=query, context=context or {}
             )
-            
+
             execution_time = time.time() - start_time
-            
+
             return ComparisonResult(
                 sources=[str(s) for s in sources],
                 query=query,
-                answer=comparison['answer'],
-                confidence=comparison['confidence'],
-                reasoning=comparison['reasoning'],
+                answer=comparison["answer"],
+                confidence=comparison["confidence"],
+                reasoning=comparison["reasoning"],
                 individual_analyses=individual_results,
                 screenshot_paths=screenshot_paths,
                 execution_time=execution_time,
-                metadata=comparison.get('metadata', {})
+                metadata=comparison.get("metadata", {}),
             )
-            
+
         except Exception as e:
             execution_time = time.time() - start_time
             return ComparisonResult(
@@ -347,19 +394,19 @@ class LayoutLens:
                 confidence=0.0,
                 reasoning="Comparison failed due to error",
                 execution_time=execution_time,
-                metadata={"error": str(e)}
+                metadata={"error": str(e)},
             )
-    
+
     def analyze_batch(
         self,
         sources: list[str | Path],
         queries: list[str],
         viewport: str = "desktop",
-        context: dict[str, Any] | None = None
+        context: dict[str, Any] | None = None,
     ) -> BatchResult:
         """
         Analyze multiple sources with multiple queries efficiently.
-        
+
         Parameters
         ----------
         sources : list[str or Path]
@@ -370,7 +417,7 @@ class LayoutLens:
             Viewport size for URL captures
         context : dict, optional
             Additional context for analysis
-            
+
         Returns
         -------
         BatchResult
@@ -378,55 +425,255 @@ class LayoutLens:
         """
         start_time = time.time()
         results = []
-        
+
         for source in sources:
             for query in queries:
-                result = self.analyze(source, query, viewport, context)
-                results.append(result)
-        
+                try:
+                    result = self.analyze(source, query, viewport, context)
+                    results.append(result)
+                except Exception as e:
+                    # Create error result for failed analysis
+                    error_result = AnalysisResult(
+                        source=str(source),
+                        query=query,
+                        answer=f"Error analyzing {source}: {str(e)}",
+                        confidence=0.0,
+                        reasoning=f"Analysis failed due to: {str(e)}",
+                        metadata={
+                            "error": str(e),
+                            "error_type": type(e).__name__,
+                        },
+                    )
+                    results.append(error_result)
+
         # Calculate aggregate metrics
         successful_results = [r for r in results if r.confidence > 0]
         total_execution_time = time.time() - start_time
-        
+
         return BatchResult(
             results=results,
             total_queries=len(results),
             successful_queries=len(successful_results),
-            average_confidence=sum(r.confidence for r in successful_results) / len(successful_results) if successful_results else 0.0,
-            total_execution_time=total_execution_time
+            average_confidence=(
+                sum(r.confidence for r in successful_results) / len(successful_results) if successful_results else 0.0
+            ),
+            total_execution_time=total_execution_time,
         )
-    
+
+    async def analyze_async(
+        self,
+        source: str | Path,
+        query: str,
+        viewport: str = "desktop",
+        context: dict[str, Any] | None = None,
+    ) -> AnalysisResult:
+        """
+        Async version of analyze method for concurrent processing.
+
+        Parameters
+        ----------
+        source : str or Path
+            URL or path to screenshot file
+        query : str
+            Natural language query about the UI
+        viewport : str, default "desktop"
+            Viewport size for URL captures ("desktop", "mobile_portrait", etc.)
+        context : dict, optional
+            Additional context for analysis
+
+        Returns
+        -------
+        AnalysisResult
+            Analysis result with answer, confidence, and metadata
+        """
+        # Input validation
+        if not query or not query.strip():
+            raise ValidationError("Query cannot be empty", field="query", value=query)
+
+        start_time = time.time()
+
+        # Check cache first
+        cache_key = self.cache.get_analysis_key(source=str(source), query=query, viewport=viewport, context=context)
+
+        cached_result = self.cache.get(cache_key)
+        if cached_result and isinstance(cached_result, AnalysisResult):
+            cached_result.execution_time = time.time() - start_time
+            cached_result.metadata["cache_hit"] = True
+            return cached_result
+
+        try:
+            # Handle URL vs file path
+            if self._is_url(source):
+                # For now, run capture in thread pool (Playwright isn't fully async here)
+                loop = asyncio.get_event_loop()
+                screenshot_path = await loop.run_in_executor(None, self.capture.capture_url, str(source), viewport)
+            else:
+                screenshot_path = str(source)
+                if not Path(screenshot_path).exists():
+                    raise LayoutFileNotFoundError(
+                        f"Screenshot file not found: {screenshot_path}",
+                        file_path=screenshot_path,
+                    )
+
+            # Use provider's async analysis
+            from ..providers import VisionAnalysisRequest
+
+            request = VisionAnalysisRequest(
+                image_path=screenshot_path,
+                query=query,
+                context=context,
+                source_url=str(source) if self._is_url(source) else None,
+                viewport=viewport,
+            )
+
+            vision_response = await self.vision_provider.analyze_image_async(request)
+
+            execution_time = time.time() - start_time
+
+            result = AnalysisResult(
+                source=str(source),
+                query=query,
+                answer=vision_response.answer,
+                confidence=vision_response.confidence,
+                reasoning=vision_response.reasoning,
+                screenshot_path=screenshot_path,
+                viewport=viewport,
+                execution_time=execution_time,
+                metadata={
+                    **vision_response.metadata,
+                    "cache_hit": False,
+                    "provider": self.provider,
+                    "model": self.model,
+                },
+            )
+
+            # Cache the result
+            self.cache.set(cache_key, result)
+            return result
+
+        except Exception as e:
+            if isinstance(e, LayoutLensError):
+                raise
+            raise AnalysisError(
+                f"Failed to analyze screenshot: {str(e)}",
+                query=query,
+                source=str(source),
+                confidence=0.0,
+            ) from e
+
+    async def analyze_batch_async(
+        self,
+        sources: list[str | Path],
+        queries: list[str],
+        viewport: str = "desktop",
+        context: dict[str, Any] | None = None,
+        max_concurrent: int = 5,
+    ) -> BatchResult:
+        """
+        Analyze multiple sources with multiple queries concurrently.
+
+        Parameters
+        ----------
+        sources : list[str or Path]
+            List of URLs or screenshot paths
+        queries : list[str]
+            List of natural language queries
+        viewport : str, default "desktop"
+            Viewport size for URL captures
+        context : dict, optional
+            Additional context for analysis
+        max_concurrent : int, default 5
+            Maximum number of concurrent analyses
+
+        Returns
+        -------
+        BatchResult
+            Batch analysis results with aggregated metrics
+        """
+        start_time = time.time()
+
+        # Create semaphore to limit concurrent operations
+        semaphore = asyncio.Semaphore(max_concurrent)
+
+        async def analyze_single(source: str | Path, query: str) -> AnalysisResult:
+            async with semaphore:
+                return await self.analyze_async(source, query, viewport, context)
+
+        # Create tasks for all source/query combinations
+        tasks = []
+        for source in sources:
+            for query in queries:
+                task = asyncio.create_task(analyze_single(source, query))
+                tasks.append(task)
+
+        # Execute all tasks concurrently
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Process results and handle exceptions
+        processed_results = []
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                # Create error result for failed analysis
+                source_idx = i // len(queries)
+                query_idx = i % len(queries)
+                source = sources[source_idx]
+                query = queries[query_idx]
+
+                error_result = AnalysisResult(
+                    source=str(source),
+                    query=query,
+                    answer=f"Error analyzing {source}: {str(result)}",
+                    confidence=0.0,
+                    reasoning=f"Analysis failed due to: {str(result)}",
+                    metadata={
+                        "error": str(result),
+                        "error_type": type(result).__name__,
+                    },
+                )
+                processed_results.append(error_result)
+            else:
+                # result should be AnalysisResult here
+                assert isinstance(result, AnalysisResult), f"Expected AnalysisResult, got {type(result)}"
+                processed_results.append(result)
+
+        # Calculate aggregate metrics
+        successful_results = [r for r in processed_results if r.confidence > 0]
+        total_execution_time = time.time() - start_time
+
+        return BatchResult(
+            results=processed_results,
+            total_queries=len(processed_results),
+            successful_queries=len(successful_results),
+            average_confidence=(
+                sum(r.confidence for r in successful_results) / len(successful_results) if successful_results else 0.0
+            ),
+            total_execution_time=total_execution_time,
+        )
+
     def _is_url(self, source: str | Path) -> bool:
         """Check if source is a URL or file path."""
         if isinstance(source, Path):
             return False
-        
+
         parsed = urlparse(str(source))
         return bool(parsed.scheme and parsed.netloc)
 
     # Developer convenience methods
-    def check_accessibility(
-        self,
-        source: str | Path,
-        viewport: str = "desktop"
-    ) -> AnalysisResult:
+    def check_accessibility(self, source: str | Path, viewport: str = "desktop") -> AnalysisResult:
         """Quick accessibility check with common WCAG queries."""
         query = """
         Analyze this page for accessibility issues. Check:
         1. Color contrast and readability
-        2. Button and link sizing for touch targets  
+        2. Button and link sizing for touch targets
         3. Visual hierarchy and heading structure
         4. Form labels and input clarity
         5. Overall usability for users with disabilities
-        
+
         Provide specific feedback on what works well and what needs improvement.
         """
         return self.analyze(source, query, viewport)
-    
-    def check_mobile_friendly(
-        self,
-        source: str | Path
-    ) -> AnalysisResult:
+
+    def check_mobile_friendly(self, source: str | Path) -> AnalysisResult:
         """Quick mobile responsiveness check."""
         query = """
         Evaluate this page for mobile usability:
@@ -435,16 +682,12 @@ class LayoutLens:
         3. Is navigation accessible on small screens?
         4. Does content fit properly without horizontal scrolling?
         5. Are forms easy to use on mobile?
-        
+
         Rate the mobile experience and suggest improvements.
         """
         return self.analyze(source, query, "mobile")
-    
-    def check_conversion_optimization(
-        self,
-        source: str | Path,
-        viewport: str = "desktop"
-    ) -> AnalysisResult:
+
+    def check_conversion_optimization(self, source: str | Path, viewport: str = "desktop") -> AnalysisResult:
         """Check for conversion-focused design elements."""
         query = """
         Analyze this page for conversion optimization:
@@ -453,24 +696,24 @@ class LayoutLens:
         3. Are there any friction points in the user flow?
         4. Does the design build trust and credibility?
         5. Is the page focused or too cluttered?
-        
+
         Provide specific recommendations to improve conversions.
         """
         return self.analyze(source, query, viewport)
-    
+
     # Cache management methods
     def get_cache_stats(self) -> dict[str, Any]:
         """Get cache performance statistics."""
         return self.cache.stats()
-    
+
     def clear_cache(self) -> None:
         """Clear all cached analysis results."""
         self.cache.clear()
-    
+
     def enable_cache(self) -> None:
         """Enable caching."""
         self.cache.enabled = True
-    
+
     def disable_cache(self) -> None:
         """Disable caching."""
         self.cache.enabled = False

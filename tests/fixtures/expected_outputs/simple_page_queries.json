@@ -9,7 +9,7 @@
     },
     {
       "query": "Is the main title visible and prominent?",
-      "element_id": "main_title", 
+      "element_id": "main_title",
       "category": "visibility",
       "expected_answer": "yes",
       "confidence": 0.95

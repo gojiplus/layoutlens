@@ -55,7 +55,7 @@
         "wcag_level": "AA",
         "accessibility_features": [
           "skip_link",
-          "proper_labels", 
+          "proper_labels",
           "focus_indicators",
           "color_contrast",
           "touch_targets",
@@ -112,7 +112,7 @@
       "metadata": {
         "intentional_issue": true,
         "issue_type": "accessibility_violations",
-        "example_type": "negative", 
+        "example_type": "negative",
         "difficulty": "easy",
         "wcag_level": "fails_AA",
         "violations": [
@@ -170,7 +170,7 @@
         "wcag_level": "meets_AA",
         "accessibility_features": [
           "focus_trapping",
-          "focus_restoration", 
+          "focus_restoration",
           "keyboard_navigation",
           "aria_dialog",
           "skip_links",
@@ -194,7 +194,7 @@
           "measurable_criteria": "No focus styles, no Escape key handler, no tab trapping"
         },
         "Does the modal meet ARIA standards for dialogs?": {
-          "expected": "no", 
+          "expected": "no",
           "confidence_threshold": 0.8,
           "reasoning": "Missing role='dialog', aria-modal, and aria-labelledby attributes",
           "measurable_criteria": "No ARIA attributes for modal accessibility"
@@ -234,7 +234,7 @@
   "validation_config": {
     "confidence_thresholds": {
       "high_confidence": 0.9,
-      "medium_confidence": 0.7, 
+      "medium_confidence": 0.7,
       "low_confidence": 0.5
     },
     "accuracy_target": 0.95,

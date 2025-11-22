@@ -22,12 +22,12 @@ help:
 # Custom targets
 clean-all:
 	rm -rf $(BUILDDIR)/*
-	
+
 livehtml:
 	sphinx-autobuild "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
-	
+
 linkcheck:
 	@$(SPHINXBUILD) -b linkcheck "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
-	
+
 install-deps:
 	pip install -e ..[docs]

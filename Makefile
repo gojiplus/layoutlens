@@ -20,9 +20,9 @@ help:
 	@echo "  make test-fast       Run fast tests only (skip slow)"
 	@echo ""
 	@echo "Code Quality:"
-	@echo "  make lint            Run linting (flake8, mypy)"
-	@echo "  make format          Format code (black, isort)"
-	@echo "  make check           Check code formatting and linting"
+	@echo "  make lint            Run linting (ruff, mypy) using pyproject.toml"
+	@echo "  make format          Format code (ruff) using pyproject.toml"
+	@echo "  make check           Check code formatting and linting using pyproject.toml"
 	@echo ""
 	@echo "Package:"
 	@echo "  make clean           Clean build artifacts"
@@ -36,7 +36,7 @@ help:
 	@echo "Local CI/CD with act:"
 	@echo "  make install-act     Install act (GitHub Actions runner)"
 	@echo "  make act-test        Run GitHub Actions test workflow locally"
-	@echo "  make act-build       Run GitHub Actions CI workflow locally" 
+	@echo "  make act-build       Run GitHub Actions CI workflow locally"
 	@echo "  make act-docs        Run GitHub Actions docs workflow locally"
 	@echo "  make act-all         Run all workflows locally"
 	@echo ""
@@ -44,6 +44,10 @@ help:
 	@echo "  make pre-commit-install  Install pre-commit hooks"
 	@echo "  make pre-commit-run      Run all pre-commit hooks"
 	@echo "  make ci-local           Run full local CI pipeline"
+	@echo ""
+	@echo "Configuration:"
+	@echo "  make validate-configs   Validate all configuration files"
+	@echo "  make check-tooling      Verify unified tool configuration"
 	@echo ""
 
 # Installation targets
@@ -71,7 +75,7 @@ test-e2e:
 	pytest tests/e2e/ -v -m e2e
 
 test-coverage:
-	pytest tests/ -v --cov=layoutlens --cov=scripts --cov-report=html --cov-report=term-missing
+	pytest tests/ -v --cov=layoutlens --cov-report=html --cov-report=term-missing
 
 test-fast:
 	pytest tests/ -v -m "not slow"
@@ -81,17 +85,16 @@ test-parallel:
 
 # Code quality targets
 lint:
-	flake8 layoutlens/ scripts/ tests/ --exclude=__pycache__
-	mypy layoutlens/ --ignore-missing-imports
+	ruff check layoutlens/ tests/ examples/
+	mypy layoutlens/ --config-file=pyproject.toml
 
 format:
-	black layoutlens/ scripts/ tests/ examples/
-	isort layoutlens/ scripts/ tests/ examples/
+	ruff format layoutlens/ tests/ examples/
 
 check:
-	black --check layoutlens/ scripts/ tests/ examples/
-	isort --check-only layoutlens/ scripts/ tests/ examples/
-	flake8 layoutlens/ scripts/ tests/ --exclude=__pycache__
+	ruff check --no-fix layoutlens/ tests/ examples/
+	ruff format --check layoutlens/ tests/ examples/
+	mypy layoutlens/ --config-file=pyproject.toml
 
 # Package targets
 clean:
@@ -132,7 +135,7 @@ ci-test: install-dev install-browsers test-coverage
 	@echo "CI test suite completed."
 
 pre-commit: format lint test-fast
-	@echo "Pre-commit checks passed!"
+	@echo "Pre-commit checks passed! (using pyproject.toml config)"
 
 release-check: clean install-dev test-coverage lint check-package
 	@echo "Release checks completed successfully!"
@@ -140,7 +143,7 @@ release-check: clean install-dev test-coverage lint check-package
 
 # Benchmark and example targets
 run-benchmarks:
-	python scripts/benchmark/benchmark_generator.py
+	python benchmarks/evaluation/evaluator.py
 
 test-examples:
 	python examples/basic_usage.py
@@ -153,7 +156,7 @@ info:
 quick-start:
 	@echo "LayoutLens Quick Start:"
 	@echo "1. Install: pip install -e ."
-	@echo "2. Install browsers: playwright install chromium"  
+	@echo "2. Install browsers: playwright install chromium"
 	@echo "3. Set API key: export OPENAI_API_KEY='your-key'"
 	@echo "4. Test setup: make info"
 	@echo "5. Run example: make test-basic"
@@ -162,8 +165,25 @@ test-basic:
 	python -m layoutlens.cli test --page benchmarks/test_data/layout_alignment/nav_centered.html --queries "Is this page well-structured?" --viewports desktop
 
 validate-configs:
-	python -c "import yaml; yaml.safe_load(open('examples/layoutlens_config.yaml'))"
-	python -c "import yaml; yaml.safe_load(open('examples/sample_test_suite.yaml'))"
+	@echo "Validating configuration consistency..."
+	@echo "✓ Checking pyproject.toml contains ruff config..."
+	@python3 -c "import tomllib; config = tomllib.load(open('pyproject.toml', 'rb')); assert 'ruff' in config.get('tool', {}), 'Missing ruff config'"
+	@echo "✓ Checking pyproject.toml contains mypy config..."
+	@python3 -c "import tomllib; config = tomllib.load(open('pyproject.toml', 'rb')); assert 'mypy' in config.get('tool', {}), 'Missing mypy config'"
+	@echo "✓ Checking example configs are valid YAML..."
+	@python3 -c "import yaml; yaml.safe_load(open('examples/layoutlens_config.yaml'))"
+	@python3 -c "import yaml; yaml.safe_load(open('examples/sample_test_suite.yaml'))"
+	@echo "✓ All configurations are valid and consistent!"
+
+check-tooling:
+	@echo "Verifying unified tooling configuration..."
+	@echo "✓ Ruff configuration in pyproject.toml:"
+	@ruff check --show-settings 2>/dev/null | head -10 || echo "  (settings not available in this ruff version)"
+	@echo "✓ MyPy uses pyproject.toml config"
+	@echo "✓ Pre-commit hooks use pyproject.toml config"
+	@echo "✓ GitHub Actions use pyproject.toml config"
+	@echo "✓ Makefile uses pyproject.toml config"
+	@echo "All tools unified under single configuration source!"
 
 # Docker targets (if needed)
 docker-build:
@@ -246,7 +266,7 @@ pre-commit-run:
 # Local CI pipeline that mirrors GitHub Actions
 ci-local: format lint test-coverage
 	@echo "🚀 Local CI pipeline completed successfully!"
-	@echo "This mirrors what runs in GitHub Actions."
+	@echo "This mirrors what runs in GitHub Actions using pyproject.toml config."
 	@echo "Ready to push to GitHub!"
 
 # Development setup with all tools

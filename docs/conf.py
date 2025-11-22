@@ -5,13 +5,13 @@
 
 import os
 import sys
-from pathlib import Path
 
 # Dynamic version import
 try:
     import importlib.metadata
+
     release = importlib.metadata.version("layoutlens")
-    version = '.'.join(release.split('.')[:2])  # Major.minor
+    version = ".".join(release.split(".")[:2])  # Major.minor
 except importlib.metadata.PackageNotFoundError:
     release = "1.1.0-dev"
     version = "1.1"
@@ -19,9 +19,9 @@ except importlib.metadata.PackageNotFoundError:
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = 'LayoutLens'
-copyright = '2024, LayoutLens Team'
-author = 'LayoutLens Team'
+project = "LayoutLens"
+copyright = "2024, LayoutLens Team"
+author = "LayoutLens Team"
 
 # Version is set dynamically above from package metadata
 
@@ -29,21 +29,21 @@ author = 'LayoutLens Team'
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 # Add the project root to Python path for autodoc
-sys.path.insert(0, os.path.abspath('..'))
+sys.path.insert(0, os.path.abspath(".."))
 
 extensions = [
-    'sphinx.ext.autodoc',
-    'sphinx.ext.autosummary',
-    'sphinx.ext.viewcode',
-    'sphinx.ext.napoleon',
-    'sphinx.ext.intersphinx',
-    'myst_parser',
+    "sphinx.ext.autodoc",
+    "sphinx.ext.autosummary",
+    "sphinx.ext.viewcode",
+    "sphinx.ext.napoleon",
+    "sphinx.ext.intersphinx",
+    "myst_parser",
 ]
 
 # MyST Markdown support
 myst_enable_extensions = [
     "colon_fence",
-    "deflist", 
+    "deflist",
     "dollarmath",
     "html_admonition",
     "html_image",
@@ -53,14 +53,14 @@ myst_enable_extensions = [
     "tasklist",
 ]
 
-templates_path = ['_templates']
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
+templates_path = ["_templates"]
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
-html_theme = 'furo'
-html_static_path = ['_static']
+html_theme = "furo"
+html_static_path = ["_static"]
 
 # Furo theme options
 html_theme_options = {
@@ -80,11 +80,11 @@ html_theme_options = {
 
 # -- Options for autodoc ----------------------------------------------------
 autodoc_default_options = {
-    'members': True,
-    'member-order': 'bysource',
-    'special-members': '__init__',
-    'undoc-members': True,
-    'exclude-members': '__weakref__'
+    "members": True,
+    "member-order": "bysource",
+    "special-members": "__init__",
+    "undoc-members": True,
+    "exclude-members": "__weakref__",
 }
 
 # Napoleon settings
@@ -105,8 +105,8 @@ napoleon_attr_annotations = True
 
 # -- Options for intersphinx extension ---------------------------------------
 intersphinx_mapping = {
-    'python': ('https://docs.python.org/3/', None),
-    'playwright': ('https://playwright.dev/python/', None),
+    "python": ("https://docs.python.org/3/", None),
+    "playwright": ("https://playwright.dev/python/", None),
 }
 
 # -- Autosummary settings ----------------------------------------------------
@@ -120,13 +120,13 @@ html_logo = None
 html_favicon = None
 
 # Custom CSS
-html_css_files = []
+html_css_files: list[str] = []
 
 # GitHub integration
 html_context = {
     "display_github": True,
     "github_user": "gojiplus",
-    "github_repo": "layoutlens", 
+    "github_repo": "layoutlens",
     "github_version": "main",
     "conf_py_path": "/docs/",
 }
