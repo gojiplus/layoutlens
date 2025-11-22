@@ -1,10 +1,10 @@
 # LayoutLens: AI-Enabled UI Test System
 
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Test](https://github.com/gojiplus/layoutlens/actions/workflows/test.yml/badge.svg)](https://github.com/gojiplus/layoutlens/actions/workflows/test.yml)
+[![Test](https://github.com/gojiplus/layoutlens/actions/workflows/ci.yml/badge.svg)](https://github.com/gojiplus/layoutlens/actions/workflows/ci.yml)
 [![PyPI version](https://badge.fury.io/py/layoutlens.svg)](https://badge.fury.io/py/layoutlens)
 [![Downloads](https://static.pepy.tech/badge/layoutlens)](https://pepy.tech/project/layoutlens)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 
 Write visual UI tests using natural language to validate web layouts, accessibility compliance, and user interface consistency across devices. LayoutLens combines computer vision AI with automated screenshot testing to provide comprehensive UI validation.
