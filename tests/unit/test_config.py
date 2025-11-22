@@ -214,9 +214,10 @@ viewports:
         results_path = config.get_output_path("results")
         custom_path = config.get_output_path("custom")
 
-        assert str(screenshots_path) == "/test/output/screenshots"
-        assert str(results_path) == "/test/output/results"
-        assert str(custom_path) == "/test/output/custom"
+        # Normalize paths for cross-platform compatibility
+        assert str(screenshots_path) == str(Path("/test/output/screenshots"))
+        assert str(results_path) == str(Path("/test/output/results"))
+        assert str(custom_path) == str(Path("/test/output/custom"))
 
     def test_config_viewport_management(self):
         """Test viewport configuration management."""

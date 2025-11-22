@@ -354,7 +354,7 @@ class TestFileStructure(unittest.TestCase):
             with self.subTest(file=file_path):
                 if Path(file_path).exists():
                     try:
-                        with open(file_path) as f:
+                        with open(file_path, encoding="utf-8") as f:
                             compile(f.read(), file_path, "exec")
                     except SyntaxError as e:
                         self.fail(f"Syntax error in {file_path}: {e}")
@@ -386,7 +386,7 @@ class TestExamplesAndDocs(unittest.TestCase):
             with self.subTest(file=file_path):
                 if Path(file_path).exists():
                     try:
-                        with open(file_path) as f:
+                        with open(file_path, encoding="utf-8") as f:
                             compile(f.read(), file_path, "exec")
                     except SyntaxError as e:
                         self.fail(f"Syntax error in {file_path}: {e}")

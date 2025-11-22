@@ -213,7 +213,9 @@ class TestLayoutLensProviderIntegration:
 
         # Verify provider was called with file path directly
         call_args = mock_provider.analyze_image.call_args[0][0]
-        assert call_args.image_path == "/path/to/mobile_screenshot.png"
+        # Normalize paths for cross-platform compatibility
+        expected_path = str(Path("/path/to/mobile_screenshot.png"))
+        assert call_args.image_path == expected_path
         assert call_args.source_url is None  # No URL for file path
         assert call_args.viewport == "mobile_portrait"
 
