@@ -49,6 +49,10 @@ jobs:
 
         echo "VERSION=$VERSION" >> $GITHUB_ENV
 
+    - name: Install Playwright browsers
+      run: |
+        python -m playwright install chromium
+
     - name: Run tests before publishing
       run: |
         python -m pip install -e ".[test]"
