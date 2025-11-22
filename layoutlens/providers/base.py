@@ -138,7 +138,7 @@ Focus on:
         import json
         import re
 
-        # Try to extract JSON from response
+        # Try to extract JSON from response first
         json_match = re.search(r'\{[^{}]*"answer"[^{}]*\}', response_text)
 
         if json_match:
@@ -160,6 +160,31 @@ Focus on:
             except (json.JSONDecodeError, ValueError):
                 pass
 
+        # Try to parse structured text response (ANSWER:/CONFIDENCE:/REASONING: format)
+        answer_match = re.search(r"ANSWER:\s*(.+?)(?=\n(?:CONFIDENCE|REASONING)|$)", response_text, re.DOTALL)
+        confidence_match = re.search(r"CONFIDENCE:\s*([0-9]*\.?[0-9]+)", response_text)
+        reasoning_match = re.search(r"REASONING:\s*(.+?)$", response_text, re.DOTALL)
+
+        if answer_match:
+            answer = answer_match.group(1).strip()
+            confidence = float(confidence_match.group(1)) if confidence_match else 0.5
+            reasoning = reasoning_match.group(1).strip() if reasoning_match else "Analysis completed"
+
+            return VisionAnalysisResponse(
+                answer=answer,
+                confidence=confidence,
+                reasoning=reasoning,
+                metadata={
+                    "source": request.image_path,
+                    "query": request.query,
+                    "viewport": request.viewport,
+                    "raw_response": response_text,
+                    "parsing_type": "structured_text",
+                },
+                provider=self.provider_name,
+                model=self.config.model,
+            )
+
         # Fallback to simple text parsing
         return VisionAnalysisResponse(
             answer=response_text,
@@ -170,7 +195,7 @@ Focus on:
                 "query": request.query,
                 "viewport": request.viewport,
                 "raw_response": response_text,
-                "parsing_note": "Used fallback parsing due to non-JSON response",
+                "parsing_note": "Used fallback parsing due to unrecognized response format",
             },
             provider=self.provider_name,
             model=self.config.model,

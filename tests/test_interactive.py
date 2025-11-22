@@ -1,5 +1,6 @@
 """Tests for interactive CLI mode."""
 
+import contextlib
 from unittest.mock import Mock, patch
 
 import pytest
@@ -178,15 +179,17 @@ class TestInteractiveSession:
 class TestInteractiveIntegration:
     """Integration tests for interactive mode."""
 
-    @patch("layoutlens.interactive.run_interactive_session")
-    @patch("layoutlens.api.core.create_provider")
-    def test_interactive_command_integration(self, mock_create_provider, mock_run_session):
+    @patch("layoutlens.cli.run_interactive_session")
+    @patch("layoutlens.cli.LayoutLens")
+    def test_interactive_command_integration(self, mock_lens_class, mock_run_session):
         """Test that interactive command integrates properly."""
         from layoutlens.cli import cmd_interactive
 
-        # Mock provider and LayoutLens
-        mock_provider = Mock()
-        mock_create_provider.return_value = mock_provider
+        # Mock LayoutLens
+        mock_lens = Mock()
+        mock_lens.provider = "openrouter"
+        mock_lens.model = "gpt-4o-mini"
+        mock_lens_class.return_value = mock_lens
 
         # Mock args
         args = Mock()
@@ -196,17 +199,13 @@ class TestInteractiveIntegration:
         args.output = "test_output"
 
         # Test command execution
-        cmd_interactive(args)
+        with contextlib.suppress(SystemExit):
+            cmd_interactive(args)
 
         # Verify LayoutLens was created correctly
-        mock_create_provider.assert_called_once_with(
-            provider_name="openrouter", api_key="test-key", model="gpt-4o-mini"
+        mock_lens_class.assert_called_once_with(
+            api_key="test-key", model="gpt-4o-mini", provider="openrouter", output_dir="test_output"
         )
 
         # Verify interactive session was started
-        mock_run_session.assert_called_once()
-
-        # Get the LayoutLens instance passed to run_interactive_session
-        lens_instance = mock_run_session.call_args[0][0]
-        assert lens_instance.provider == "openrouter"
-        assert lens_instance.model == "gpt-4o-mini"
+        mock_run_session.assert_called_once_with(mock_lens)

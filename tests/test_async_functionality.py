@@ -44,18 +44,27 @@ def sample_html_file():
 class TestAsyncCore:
     """Test async functionality in core LayoutLens API."""
 
-    @patch("layoutlens.api.core.LayoutLens.analyze")
-    async def test_analyze_async_single(self, mock_analyze, mock_api_key):
+    @patch("layoutlens.api.core.create_provider")
+    @patch("pathlib.Path.exists")
+    async def test_analyze_async_single(self, mock_exists, mock_create_provider, mock_api_key):
         """Test async single page analysis."""
-        # Setup mock
-        expected_result = AnalysisResult(
-            source="test.html",
-            query="Test query",
+        # Setup mocks
+        mock_exists.return_value = True
+
+        # Create mock provider
+        from layoutlens.providers.base import VisionAnalysisResponse
+
+        mock_provider = Mock()
+        mock_vision_response = VisionAnalysisResponse(
             answer="Test answer",
             confidence=0.85,
             reasoning="Test reasoning",
+            metadata={},
+            provider="openrouter",
+            model="gpt-4o-mini",
         )
-        mock_analyze.return_value = expected_result
+        mock_provider.analyze_image_async = AsyncMock(return_value=mock_vision_response)
+        mock_create_provider.return_value = mock_provider
 
         # Test async analyze
         lens = LayoutLens(api_key=mock_api_key)
@@ -65,7 +74,6 @@ class TestAsyncCore:
         assert isinstance(result, AnalysisResult)
         assert result.answer == "Test answer"
         assert result.confidence == 0.85
-        mock_analyze.assert_called_once_with("test.html", "Test query", "desktop", None)
 
     @patch("layoutlens.api.core.LayoutLens.analyze_async")
     async def test_analyze_batch_async(self, mock_analyze_async, mock_api_key):
@@ -208,13 +216,17 @@ class TestAsyncCLI:
         args.queries = "Is it good?"
         args.viewports = "desktop"
         args.max_concurrent = 3
+        args.model = "gpt-4o-mini"  # Add missing attributes
+        args.provider = "openrouter"
 
         # Test the command
         with patch("builtins.print") as mock_print:
             await cmd_test_async(args)
 
             # Verify LayoutLens was initialized correctly
-            mock_lens_class.assert_called_once_with(api_key="test-key", output_dir="test_output")
+            mock_lens_class.assert_called_once_with(
+                api_key="test-key", model="gpt-4o-mini", provider="openrouter", output_dir="test_output"
+            )
 
             # Verify batch analysis was called
             mock_lens.analyze_batch_async.assert_called_once()
@@ -289,7 +301,7 @@ class TestAsyncIntegration:
         # But we can test that the argument parser accepts async flags
         with (
             patch("sys.argv", ["layoutlens", "--async", "test", "--page", "test.html"]),
-            patch("layoutlens.cli.cmd_test_async") as mock_async_cmd,
+            patch("layoutlens.cli_async.cmd_test_async") as mock_async_cmd,
             patch("asyncio.run") as mock_asyncio_run,
             contextlib.suppress(SystemExit),
         ):
