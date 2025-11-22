@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling>=1.21.1"]
+build-backend = "hatchling.build"
 
 [project]
 name = "layoutlens"
@@ -36,28 +36,16 @@ dependencies = [
     "Pillow>=10.0.0",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
     "pytest-mock>=3.10.0",
     "pytest-xdist>=3.0.0",
-    "black>=23.0.0",
-    "ruff>=0.1.0",
+    "ruff>=0.7.0",
     "mypy>=1.0.0",
-    "isort>=5.12.0",
     "pre-commit>=3.0.0",
     "bandit>=1.7.0",
-    "pydocstyle>=6.3.0",
-]
-interactive = [
-    "rich>=13.0.0",
-]
-docs = [
-    "sphinx>=5.0.0",
-    "furo>=2023.9.10",
-    "myst-parser>=0.18.0",
-    "sphinx-autodoc-typehints>=1.19.0",
 ]
 test = [
     "pytest>=7.0.0",
@@ -66,6 +54,15 @@ test = [
     "pytest-xdist>=3.0.0",
     "pytest-asyncio>=0.21.0",
     "coverage[toml]>=7.0.0",
+]
+interactive = [
+    "rich>=13.0.0",
+]
+docs = [
+    "sphinx>=7.0",
+    "furo>=2024.1.29",
+    "myst-parser>=2.0",
+    "sphinx-autodoc-typehints>=1.25",
 ]
 
 [project.urls]
@@ -79,20 +76,21 @@ test = [
 layoutlens = "layoutlens.cli:main"
 layoutlens-async = "layoutlens.cli_async:main"
 
-[tool.setuptools]
-packages = [
-    "layoutlens",
-    "layoutlens.api",
-    "layoutlens.vision",
-    "layoutlens.integrations",
-    "layoutlens.providers"
-]
-include-package-data = true
+[tool.hatch.build.targets.wheel]
+packages = ["layoutlens"]
 
-[tool.setuptools.package-data]
-layoutlens = ["*.yaml", "*.yml"]
-examples = ["*.yaml", "*.yml", "*.html"]
-benchmarks = ["templates/*"]
+[tool.hatch.build.targets.wheel.sources]
+"layoutlens" = "layoutlens"
+
+[tool.hatch.build]
+include = [
+  "layoutlens/*.yaml",
+  "layoutlens/*.yml",
+  "examples/*.yaml",
+  "examples/*.yml",
+  "examples/*.html",
+  "benchmarks/templates/*"
+]
 
 [tool.pytest.ini_options]
 minversion = "7.0"
@@ -142,32 +140,6 @@ exclude_lines = [
     "@(abc\\.)?abstractmethod",
 ]
 
-[tool.black]
-line-length = 120
-target-version = ['py311', 'py312', 'py313']
-include = '\.pyi?$'
-exclude = '''
-/(
-    \.eggs
-  | \.git
-  | \.hg
-  | \.mypy_cache
-  | \.tox
-  | \.venv
-  | _build
-  | buck-out
-  | build
-  | dist
-  | __pycache__
-)/
-'''
-
-[tool.isort]
-profile = "black"
-multi_line_output = 3
-line_length = 120
-known_first_party = ["layoutlens"]
-known_third_party = ["pytest", "openai", "playwright", "beautifulsoup4", "yaml", "PIL"]
 
 [tool.mypy]
 python_version = "3.11"

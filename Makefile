@@ -52,10 +52,10 @@ help:
 
 # Installation targets
 install:
-	pip install -e .
+	uv pip install -e .
 
 install-dev:
-	pip install -e ".[dev,test,docs]"
+	uv sync --dev
 	playwright install chromium
 
 install-browsers:
@@ -108,7 +108,7 @@ clean:
 	find . -type f -name "*.pyc" -delete
 
 build: clean
-	python -m build
+	uv build
 
 check-package: build
 	twine check dist/*
