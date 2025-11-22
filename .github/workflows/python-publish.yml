@@ -1,12 +1,8 @@
-name: Publish Python Package
+name: Publish to PyPI
 
 on:
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version to publish (leave empty to use version from pyproject.toml)'
-        required: false
-        type: string
+  release:
+    types: [published]
 
 permissions:
   id-token: write  # Required for trusted publishing
@@ -14,7 +10,7 @@ permissions:
 
 jobs:
   publish:
-    name: Publish to PyPI
+    name: Upload release to PyPI
     runs-on: ubuntu-latest
     environment:
       name: pypi
@@ -28,114 +24,14 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
-        cache: 'pip'
 
     - name: Install build dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install build twine
-
-    - name: Verify version consistency
-      run: |
-        VERSION=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
-        echo "Version from pyproject.toml: $VERSION"
-
-        if [ -n "${{ github.event.inputs.version }}" ]; then
-          if [ "$VERSION" != "${{ github.event.inputs.version }}" ]; then
-            echo "Version mismatch: pyproject.toml has $VERSION but input specifies ${{ github.event.inputs.version }}"
-            exit 1
-          fi
-        fi
-
-        echo "VERSION=$VERSION" >> $GITHUB_ENV
-
-    - name: Install Playwright browsers
-      run: |
-        python -m playwright install chromium
-
-    - name: Run tests before publishing
-      run: |
-        python -m pip install -e ".[test]"
-        python -m pytest tests/ -v --tb=short -x -m "not slow"
+        python -m pip install build
 
     - name: Build package
-      run: |
-        python -m build
-
-        # Verify the build
-        ls -la dist/
-        python -m twine check dist/*
-
-    - name: Verify package contents
-      run: |
-        # Check that the package contains expected files
-        python -m pip install dist/*.whl --force-reinstall
-        python -c "
-        import layoutlens
-        print(f'Package version: {layoutlens.__version__}')
-        print('Available exports:', [x for x in dir(layoutlens) if not x.startswith('_')])
-
-        # Test basic functionality
-        try:
-            lens = layoutlens.LayoutLens(api_key='test-key-for-import-check')
-            print('✅ LayoutLens import and initialization successful')
-        except Exception as e:
-            print(f'❌ LayoutLens initialization failed: {e}')
-            exit(1)
-        "
+      run: python -m build
 
     - name: Publish to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        print-hash: true
-        verbose: true
-
-    - name: Create GitHub Release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: v${{ env.VERSION }}
-        release_name: LayoutLens v${{ env.VERSION }}
-        body: |
-          ## What's Changed
-
-          🚀 **LayoutLens v${{ env.VERSION }}**
-
-          This release was automatically published from commit ${{ github.sha }}.
-
-          ### Installation
-          ```bash
-          pip install layoutlens==${{ env.VERSION }}
-          ```
-
-          ### Documentation
-          - [API Documentation](https://gojiplus.github.io/layoutlens/)
-          - [PyPI Package](https://pypi.org/project/layoutlens/${{ env.VERSION }}/)
-
-          See the [CHANGELOG](https://github.com/gojiplus/layoutlens/blob/main/CHANGELOG.md) for detailed changes.
-        draft: false
-        prerelease: false
-
-    - name: Verify PyPI publication
-      run: |
-        echo "Waiting for PyPI to update..."
-        sleep 30
-
-        # Verify the package is available on PyPI
-        pip install layoutlens==${{ env.VERSION }} --no-cache-dir
-        python -c "
-        import layoutlens
-        print(f'✅ Successfully installed LayoutLens v{layoutlens.__version__} from PyPI')
-
-        # Verify async functionality is available
-        import inspect
-        lens = layoutlens.LayoutLens(api_key='test')
-        assert hasattr(lens, 'analyze_async'), 'Missing analyze_async method'
-        assert hasattr(lens, 'analyze_batch_async'), 'Missing analyze_batch_async method'
-        assert inspect.iscoroutinefunction(lens.analyze_async), 'analyze_async is not async'
-        print('✅ Async functionality verified')
-        "
-
-        echo "🎉 Publication successful!"
-        echo "📦 Package: https://pypi.org/project/layoutlens/${{ env.VERSION }}/"
