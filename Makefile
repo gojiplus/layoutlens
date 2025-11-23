@@ -55,46 +55,46 @@ install:
 	uv pip install -e .
 
 install-dev:
-	uv sync --dev
-	playwright install chromium
+	uv sync --group dev --group test
+	uv run playwright install chromium
 
 install-browsers:
-	playwright install chromium
+	uv run playwright install chromium
 
 # Testing targets
 test:
-	pytest tests/ -v
+	uv run pytest tests/ -v
 
 test-unit:
-	pytest tests/unit/ -v -m unit
+	uv run pytest tests/unit/ -v -m unit
 
 test-integration:
-	pytest tests/integration/ -v -m integration
+	uv run pytest tests/integration/ -v -m integration
 
 test-e2e:
-	pytest tests/e2e/ -v -m e2e
+	uv run pytest tests/e2e/ -v -m e2e
 
 test-coverage:
-	pytest tests/ -v --cov=layoutlens --cov-report=html --cov-report=term-missing
+	uv run pytest tests/ -v --cov=layoutlens --cov-report=html --cov-report=term-missing
 
 test-fast:
-	pytest tests/ -v -m "not slow"
+	uv run pytest tests/ -v -m "not slow"
 
 test-parallel:
-	pytest tests/ -v -n auto
+	uv run pytest tests/ -v -n auto
 
 # Code quality targets
 lint:
-	ruff check layoutlens/ tests/ examples/
-	mypy layoutlens/ --config-file=pyproject.toml
+	uv run ruff check layoutlens/ tests/ examples/
+	uv run mypy layoutlens/ --config-file=pyproject.toml
 
 format:
-	ruff format layoutlens/ tests/ examples/
+	uv run ruff format layoutlens/ tests/ examples/
 
 check:
-	ruff check --no-fix layoutlens/ tests/ examples/
-	ruff format --check layoutlens/ tests/ examples/
-	mypy layoutlens/ --config-file=pyproject.toml
+	uv run ruff check --no-fix layoutlens/ tests/ examples/
+	uv run ruff format --check layoutlens/ tests/ examples/
+	uv run mypy layoutlens/ --config-file=pyproject.toml
 
 # Package targets
 clean:
@@ -121,7 +121,7 @@ upload: build check-package
 
 # Documentation targets
 docs:
-	cd docs && sphinx-build -b html . _build/html
+	cd docs && uv run sphinx-build -b html . _build/html
 
 serve-docs: docs
 	cd docs/_build/html && python -m http.server 8000
@@ -178,7 +178,7 @@ validate-configs:
 check-tooling:
 	@echo "Verifying unified tooling configuration..."
 	@echo "✓ Ruff configuration in pyproject.toml:"
-	@ruff check --show-settings 2>/dev/null | head -10 || echo "  (settings not available in this ruff version)"
+	@uv run ruff check --show-settings 2>/dev/null | head -10 || echo "  (settings not available in this ruff version)"
 	@echo "✓ MyPy uses pyproject.toml config"
 	@echo "✓ Pre-commit hooks use pyproject.toml config"
 	@echo "✓ GitHub Actions use pyproject.toml config"
