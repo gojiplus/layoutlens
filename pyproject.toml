@@ -1,6 +1,6 @@
 [build-system]
-requires = ["hatchling>=1.21.1"]
-build-backend = "hatchling.build"
+requires = ["uv_build>=0.9.14,<0.10.0"]
+build-backend = "uv_build"
 
 [project]
 name = "layoutlens"
@@ -76,21 +76,8 @@ docs = [
 layoutlens = "layoutlens.cli:main"
 layoutlens-async = "layoutlens.cli_async:main"
 
-[tool.hatch.build.targets.wheel]
-packages = ["layoutlens"]
-
-[tool.hatch.build.targets.wheel.sources]
-"layoutlens" = "layoutlens"
-
-[tool.hatch.build]
-include = [
-  "layoutlens/*.yaml",
-  "layoutlens/*.yml",
-  "examples/*.yaml",
-  "examples/*.yml",
-  "examples/*.html",
-  "benchmarks/templates/*"
-]
+[tool.uv.build-backend]
+module-root = ""
 
 [tool.pytest.ini_options]
 minversion = "7.0"
