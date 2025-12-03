@@ -7,7 +7,7 @@ on:
 
 permissions:
   id-token: write  # Required for trusted publishing
-  contents: read
+  contents: write
 
 jobs:
   publish:
@@ -20,6 +20,11 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+
+    - name: Sync CITATION.cff
+      uses: gojiplus/citation-sync@v1
+      with:
+        commit: true
 
     - name: Install uv
       uses: astral-sh/setup-uv@v7
