@@ -48,7 +48,7 @@ def cmd_test(args) -> None:
         try:
             results = []
             for i, query in enumerate(queries):
-                logger.debug(f"Processing query {i+1}/{len(queries)}: {query.strip()[:50]}...")
+                logger.debug(f"Processing query {i + 1}/{len(queries)}: {query.strip()[:50]}...")
                 result = tester.analyze(source=args.page, query=query.strip(), viewport=viewport)
                 results.append(
                     {

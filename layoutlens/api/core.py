@@ -432,7 +432,7 @@ class LayoutLens:
             screenshot_paths = []
 
             for i, source in enumerate(sources):
-                self.logger.debug(f"Processing source {i+1}/{len(sources)}: {str(source)[:50]}...")
+                self.logger.debug(f"Processing source {i + 1}/{len(sources)}: {str(source)[:50]}...")
                 if self._is_url(source):
                     screenshot_path = self.capture.capture_url(str(source), viewport)
                 else:
@@ -539,13 +539,13 @@ class LayoutLens:
             for j, query in enumerate(queries):
                 try:
                     self.logger.debug(
-                        f"Batch analysis {len(results)+1}/{len(sources)*len(queries)}: {str(source)[:30]}..."
+                        f"Batch analysis {len(results) + 1}/{len(sources) * len(queries)}: {str(source)[:30]}..."
                     )
                     result = self.analyze(source, query, viewport, context)
                     results.append(result)
                 except Exception as e:
                     failed_count += 1
-                    self.logger.warning(f"Batch analysis failed for {source} + query {j+1}: {e}")
+                    self.logger.warning(f"Batch analysis failed for {source} + query {j + 1}: {e}")
                     # Create error result for failed analysis
                     error_result = AnalysisResult(
                         source=str(source),
