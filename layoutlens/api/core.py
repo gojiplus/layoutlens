@@ -29,6 +29,9 @@ from ..exceptions import (
     wrap_exception,
 )
 
+# Import logging
+from ..logger import get_logger, log_function_call, log_performance_metric
+
 # Import provider components
 from ..providers import VisionProvider, create_provider
 
@@ -132,9 +135,23 @@ class LayoutLens:
         cache_ttl : int, default 3600
             Cache time-to-live in seconds (1 hour default)
         """
+        # Initialize logger
+        self.logger = get_logger("api.core")
+
+        log_function_call(
+            "LayoutLens.__init__",
+            model=model,
+            provider=provider,
+            output_dir=output_dir,
+            cache_enabled=cache_enabled,
+            cache_type=cache_type,
+            cache_ttl=cache_ttl,
+        )
+
         # Determine API key based on provider
         self.api_key = api_key or self._get_api_key_for_provider(provider)
         if not self.api_key:
+            self.logger.error(f"No API key found for {provider} provider")
             raise AuthenticationError(
                 f"API key required for {provider} provider. "
                 f"Set OPENAI_API_KEY/OPENROUTER_API_KEY env var or pass api_key parameter."
@@ -145,25 +162,43 @@ class LayoutLens:
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(exist_ok=True)
 
+        self.logger.info(f"Initialized LayoutLens with {provider} provider using {model} model")
+        self.logger.debug(f"Output directory: {self.output_dir}")
+
         # Initialize provider
-        self.vision_provider = create_provider(
-            provider_name=provider,
-            api_key=self.api_key,
-            model=self.model,
-        )
+        try:
+            self.vision_provider = create_provider(
+                provider_name=provider,
+                api_key=self.api_key,
+                model=self.model,
+            )
+            self.logger.debug(f"Created {provider} vision provider")
+        except Exception as e:
+            self.logger.error(f"Failed to create vision provider: {e}")
+            raise
 
         # Initialize components
-        self.capture = URLCapture(output_dir=str(self.output_dir / "screenshots"))
-        self.comparator = LayoutComparator(vision_provider=self.vision_provider)
+        try:
+            self.capture = URLCapture(output_dir=str(self.output_dir / "screenshots"))
+            self.comparator = LayoutComparator(vision_provider=self.vision_provider)
+            self.logger.debug("Initialized capture and comparator components")
+        except Exception as e:
+            self.logger.error(f"Failed to initialize components: {e}")
+            raise
 
         # Initialize cache
         cache_dir = str(self.output_dir / "cache") if cache_type == "file" else "cache"
-        self.cache = create_cache(
-            cache_type=cache_type,
-            cache_dir=cache_dir,
-            default_ttl=cache_ttl,
-            enabled=cache_enabled,
-        )
+        try:
+            self.cache = create_cache(
+                cache_type=cache_type,
+                cache_dir=cache_dir,
+                default_ttl=cache_ttl,
+                enabled=cache_enabled,
+            )
+            self.logger.info(f"Initialized {cache_type} cache (enabled: {cache_enabled})")
+        except Exception as e:
+            self.logger.error(f"Failed to initialize cache: {e}")
+            raise
 
     def _get_api_key_for_provider(self, provider: str) -> str | None:
         """Get appropriate API key based on provider."""
@@ -211,8 +246,16 @@ class LayoutLens:
         """
         start_time = time.time()
 
+        log_function_call(
+            "LayoutLens.analyze",
+            source=str(source)[:50] + "..." if len(str(source)) > 50 else str(source),
+            query=query[:100] + "..." if len(query) > 100 else query,
+            viewport=viewport,
+        )
+
         # Input validation
         if not query or not query.strip():
+            self.logger.error(f"Empty query provided for source: {source}")
             raise ValidationError("Query cannot be empty", field="query", value=query)
 
         # Check cache first
@@ -223,15 +266,19 @@ class LayoutLens:
             # Update execution time and return cached result
             cached_result.execution_time = time.time() - start_time
             cached_result.metadata["cache_hit"] = True
+            self.logger.info(f"Cache hit for source: {str(source)[:50]}... - confidence: {cached_result.confidence}")
             return cached_result
 
         try:
             # Determine if source is URL or image file
             if self._is_url(source):
+                self.logger.debug(f"Capturing screenshot from URL: {source}")
                 # Capture screenshot from URL
                 try:
                     screenshot_path = self.capture.capture_url(url=str(source), viewport=viewport)
+                    self.logger.info(f"Successfully captured screenshot: {screenshot_path}")
                 except Exception as e:
+                    self.logger.error(f"Screenshot capture failed for {source}: {e}")
                     raise ScreenshotError(
                         f"Failed to capture screenshot from URL: {str(e)}",
                         source=str(source),
@@ -241,15 +288,18 @@ class LayoutLens:
                 # Use existing image file
                 screenshot_path = str(source)
                 if not Path(screenshot_path).exists():
+                    self.logger.error(f"Screenshot file not found: {screenshot_path}")
                     raise LayoutFileNotFoundError(
                         f"Screenshot file not found: {screenshot_path}",
                         file_path=screenshot_path,
                     )
+                self.logger.debug(f"Using existing screenshot: {screenshot_path}")
 
             # Analyze with vision provider
             try:
                 from ..providers import VisionAnalysisRequest
 
+                self.logger.debug(f"Starting vision analysis for query: {query[:50]}...")
                 request = VisionAnalysisRequest(
                     image_path=screenshot_path,
                     query=query,
@@ -259,6 +309,7 @@ class LayoutLens:
                 )
 
                 vision_response = self.vision_provider.analyze_image(request)
+                self.logger.debug(f"Vision analysis completed with confidence: {vision_response.confidence}")
 
                 analysis = {
                     "answer": vision_response.answer,
@@ -268,6 +319,7 @@ class LayoutLens:
                 }
 
             except Exception as e:
+                self.logger.error(f"Vision analysis failed for {source}: {e}")
                 raise AnalysisError(
                     f"Failed to analyze screenshot: {str(e)}",
                     query=query,
@@ -302,16 +354,32 @@ class LayoutLens:
                 },
             )
 
+            # Log performance metrics
+            log_performance_metric(
+                operation="analyze",
+                duration=execution_time,
+                confidence=confidence,
+                source_type="url" if self._is_url(source) else "file",
+                viewport=viewport,
+                cache_hit=False,
+            )
+
+            self.logger.info(
+                f"Analysis completed for {str(source)[:50]}... - confidence: {confidence:.2f}, time: {execution_time:.2f}s"
+            )
+
             # Cache the result
             self.cache.set(cache_key, result)
 
             return result
 
-        except LayoutLensError:
+        except LayoutLensError as e:
             # Re-raise our custom exceptions
+            self.logger.debug(f"LayoutLens error in analyze: {type(e).__name__}")
             raise
         except Exception as e:
             # Wrap other exceptions
+            self.logger.error(f"Unexpected error in analyze: {e}")
             raise wrap_exception(e, "Analysis failed") from e
 
     def compare(
@@ -349,12 +417,22 @@ class LayoutLens:
         """
         start_time = time.time()
 
+        log_function_call(
+            "LayoutLens.compare",
+            sources=[str(s)[:30] + "..." if len(str(s)) > 30 else str(s) for s in sources],
+            query=query[:100] + "..." if len(query) > 100 else query,
+            viewport=viewport,
+        )
+
+        self.logger.info(f"Starting comparison of {len(sources)} sources")
+
         try:
             # Analyze each source individually first
             individual_results = []
             screenshot_paths = []
 
-            for source in sources:
+            for i, source in enumerate(sources):
+                self.logger.debug(f"Processing source {i+1}/{len(sources)}: {str(source)[:50]}...")
                 if self._is_url(source):
                     screenshot_path = self.capture.capture_url(str(source), viewport)
                 else:
@@ -367,17 +445,33 @@ class LayoutLens:
                 individual_results.append(individual_result)
 
             # Comparative analysis
+            self.logger.debug("Starting comparative analysis")
             comparison = self.comparator.compare_layouts(
                 screenshot_paths=screenshot_paths, query=query, context=context or {}
             )
 
             execution_time = time.time() - start_time
 
+            confidence = comparison.get("confidence", 0.0)
+
+            # Log performance metrics
+            log_performance_metric(
+                operation="compare",
+                duration=execution_time,
+                confidence=confidence,
+                source_count=len(sources),
+                viewport=viewport,
+            )
+
+            self.logger.info(
+                f"Comparison completed for {len(sources)} sources - confidence: {confidence:.2f}, time: {execution_time:.2f}s"
+            )
+
             return ComparisonResult(
                 sources=[str(s) for s in sources],
                 query=query,
                 answer=comparison["answer"],
-                confidence=comparison["confidence"],
+                confidence=confidence,
                 reasoning=comparison["reasoning"],
                 individual_analyses=individual_results,
                 screenshot_paths=screenshot_paths,
@@ -386,6 +480,7 @@ class LayoutLens:
             )
 
         except Exception as e:
+            self.logger.error(f"Comparison failed for {len(sources)} sources: {e}")
             execution_time = time.time() - start_time
             return ComparisonResult(
                 sources=[str(s) for s in sources],
@@ -424,14 +519,33 @@ class LayoutLens:
             Batch analysis results with aggregated metrics
         """
         start_time = time.time()
-        results = []
+
+        log_function_call(
+            "LayoutLens.analyze_batch",
+            source_count=len(sources),
+            query_count=len(queries),
+            total_combinations=len(sources) * len(queries),
+            viewport=viewport,
+        )
+
+        self.logger.info(
+            f"Starting batch analysis: {len(sources)} sources × {len(queries)} queries = {len(sources) * len(queries)} total analyses"
+        )
+
+        results: list[AnalysisResult] = []
+        failed_count = 0
 
         for source in sources:
-            for query in queries:
+            for j, query in enumerate(queries):
                 try:
+                    self.logger.debug(
+                        f"Batch analysis {len(results)+1}/{len(sources)*len(queries)}: {str(source)[:30]}..."
+                    )
                     result = self.analyze(source, query, viewport, context)
                     results.append(result)
                 except Exception as e:
+                    failed_count += 1
+                    self.logger.warning(f"Batch analysis failed for {source} + query {j+1}: {e}")
                     # Create error result for failed analysis
                     error_result = AnalysisResult(
                         source=str(source),
@@ -449,14 +563,31 @@ class LayoutLens:
         # Calculate aggregate metrics
         successful_results = [r for r in results if r.confidence > 0]
         total_execution_time = time.time() - start_time
+        average_confidence = (
+            sum(r.confidence for r in successful_results) / len(successful_results) if successful_results else 0.0
+        )
+
+        # Log performance metrics
+        log_performance_metric(
+            operation="analyze_batch",
+            duration=total_execution_time,
+            total_analyses=len(results),
+            successful_analyses=len(successful_results),
+            failed_analyses=failed_count,
+            average_confidence=average_confidence,
+            viewport=viewport,
+        )
+
+        self.logger.info(
+            f"Batch analysis completed: {len(successful_results)}/{len(results)} successful, "
+            f"avg confidence: {average_confidence:.2f}, time: {total_execution_time:.2f}s"
+        )
 
         return BatchResult(
             results=results,
             total_queries=len(results),
             successful_queries=len(successful_results),
-            average_confidence=(
-                sum(r.confidence for r in successful_results) / len(successful_results) if successful_results else 0.0
-            ),
+            average_confidence=average_confidence,
             total_execution_time=total_execution_time,
         )
 

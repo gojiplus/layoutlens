@@ -13,10 +13,16 @@ from .api.core import LayoutLens
 from .api.test_suite import UITestCase, UITestResult, UITestSuite
 from .config import Config, create_default_config
 from .interactive import run_interactive_session
+from .logger import configure_for_development, get_logger, setup_logging
 
 
 def cmd_test(args) -> None:
     """Execute test command."""
+    logger = get_logger("cli.test")
+    logger.debug(
+        f"Starting test command with args: page={getattr(args, 'page', None)}, suite={getattr(args, 'suite', None)}"
+    )
+
     # Initialize LayoutLens
     try:
         tester = LayoutLens(
@@ -25,7 +31,9 @@ def cmd_test(args) -> None:
             provider=getattr(args, "provider", "openrouter"),
             output_dir=args.output,
         )
+        logger.info("LayoutLens initialized successfully")
     except Exception as e:
+        logger.error(f"Failed to initialize LayoutLens: {e}")
         print(f"Error initializing LayoutLens: {e}")
         sys.exit(1)
 
@@ -34,11 +42,13 @@ def cmd_test(args) -> None:
         queries = args.queries.split(",") if args.queries else ["Is this page well-designed and user-friendly?"]
         viewport = args.viewports.split(",")[0] if args.viewports else "desktop"
 
+        logger.info(f"Starting single page analysis: {args.page} with {len(queries)} queries")
         print(f"Analyzing page: {args.page}")
 
         try:
             results = []
-            for query in queries:
+            for i, query in enumerate(queries):
+                logger.debug(f"Processing query {i+1}/{len(queries)}: {query.strip()[:50]}...")
                 result = tester.analyze(source=args.page, query=query.strip(), viewport=viewport)
                 results.append(
                     {
@@ -53,9 +63,11 @@ def cmd_test(args) -> None:
                 print("-" * 50)
 
             avg_confidence = sum(r["confidence"] for r in results) / len(results)
+            logger.info(f"Single page analysis completed: {len(results)} queries, avg confidence: {avg_confidence:.2f}")
             print(f"Analysis complete. Average confidence: {avg_confidence:.1%}")
 
         except Exception as e:
+            logger.error(f"Single page analysis failed: {e}")
             print(f"Analysis failed: {e}")
             sys.exit(1)
 
@@ -112,6 +124,9 @@ def cmd_test(args) -> None:
 
 def cmd_compare(args) -> None:
     """Execute compare command."""
+    logger = get_logger("cli.compare")
+    logger.debug(f"Starting compare command: {args.page_a} vs {args.page_b}")
+
     try:
         tester = LayoutLens(
             api_key=args.api_key,
@@ -119,21 +134,26 @@ def cmd_compare(args) -> None:
             provider=args.provider,
             output_dir=args.output,
         )
+        logger.info("LayoutLens initialized for comparison")
     except Exception as e:
+        logger.error(f"Failed to initialize LayoutLens for comparison: {e}")
         print(f"Error initializing LayoutLens: {e}")
         sys.exit(1)
 
     print(f"Comparing: {args.page_a} vs {args.page_b}")
 
     try:
+        logger.info(f"Starting comparison: {args.page_a} vs {args.page_b}")
         result = tester.compare(sources=[args.page_a, args.page_b], query=args.query)
 
+        logger.info(f"Comparison completed with confidence: {result.confidence:.2f}")
         print(f"Comparison result: {result.answer}")
         print(f"Confidence: {result.confidence:.1%}")
         if hasattr(result, "reasoning"):
             print(f"Reasoning: {result.reasoning}")
 
     except Exception as e:
+        logger.error(f"Comparison failed: {e}")
         print(f"Comparison failed: {e}")
         sys.exit(1)
 
@@ -536,43 +556,74 @@ Examples:
     # Parse arguments
     args = parser.parse_args()
 
+    # Configure logging based on verbosity
+    if getattr(args, "verbose", False):
+        # Enable debug logging for verbose mode
+        setup_logging(
+            level="DEBUG",
+            console=True,
+            file_path=os.path.join(getattr(args, "output", "layoutlens_output"), "cli.log"),
+            format_type="debug",
+        )
+    else:
+        # Standard logging - only warnings and errors to avoid cluttering user output
+        setup_logging(
+            level="WARNING",
+            console=False,  # Don't output to console to avoid interfering with user output
+            file_path=os.path.join(getattr(args, "output", "layoutlens_output"), "cli.log"),
+            format_type="default",
+        )
+
+    logger = get_logger("cli.main")
+    logger.debug(f"CLI started with command: {args.command}")
+
     # Set up API key from environment if not provided
     if not args.api_key:
         args.api_key = os.getenv("OPENAI_API_KEY")
 
     # Handle commands
-    if getattr(args, "async", False):
-        # Route to async commands
-        import asyncio
+    try:
+        if getattr(args, "async", False):
+            # Route to async commands
+            logger.debug("Using async command execution")
+            import asyncio
 
-        from .cli_async import cmd_compare_async, cmd_test_async
+            from .cli_async import cmd_compare_async, cmd_test_async
 
-        if args.command == "test":
-            asyncio.run(cmd_test_async(args))
-        elif args.command == "compare":
-            asyncio.run(cmd_compare_async(args))
+            if args.command == "test":
+                asyncio.run(cmd_test_async(args))
+            elif args.command == "compare":
+                asyncio.run(cmd_compare_async(args))
+            else:
+                logger.warning(f"Async mode not available for command: {args.command}")
+                print(f"Async mode not available for command: {args.command}")
+                print("Available async commands: test, compare")
+                sys.exit(1)
         else:
-            print(f"Async mode not available for command: {args.command}")
-            print("Available async commands: test, compare")
+            # Use synchronous commands
+            logger.debug(f"Executing synchronous command: {args.command}")
+            if args.command == "test":
+                cmd_test(args)
+            elif args.command == "compare":
+                cmd_compare(args)
+            elif args.command == "generate":
+                cmd_generate(args)
+            elif args.command == "regression":
+                cmd_regression(args)
+            elif args.command == "info":
+                cmd_info(args)
+            elif args.command == "interactive":
+                cmd_interactive(args)
+            elif args.command == "validate":
+                cmd_validate(args)
+            else:
+                logger.warning("No command specified, showing help")
+                parser.print_help()
             sys.exit(1)
-    else:
-        # Use synchronous commands
-        if args.command == "test":
-            cmd_test(args)
-        elif args.command == "compare":
-            cmd_compare(args)
-        elif args.command == "generate":
-            cmd_generate(args)
-        elif args.command == "regression":
-            cmd_regression(args)
-        elif args.command == "info":
-            cmd_info(args)
-        elif args.command == "interactive":
-            cmd_interactive(args)
-        elif args.command == "validate":
-            cmd_validate(args)
-        else:
-            parser.print_help()
+    except Exception as e:
+        logger.error(f"Command execution failed: {e}")
+        # Don't log to console as this would clutter user output
+        # The specific command functions already handle user-facing error messages
         sys.exit(1)
 
 

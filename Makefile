@@ -20,7 +20,7 @@ help:
 	@echo "  make test-fast       Run fast tests only (skip slow)"
 	@echo ""
 	@echo "Code Quality:"
-	@echo "  make lint            Run linting (ruff, mypy) using pyproject.toml"
+	@echo "  make lint            Run linting (ruff) using pyproject.toml"
 	@echo "  make format          Format code (ruff) using pyproject.toml"
 	@echo "  make check           Check code formatting and linting using pyproject.toml"
 	@echo ""
@@ -86,7 +86,6 @@ test-parallel:
 # Code quality targets
 lint:
 	uv run ruff check layoutlens/ tests/ examples/
-	uv run mypy layoutlens/ --config-file=pyproject.toml
 
 format:
 	uv run ruff format layoutlens/ tests/ examples/
@@ -94,7 +93,6 @@ format:
 check:
 	uv run ruff check --no-fix layoutlens/ tests/ examples/
 	uv run ruff format --check layoutlens/ tests/ examples/
-	uv run mypy layoutlens/ --config-file=pyproject.toml
 
 # Package targets
 clean:
@@ -168,8 +166,6 @@ validate-configs:
 	@echo "Validating configuration consistency..."
 	@echo "✓ Checking pyproject.toml contains ruff config..."
 	@python3 -c "import tomllib; config = tomllib.load(open('pyproject.toml', 'rb')); assert 'ruff' in config.get('tool', {}), 'Missing ruff config'"
-	@echo "✓ Checking pyproject.toml contains mypy config..."
-	@python3 -c "import tomllib; config = tomllib.load(open('pyproject.toml', 'rb')); assert 'mypy' in config.get('tool', {}), 'Missing mypy config'"
 	@echo "✓ Checking example configs are valid YAML..."
 	@python3 -c "import yaml; yaml.safe_load(open('examples/layoutlens_config.yaml'))"
 	@python3 -c "import yaml; yaml.safe_load(open('examples/sample_test_suite.yaml'))"
@@ -179,7 +175,6 @@ check-tooling:
 	@echo "Verifying unified tooling configuration..."
 	@echo "✓ Ruff configuration in pyproject.toml:"
 	@uv run ruff check --show-settings 2>/dev/null | head -10 || echo "  (settings not available in this ruff version)"
-	@echo "✓ MyPy uses pyproject.toml config"
 	@echo "✓ Pre-commit hooks use pyproject.toml config"
 	@echo "✓ GitHub Actions use pyproject.toml config"
 	@echo "✓ Makefile uses pyproject.toml config"

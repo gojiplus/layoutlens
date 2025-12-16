@@ -4,6 +4,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
 
+from ..logger import get_logger
+
 
 @dataclass
 class VisionProviderConfig:
@@ -58,6 +60,13 @@ class VisionProvider(ABC):
     def __init__(self, config: VisionProviderConfig):
         self.config = config
         self._client = None
+        # Logger will be initialized in subclasses after provider_name is available
+        self.logger = None
+
+    def _init_logger(self) -> None:
+        """Initialize logger for the provider."""
+        if not self.logger:
+            self.logger = get_logger(f"providers.{self.provider_name}")
 
     @property
     @abstractmethod
@@ -88,15 +97,23 @@ class VisionProvider(ABC):
 
     def validate_config(self) -> bool:
         """Validate the provider configuration."""
+        if self.logger:
+            self.logger.debug(f"Validating configuration for {self.provider_name}")
+
         if not self.config.api_key:
-            raise ValueError(f"API key required for {self.provider_name} provider")
+            error_msg = f"API key required for {self.provider_name} provider"
+            if self.logger:
+                self.logger.error(error_msg)
+            raise ValueError(error_msg)
 
         if self.config.model not in self.supported_models:
-            raise ValueError(
-                f"Model '{self.config.model}' not supported by {self.provider_name}. "
-                f"Supported models: {', '.join(self.supported_models)}"
-            )
+            error_msg = f"Model '{self.config.model}' not supported by {self.provider_name}. Supported models: {', '.join(self.supported_models)}"
+            if self.logger:
+                self.logger.error(error_msg)
+            raise ValueError(error_msg)
 
+        if self.logger:
+            self.logger.info(f"Configuration validated for {self.provider_name} with model {self.config.model}")
         return True
 
     def get_client(self):

@@ -23,6 +23,14 @@ from .exceptions import (
     TimeoutError,
     ValidationError,
 )
+from .logger import (
+    configure_for_development,
+    configure_for_production,
+    configure_for_testing,
+    configure_from_env,
+    get_logger,
+    setup_logging,
+)
 
 __all__ = [
     "LayoutLens",
@@ -49,6 +57,13 @@ __all__ = [
     # Cache
     "AnalysisCache",
     "create_cache",
+    # Logging
+    "setup_logging",
+    "configure_for_development",
+    "configure_for_production",
+    "configure_for_testing",
+    "configure_from_env",
+    "get_logger",
 ]
 
 # Import version dynamically from pyproject.toml

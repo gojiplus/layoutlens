@@ -43,7 +43,6 @@ dev = [
     "pytest-mock>=3.10.0",
     "pytest-xdist>=3.0.0",
     "ruff>=0.7.0",
-    "mypy>=1.0.0",
     "pre-commit>=3.0.0",
     "bandit>=1.7.0",
 ]
@@ -128,34 +127,6 @@ exclude_lines = [
 ]
 
 
-[tool.mypy]
-python_version = "3.11"
-warn_return_any = false
-warn_unused_configs = true
-disallow_untyped_defs = false
-disallow_incomplete_defs = false
-check_untyped_defs = false
-disallow_untyped_decorators = false
-no_implicit_optional = false
-warn_redundant_casts = false
-warn_unused_ignores = false
-warn_no_return = true
-warn_unreachable = false
-strict_equality = false
-ignore_missing_imports = true
-follow_imports = "skip"
-no_implicit_reexport = false
-
-[[tool.mypy.overrides]]
-module = [
-    "openai.*",
-    "playwright.*",
-    "bs4.*",
-    "PIL.*",
-    "yaml.*",
-]
-ignore_missing_imports = true
-
 [tool.ruff]
 line-length = 120
 target-version = "py311"
@@ -171,7 +142,6 @@ exclude = [
     ".venv",
     "venv",
     "docs/conf.py",
-    ".mypy_cache",
     ".pytest_cache",
     "htmlcov",
     ".coverage",

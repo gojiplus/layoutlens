@@ -15,6 +15,7 @@ class OpenRouterProvider(VisionProvider):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._client: openai.OpenAI | None = None
+        self._init_logger()
 
     # Model mapping for OpenRouter
     SUPPORTED_MODELS = {
@@ -46,14 +47,19 @@ class OpenRouterProvider(VisionProvider):
 
     def initialize(self) -> None:
         """Initialize OpenRouter client using OpenAI SDK."""
+        self.logger.debug("Initializing OpenRouter client")
         self._client = openai.OpenAI(
             base_url="https://openrouter.ai/api/v1",
             api_key=self.config.api_key,
             timeout=self.config.timeout,
         )
+        self.logger.info(f"OpenRouter client initialized with model: {self.config.model}")
 
     def analyze_image(self, request: VisionAnalysisRequest) -> VisionAnalysisResponse:
         """Analyze image using OpenRouter's unified API."""
+        self.logger.debug(f"Starting image analysis: {request.image_path}")
+        self.logger.debug(f"Query: {request.query[:100]}..." if len(request.query) > 100 else f"Query: {request.query}")
+
         if not self._client:
             self.initialize()
 
@@ -61,14 +67,21 @@ class OpenRouterProvider(VisionProvider):
 
         # Get OpenRouter model name
         openrouter_model = self._get_openrouter_model(self.config.model)
+        self.logger.debug(f"Using OpenRouter model: {openrouter_model}")
 
         # Encode image
-        image_b64 = self._encode_image(request.image_path)
+        try:
+            image_b64 = self._encode_image(request.image_path)
+            self.logger.debug(f"Image encoded successfully: {len(image_b64)} characters")
+        except Exception as e:
+            self.logger.error(f"Image encoding failed: {e}")
+            raise
 
         # Build prompt
         prompt = self.format_query_prompt(request.query, request.context)
 
         try:
+            self.logger.debug("Making API call to OpenRouter")
             response = self._client.chat.completions.create(
                 model=openrouter_model,
                 messages=[
@@ -92,9 +105,17 @@ class OpenRouterProvider(VisionProvider):
             )
 
             raw_response = response.choices[0].message.content
+            tokens_used = (
+                getattr(response.usage, "total_tokens", 0) if hasattr(response, "usage") and response.usage else 0
+            )
+
+            self.logger.info(f"API call successful - tokens used: {tokens_used}")
+            self.logger.debug(f"Raw response length: {len(raw_response)} characters")
 
             # Parse response using base class method
             result = self.parse_response(raw_response, request)
+
+            self.logger.info(f"Analysis completed with confidence: {result.confidence}")
 
             # Add usage statistics
             if hasattr(response, "usage") and response.usage:
@@ -107,6 +128,7 @@ class OpenRouterProvider(VisionProvider):
             return result
 
         except Exception as e:
+            self.logger.error(f"OpenRouter API call failed: {e}")
             # Return error response
             return VisionAnalysisResponse(
                 answer=f"Error during analysis: {str(e)}",

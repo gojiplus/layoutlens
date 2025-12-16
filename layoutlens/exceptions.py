@@ -1,5 +1,7 @@
 """Custom exception classes for LayoutLens."""
 
+from .logger import get_logger
+
 
 class LayoutLensError(Exception):
     """Base exception for all LayoutLens errors."""
@@ -8,6 +10,10 @@ class LayoutLensError(Exception):
         super().__init__(message)
         self.message = message
         self.details = details or {}
+
+        # Log the exception when it's created
+        logger = get_logger("exceptions")
+        logger.error(f"{self.__class__.__name__}: {message}", extra={"details": self.details})
 
     def __str__(self):
         base_str = self.message
@@ -159,10 +165,13 @@ def handle_api_error(response_code: int, message: str, response: str = None) -> 
 
 def wrap_exception(original_exception: Exception, context: str = None) -> LayoutLensError:
     """Wrap a generic exception in an appropriate LayoutLens exception."""
+    logger = get_logger("exceptions")
     message = str(original_exception)
 
     if context:
         message = f"{context}: {message}"
+
+    logger.debug(f"Wrapping exception: {type(original_exception).__name__} -> {message}")
 
     # Map common exception types
     if isinstance(original_exception, ConnectionError | OSError):

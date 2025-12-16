@@ -12,6 +12,8 @@ from pathlib import Path
 from typing import Any, Optional
 from urllib.parse import urlparse
 
+from ..logger import get_logger, log_performance_metric
+
 try:
     from playwright.async_api import async_playwright
 
@@ -47,12 +49,18 @@ class URLCapture:
         timeout : int, default 30000
             Page load timeout in milliseconds
         """
+        self.logger = get_logger("vision.capture")
+
         if not PLAYWRIGHT_AVAILABLE:
+            self.logger.error("Playwright not available")
             raise ImportError("Playwright not available. Run: pip install playwright && playwright install")
 
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.timeout = timeout
+
+        self.logger.info(f"URLCapture initialized - output_dir: {output_dir}, timeout: {timeout}ms")
+        self.logger.debug(f"Available viewports: {list(self.VIEWPORTS.keys())}")
 
     def capture_url(
         self,
@@ -80,7 +88,36 @@ class URLCapture:
         str
             Path to captured screenshot
         """
-        return asyncio.run(self._capture_url_async(url, viewport, wait_for_selector, wait_time))
+        self.logger.info(f"Starting capture: {url} ({viewport})")
+        start_time = time.time()
+
+        try:
+            result = asyncio.run(self._capture_url_async(url, viewport, wait_for_selector, wait_time))
+            duration = time.time() - start_time
+
+            log_performance_metric(
+                operation="url_capture",
+                duration=duration,
+                url=url[:50] + "..." if len(url) > 50 else url,
+                viewport=viewport,
+                success=True,
+            )
+
+            self.logger.info(f"Capture successful: {url} -> {result} ({duration:.2f}s)")
+            return result
+
+        except Exception as e:
+            duration = time.time() - start_time
+            log_performance_metric(
+                operation="url_capture",
+                duration=duration,
+                url=url[:50] + "..." if len(url) > 50 else url,
+                viewport=viewport,
+                success=False,
+                error=str(e),
+            )
+            self.logger.error(f"Capture failed: {url} ({viewport}) - {e}")
+            raise
 
     async def _capture_url_async(
         self,
@@ -92,7 +129,9 @@ class URLCapture:
         """Async implementation of URL capture."""
 
         if viewport not in self.VIEWPORTS:
-            raise ValueError(f"Unknown viewport: {viewport}. Available: {list(self.VIEWPORTS.keys())}")
+            error_msg = f"Unknown viewport: {viewport}. Available: {list(self.VIEWPORTS.keys())}"
+            self.logger.error(error_msg)
+            raise ValueError(error_msg)
 
         viewport_config = self.VIEWPORTS[viewport]
 
@@ -102,8 +141,12 @@ class URLCapture:
         filename = f"{self._sanitize_url_for_filename(url)}_{viewport}_{url_hash}_{timestamp}.png"
         screenshot_path = self.output_dir / filename
 
+        self.logger.debug(f"Generated screenshot path: {screenshot_path}")
+        self.logger.debug(f"Using viewport config: {viewport_config}")
+
         async with async_playwright() as p:
             # Launch browser
+            self.logger.debug("Launching browser")
             browser = await p.chromium.launch(headless=True)
 
             # Configure context for mobile if needed
@@ -114,31 +157,39 @@ class URLCapture:
 
             if viewport in ["mobile", "mobile_landscape"]:
                 context_options.update({"is_mobile": True, "has_touch": True})
+                self.logger.debug("Configured mobile context options")
 
             context = await browser.new_context(**context_options)
             page = await context.new_page()
 
             try:
                 # Navigate to URL
+                self.logger.debug(f"Navigating to URL: {url}")
                 await page.goto(url, timeout=self.timeout, wait_until="networkidle")
+                self.logger.debug("Page loaded successfully")
 
                 # Wait for specific selector if provided
                 if wait_for_selector:
+                    self.logger.debug(f"Waiting for selector: {wait_for_selector}")
                     await page.wait_for_selector(wait_for_selector, timeout=10000)
 
                 # Additional wait time if specified
                 if wait_time:
+                    self.logger.debug(f"Additional wait time: {wait_time}ms")
                     await page.wait_for_timeout(wait_time)
 
                 # Capture full page screenshot
+                self.logger.debug(f"Capturing screenshot to: {screenshot_path}")
                 await page.screenshot(path=str(screenshot_path), full_page=True, type="png")
 
                 return str(screenshot_path)
 
             except Exception as e:
+                self.logger.error(f"Browser operation failed for {url}: {e}")
                 raise RuntimeError(f"Failed to capture screenshot from {url}: {str(e)}") from e
 
             finally:
+                self.logger.debug("Cleaning up browser resources")
                 await context.close()
                 await browser.close()
 

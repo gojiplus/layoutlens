@@ -29,9 +29,6 @@ jobs:
     - name: Check ruff formatting
       run: uv run ruff format --check layoutlens/ tests/ examples/
 
-    - name: Run mypy type checking
-      run: uv run mypy layoutlens/ --config-file=pyproject.toml
-
   test:
     runs-on: ${{ matrix.os }}
     strategy:

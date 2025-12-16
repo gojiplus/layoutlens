@@ -10,6 +10,8 @@ import os
 from pathlib import Path
 from typing import Any, Optional
 
+from ..logger import get_logger
+
 try:
     import openai
 
@@ -37,11 +39,16 @@ class VisionAnalyzer:
         model : str, default "gpt-4o-mini"
             OpenAI model to use (gpt-4o, gpt-4o-mini)
         """
+        self.logger = get_logger("vision.analyzer")
+
         if not OPENAI_AVAILABLE:
+            self.logger.error("OpenAI package not available")
             raise ImportError("OpenAI package not available. Run: pip install openai")
 
         self.client = openai.OpenAI(api_key=api_key)
         self.model = model
+        self.logger.info(f"VisionAnalyzer initialized with model: {model}")
+        self.logger.debug(f"OpenAI client created successfully")
 
     def analyze_screenshot(
         self, screenshot_path: str, query: str, context: dict[str, Any] | None = None
@@ -63,17 +70,29 @@ class VisionAnalyzer:
         dict
             Analysis results with answer, confidence, and reasoning
         """
+        self.logger.debug(f"Starting analysis of screenshot: {screenshot_path}")
+        self.logger.debug(f"Query: {query[:100]}..." if len(query) > 100 else f"Query: {query}")
+
         if not Path(screenshot_path).exists():
+            self.logger.error(f"Screenshot file not found: {screenshot_path}")
             raise FileNotFoundError(f"Screenshot not found: {screenshot_path}")
 
         # Encode image to base64
-        image_b64 = self._encode_image(screenshot_path)
+        try:
+            image_b64 = self._encode_image(screenshot_path)
+            self.logger.debug(f"Successfully encoded image to base64: {len(image_b64)} characters")
+        except Exception as e:
+            self.logger.error(f"Failed to encode image {screenshot_path}: {e}")
+            raise
 
         # Build context-aware prompt
         system_prompt = self._build_system_prompt(context)
         user_prompt = self._build_user_prompt(query, context)
 
+        self.logger.debug("Built prompts for OpenAI API call")
+
         try:
+            self.logger.debug(f"Making API call to {self.model}")
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
@@ -97,22 +116,30 @@ class VisionAnalyzer:
             )
 
             raw_response = response.choices[0].message.content
+            tokens_used = response.usage.total_tokens
+
+            self.logger.info(f"API call successful - tokens used: {tokens_used}")
+            self.logger.debug(f"Raw response length: {len(raw_response)} characters")
 
             # Parse structured response
             analysis = self._parse_response(raw_response)
+            confidence = analysis.get("confidence", 0.8)
+
+            self.logger.info(f"Analysis completed with confidence: {confidence}")
 
             return {
                 "answer": analysis.get("answer", raw_response),
-                "confidence": analysis.get("confidence", 0.8),
+                "confidence": confidence,
                 "reasoning": analysis.get("reasoning", "Analysis completed"),
                 "metadata": {
                     "model": self.model,
-                    "tokens_used": response.usage.total_tokens,
+                    "tokens_used": tokens_used,
                     "context": context or {},
                 },
             }
 
         except Exception as e:
+            self.logger.error(f"API call failed: {e}")
             return {
                 "answer": f"Error during analysis: {str(e)}",
                 "confidence": 0.0,

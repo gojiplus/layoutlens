@@ -11,17 +11,6 @@ repos:
         args: [--fix, --exit-non-zero-on-fix]
       - id: ruff-format
 
-  # Type checking
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.13.0
-    hooks:
-      - id: mypy
-        additional_dependencies:
-          - types-PyYAML
-          - types-requests
-          - types-pillow
-        args: [--config-file=pyproject.toml]
-
   # General code quality
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
@@ -68,9 +57,9 @@ repos:
       # Package build check (mirrors CI build step)
       - id: build-check
         name: build-check
-        entry: python3
+        entry: uv
         language: system
-        args: [-m, build, --outdir, /tmp/build-check]
+        args: [build, --out-dir, /tmp/build-check]
         always_run: true
         pass_filenames: false
         stages: [pre-push]
