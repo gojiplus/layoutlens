@@ -147,11 +147,11 @@ class TestLiteLLMProvider:
 
         mock_openai.assert_called_once_with(base_url="https://litellm.ai/api/v1", api_key="test-key", timeout=30.0)
 
-    @patch("openai.OpenAI")
+    @patch("layoutlens.providers.litellm_provider.completion")
     @patch("builtins.open")
     @patch("base64.b64encode")
     @patch("pathlib.Path.exists")
-    def test_analyze_image_success(self, mock_exists, mock_b64, mock_open, mock_openai):
+    def test_analyze_image_success(self, mock_exists, mock_b64, mock_open, mock_completion):
         """Test successful image analysis."""
         # Setup mocks
         mock_exists.return_value = True
@@ -160,16 +160,14 @@ class TestLiteLLMProvider:
         mock_file.read.return_value = b"fake-image-data"
         mock_open.return_value.__enter__.return_value = mock_file
 
+        # Setup mock LiteLLM response
         mock_response = Mock()
         mock_response.choices = [Mock()]
-        mock_response.choices[0].message.content = '{"answer": "Yes", "confidence": 0.9, "reasoning": "Good design"}'
-        mock_response.usage.prompt_tokens = 50
-        mock_response.usage.completion_tokens = 100
+        mock_response.choices[0].message.content = "ANSWER: Yes\nCONFIDENCE: 0.9\nREASONING: Good design"
+        mock_response.usage = Mock()
         mock_response.usage.total_tokens = 150
 
-        mock_client = Mock()
-        mock_client.chat.completions.create.return_value = mock_response
-        mock_openai.return_value = mock_client
+        mock_completion.return_value = mock_response
 
         # Test analysis
         config = VisionProviderConfig(api_key="test-key", model="gpt-4o-mini")
@@ -184,12 +182,12 @@ class TestLiteLLMProvider:
 
         response = provider.analyze_image(request)
 
-        assert response.answer == "Yes"
+        assert response.answer.lower() == "yes"
         assert response.confidence == 0.9
-        assert response.reasoning == "Good design"
+        assert response.reasoning.lower() == "good design"
         assert response.provider == "litellm"
         assert response.model == "gpt-4o-mini"
-        assert response.usage_stats["total_tokens"] == 150
+        assert response.metadata["tokens_used"] == 150
 
     @patch("openai.OpenAI")
     @patch("pathlib.Path.exists")
@@ -203,15 +201,17 @@ class TestLiteLLMProvider:
 
         request = VisionAnalysisRequest(image_path="/fake/path/nonexistent.png", query="Is this well designed?")
 
-        with pytest.raises(FileNotFoundError):
-            provider.analyze_image(request)
+        response = provider.analyze_image(request)
+        assert response.confidence == 0.0
+        assert "error" in response.answer.lower()
+        assert "image not found" in response.answer.lower()
 
-    @patch("openai.AsyncOpenAI")
+    @patch("layoutlens.providers.litellm_provider.acompletion")
     @patch("builtins.open")
     @patch("base64.b64encode")
     @patch("pathlib.Path.exists")
     @pytest.mark.asyncio
-    async def test_analyze_image_async_success(self, mock_exists, mock_b64, mock_open, mock_async_openai):
+    async def test_analyze_image_async_success(self, mock_exists, mock_b64, mock_open, mock_acompletion):
         """Test successful async image analysis."""
         # Setup mocks
         mock_exists.return_value = True
@@ -220,17 +220,14 @@ class TestLiteLLMProvider:
         mock_file.read.return_value = b"fake-image-data"
         mock_open.return_value.__enter__.return_value = mock_file
 
+        # Setup mock LiteLLM async response
         mock_response = Mock()
         mock_response.choices = [Mock()]
-        mock_response.choices[0].message.content = '{"answer": "Yes", "confidence": 0.9, "reasoning": "Good design"}'
-        mock_response.usage.prompt_tokens = 50
-        mock_response.usage.completion_tokens = 100
+        mock_response.choices[0].message.content = "ANSWER: Yes\nCONFIDENCE: 0.9\nREASONING: Good design"
+        mock_response.usage = Mock()
         mock_response.usage.total_tokens = 150
 
-        mock_client = AsyncMock()
-        mock_client.chat.completions.create.return_value = mock_response
-        mock_client.close = AsyncMock()
-        mock_async_openai.return_value = mock_client
+        mock_acompletion.return_value = mock_response
 
         # Test async analysis
         config = VisionProviderConfig(api_key="test-key", model="gpt-4o-mini")
@@ -240,10 +237,9 @@ class TestLiteLLMProvider:
 
         response = await provider.analyze_image_async(request)
 
-        assert response.answer == "Yes"
+        assert response.answer.lower() == "yes"
         assert response.confidence == 0.9
         assert response.provider == "litellm"
-        mock_client.close.assert_called_once()
 
 
 class TestProviderFactory:

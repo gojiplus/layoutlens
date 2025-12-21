@@ -117,8 +117,9 @@ class TestFullWorkflow:
         )
 
         # Mock both capture and vision provider
-        with patch.object(lens, "capture_only", return_value="/fake/screenshot/path.png") as mock_capture, patch.object(
-            lens.vision_provider, "analyze_image", return_value=mock_response
+        with (
+            patch.object(lens, "capture_only", return_value="/fake/screenshot/path.png") as mock_capture,
+            patch.object(lens.vision_provider, "analyze_image", return_value=mock_response),
         ):
             # Analyze the page
             result = lens.analyze(
@@ -164,15 +165,31 @@ class TestFullWorkflow:
                 provider="openai",
                 model="gpt-4o-mini",
             )
+            # Mock comparison response
+            mock_comparison_response = VisionAnalysisResponse(
+                answer="The second design is better due to its modern approach and user-friendly layout.",
+                confidence=0.85,
+                reasoning="After comparing both designs, the second one shows superior visual hierarchy and modern design principles.",
+                metadata={"tokens_used": 120},
+                provider="openai",
+                model="gpt-4o-mini",
+            )
 
-            # Mock both individual analyses and comparison
-            with patch.object(lens.vision_provider, "analyze_image", side_effect=[mock_response1, mock_response2]):
+            # Mock both capture and vision provider analysis (individual + comparison)
+            with (
+                patch.object(lens, "capture_only", side_effect=["/fake/screenshot1.png", "/fake/screenshot2.png"]),
+                patch.object(
+                    lens.vision_provider,
+                    "analyze_image",
+                    side_effect=[mock_response1, mock_response2, mock_comparison_response],
+                ),
+            ):
                 # Compare pages
                 result = lens.compare(sources=[sample_html_file, second_file], query="Which design is better?")
 
                 # Verify results
                 assert "second" in result.answer.lower() or "modern" in result.answer.lower()
-                assert result.confidence == 0.78
+                assert result.confidence == 0.85  # From comparison response
                 assert len(result.sources) == 2
 
         finally:
@@ -221,8 +238,11 @@ class TestFullWorkflow:
             "Does it have good color contrast?",
         ]
 
-        # Mock vision provider responses
-        with patch.object(lens.vision_provider, "analyze_image", side_effect=mock_responses):
+        # Mock both capture and vision provider responses
+        with (
+            patch.object(lens, "capture_only", return_value="/fake/screenshot.png"),
+            patch.object(lens.vision_provider, "analyze_image", side_effect=mock_responses),
+        ):
             results = lens.analyze_batch(sources=[sample_html_file], queries=queries, viewport="desktop")
 
             # Verify results
@@ -299,7 +319,10 @@ class TestFullWorkflow:
         )
 
         # Test accessibility check
-        with patch.object(lens.vision_provider, "analyze_image", return_value=mock_response):
+        with (
+            patch.object(lens.capture, "capture_url", return_value="/fake/screenshot.png"),
+            patch.object(lens.vision_provider, "analyze_image", return_value=mock_response),
+        ):
             result = lens.check_accessibility("https://example.com")
             assert result.confidence == 0.88
             assert "accessible" in result.answer.lower()
@@ -376,7 +399,7 @@ class TestCLIIntegration:
         """Test the CLI test command."""
         from argparse import Namespace
 
-        from layoutlens.cli import cmd_test
+        from layoutlens.cli_commands import cmd_test
 
         # Setup mock
         mock_lens = Mock()
@@ -406,13 +429,13 @@ class TestCLIIntegration:
         # Verify analyze was called
         mock_lens.analyze.assert_called_once()
 
-    @patch("layoutlens.cli.UITestSuite")
+    @patch("layoutlens.api.test_suite.UITestSuite")
     @patch("layoutlens.api.core.LayoutLens")
     def test_cli_suite_command(self, mock_lens_class, mock_suite_class):
         """Test the CLI test suite command."""
         from argparse import Namespace
 
-        from layoutlens.cli import cmd_test
+        from layoutlens.cli_commands import cmd_test
 
         # Setup mocks
         mock_lens = Mock()

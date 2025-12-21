@@ -179,11 +179,11 @@ class TestInteractiveSession:
 class TestInteractiveIntegration:
     """Integration tests for interactive mode."""
 
-    @patch("layoutlens.cli.run_interactive_session")
+    @patch("layoutlens.cli_interactive.run_interactive_session")
     @patch("layoutlens.api.core.LayoutLens")
     def test_interactive_command_integration(self, mock_lens_class, mock_run_session):
         """Test that interactive command integrates properly."""
-        from layoutlens.cli import cmd_interactive
+        from layoutlens.cli_commands import cmd_interactive
 
         # Mock LayoutLens
         mock_lens = Mock()
