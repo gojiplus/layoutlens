@@ -1,18 +1,18 @@
-"""Provider factory for creating and managing AI vision providers via OpenRouter."""
+"""Provider factory for creating and managing AI vision providers."""
 
 from typing import Any
 
 from ..exceptions import ConfigurationError
 from .base import VisionProvider, VisionProviderConfig
-from .openrouter_provider import OpenRouterProvider
+from .litellm_provider import LiteLLMProvider
 
-# Global registry of providers - simplified since OpenRouter handles all providers
+# Global registry of providers - All providers use LiteLLM for unified access
 _PROVIDER_REGISTRY: dict[str, type[VisionProvider]] = {
-    "openrouter": OpenRouterProvider,
-    "openai": OpenRouterProvider,  # Alias for backward compatibility
-    "anthropic": OpenRouterProvider,  # Alias for backward compatibility
-    "google": OpenRouterProvider,  # Alias for backward compatibility
-    "gemini": OpenRouterProvider,  # Alias for backward compatibility
+    "litellm": LiteLLMProvider,  # Direct LiteLLM access
+    "openai": LiteLLMProvider,  # OpenAI via LiteLLM
+    "anthropic": LiteLLMProvider,  # Anthropic via LiteLLM
+    "google": LiteLLMProvider,  # Google via LiteLLM
+    "gemini": LiteLLMProvider,  # Gemini alias
 }
 
 
@@ -51,7 +51,7 @@ def create_provider(
     """Create and initialize a provider instance.
 
     Args:
-        provider_name: Name of the provider ('openai', 'anthropic', 'gemini')
+        provider_name: Name of the provider ('openai', 'anthropic', 'google', 'gemini', 'litellm')
         api_key: API key for the provider
         model: Model name to use
         max_tokens: Maximum tokens in response
@@ -109,7 +109,7 @@ def create_provider_from_config(config: dict[str, Any]) -> VisionProvider:
         {
             "provider": "openai",
             "api_key": "your-key",
-            "model": "gpt-4o",
+            "model": "gpt-4o",  # or "anthropic/claude-3-5-sonnet", "google/gemini-1.5-pro"
             "temperature": 0.1,
             "custom_params": {"detail": "high"}
         }

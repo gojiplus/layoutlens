@@ -148,16 +148,18 @@ class TestLayoutLensExceptions:
                 lens.analyze("https://example.com", "Is this accessible?")
 
     @patch("layoutlens.vision.capture.URLCapture.capture_url")
-    @patch("layoutlens.vision.analyzer.VisionAnalyzer.analyze_screenshot")
-    def test_analysis_error(self, mock_analyze, mock_capture):
+    def test_analysis_error(self, mock_capture):
         """Test AnalysisError when analysis fails."""
         mock_capture.return_value = "screenshot.png"
-        mock_analyze.side_effect = Exception("OpenAI API failed")
 
         with patch.dict("os.environ", {"OPENAI_API_KEY": "test_key"}):
             lens = LayoutLens()
 
-            with pytest.raises(AnalysisError, match="Failed to analyze screenshot"):
+            # Mock the vision provider to raise an exception
+            with (
+                patch.object(lens.vision_provider, "analyze_image", side_effect=Exception("OpenAI API failed")),
+                pytest.raises(AnalysisError, match="Failed to analyze screenshot"),
+            ):
                 lens.analyze("https://example.com", "Is this accessible?")
 
 
@@ -196,17 +198,19 @@ class TestGracefulDegradation:
     """Test graceful degradation when errors occur."""
 
     @patch("layoutlens.vision.capture.URLCapture.capture_url")
-    @patch("layoutlens.vision.analyzer.VisionAnalyzer.analyze_screenshot")
-    def test_analysis_failure_handling(self, mock_analyze, mock_capture):
+    def test_analysis_failure_handling(self, mock_capture):
         """Test that analysis failures are handled gracefully."""
         # Setup successful capture but failed analysis
         mock_capture.return_value = "screenshot.png"
-        mock_analyze.side_effect = Exception("API quota exceeded")
 
         with patch.dict("os.environ", {"OPENAI_API_KEY": "test_key"}):
             lens = LayoutLens()
 
-            with pytest.raises(AnalysisError) as exc_info:
+            # Mock the vision provider to raise an exception
+            with (
+                patch.object(lens.vision_provider, "analyze_image", side_effect=Exception("API quota exceeded")),
+                pytest.raises(AnalysisError) as exc_info,
+            ):
                 lens.analyze("https://example.com", "Is this good?")
 
             error = exc_info.value

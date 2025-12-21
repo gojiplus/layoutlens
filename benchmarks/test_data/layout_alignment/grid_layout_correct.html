@@ -3,128 +3,122 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CSS Grid Layout - Correct Implementation</title>
+    <title>CSS Grid Layout Test (Correct)</title>
     <style>
+        /* Reset and base styles */
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
             font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-            background: #f8f9fa;
-            padding: 2rem;
+            line-height: 1.6;
+            color: #333;
+            background: #fff;
         }
 
-        .dashboard-grid {
-            display: grid;
-            grid-template-columns: 250px 1fr; /* Fixed sidebar, flexible main */
-            grid-template-rows: auto 1fr auto; /* Header, content, footer */
-            grid-template-areas:
-                "sidebar header"
-                "sidebar main"
-                "sidebar footer";
-            gap: 1.5rem;
-            min-height: 100vh;
+        /* Common utility classes */
+        .container {
             max-width: 1200px;
             margin: 0 auto;
+            padding: 0 1rem;
         }
 
-        .sidebar {
-            grid-area: sidebar;
-            background: #2c3e50;
-            color: white;
-            padding: 1.5rem;
-            border-radius: 8px;
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            border: 0;
+        }
+
+        /* Focus indicators */
+        *:focus {
+            outline: 2px solid #0066cc;
+            outline-offset: 2px;
+        }
+
+
+        .grid-container {
+            display: grid;
+            grid-template-areas:
+                "header header header"
+                "sidebar main aside"
+                "footer footer footer";
+            grid-template-columns: 200px 1fr 200px;
+            grid-template-rows: 80px 1fr 60px;
+            gap: 1rem;
+            min-height: 100vh;
+            padding: 1rem;
         }
 
         .header {
             grid-area: header;
-            background: white;
-            padding: 1.5rem;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            background: #3498db;
+            display: flex;
+            align-items: center;
+            padding: 0 2rem;
+            color: white;
         }
 
-        .main-content {
+        .sidebar {
+            grid-area: sidebar;
+            background: #ecf0f1;
+            padding: 1rem;
+        }
+
+        .main {
             grid-area: main;
             background: white;
-            padding: 1.5rem;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 1rem;
+            padding: 2rem;
+            border: 1px solid #bdc3c7;
+        }
+
+        .aside {
+            grid-area: aside;
+            background: #ecf0f1;
+            padding: 1rem;
         }
 
         .footer {
             grid-area: footer;
-            background: #6c757d;
+            background: #2c3e50;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             color: white;
-            padding: 1rem 1.5rem;
-            border-radius: 8px;
-            text-align: center;
         }
 
-        .card {
-            background: #f8f9fa;
-            padding: 1.5rem;
-            border-radius: 6px;
-            border-left: 4px solid #007bff;
-        }
-
-        .nav-item {
-            padding: 0.75rem 0;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-        }
-
-        /* Responsive grid - collapses to single column on mobile */
-        @media (max-width: 768px) {
-            .dashboard-grid {
-                grid-template-columns: 1fr;
-                grid-template-areas:
-                    "header"
-                    "sidebar"
-                    "main"
-                    "footer";
-            }
-
-            .main-content {
-                grid-template-columns: 1fr;
-            }
-        }
     </style>
 </head>
 <body>
-    <div class="dashboard-grid">
-        <aside class="sidebar">
-            <h2>Navigation</h2>
-            <div class="nav-item">Dashboard</div>
-            <div class="nav-item">Analytics</div>
-            <div class="nav-item">Users</div>
-            <div class="nav-item">Settings</div>
-        </aside>
 
+    <div class="grid-container">
         <header class="header">
-            <h1>Dashboard - Perfect Grid Layout</h1>
-            <p>This layout uses CSS Grid with proper template areas for semantic structure.</p>
+            <h1>CSS Grid Layout - Properly Structured</h1>
         </header>
-
-        <main class="main-content">
-            <div class="card">
-                <h3>Revenue</h3>
-                <p>Grid areas maintain perfect alignment and responsive behavior.</p>
-            </div>
-            <div class="card">
-                <h3>Users</h3>
-                <p>Auto-fit columns adapt smoothly to content and screen size.</p>
-            </div>
-            <div class="card">
-                <h3>Performance</h3>
-                <p>Proper gap spacing creates consistent visual rhythm.</p>
-            </div>
+        <nav class="sidebar">
+            <h2>Sidebar</h2>
+            <ul style="list-style: none; padding: 0;">
+                <li><a href="#">Link 1</a></li>
+                <li><a href="#">Link 2</a></li>
+                <li><a href="#">Link 3</a></li>
+            </ul>
+        </nav>
+        <main class="main">
+            <h2>Main Content Area</h2>
+            <p>This layout uses CSS Grid with proper semantic areas defined.</p>
+            <p>Each section is properly placed in its designated grid area.</p>
         </main>
-
+        <aside class="aside">
+            <h2>Aside</h2>
+            <p>Related content</p>
+        </aside>
         <footer class="footer">
-            <p>Footer stays properly positioned with grid-template-areas</p>
+            <p>&copy; 2024 Grid Layout Example</p>
         </footer>
     </div>
+
 </body>
 </html>

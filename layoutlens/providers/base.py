@@ -223,3 +223,82 @@ Focus on:
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(model={self.config.model!r})"
+
+    def parse_structured_response(self, content: str) -> tuple[str, float, str]:
+        """Parse structured response and return answer, confidence, and reasoning.
+
+        Args:
+            content: Raw response content to parse
+
+        Returns:
+            Tuple of (answer, confidence, reasoning)
+        """
+        import re
+
+        # Try to extract confidence from common patterns
+        confidence_patterns = [
+            r"confidence[:\s]+([0-9]*\.?[0-9]+)",
+            r"([0-9]*\.?[0-9]+)%?\s*confidence",
+            r"\*\*confidence[:\s]*\*\*\s*([0-9]*\.?[0-9]+)",
+        ]
+
+        confidence = 0.8  # Default confidence
+        for pattern in confidence_patterns:
+            match = re.search(pattern, content.lower())
+            if match:
+                try:
+                    confidence_val = float(match.group(1))
+                    # Convert percentage to decimal if needed
+                    if confidence_val > 1.0:
+                        confidence_val = confidence_val / 100.0
+                    confidence = max(0.0, min(1.0, confidence_val))
+                    break
+                except (ValueError, IndexError):
+                    continue
+
+        # Try to extract answer from common patterns
+        answer_patterns = [
+            r"answer[:\s]+([^\n\*]+)",
+            r"\*\*answer[:\s]*\*\*\s*([^\n\*]+)",
+            r"^([^.\n]*(?:yes|no)[^.\n]*)",
+        ]
+
+        answer = ""
+        for pattern in answer_patterns:
+            match = re.search(pattern, content.lower())
+            if match:
+                answer = match.group(1).strip()
+                break
+
+        # If no specific answer found, use first sentence or paragraph
+        if not answer:
+            # Split by sentences and take first meaningful one
+            sentences = re.split(r"[.!?]\s+", content.strip())
+            for sentence in sentences:
+                sentence = sentence.strip()
+                if len(sentence) > 10:  # Avoid very short fragments
+                    answer = sentence
+                    break
+
+            # Fallback to first 200 characters
+            if not answer:
+                answer = content.strip()[:200]
+
+        # Try to extract reasoning
+        reasoning_patterns = [
+            r"reasoning[:\s]+(.+?)(?=\n\n|\*\*|$)",
+            r"\*\*reasoning[:\s]*\*\*\s*(.+?)(?=\n\n|\*\*|$)",
+        ]
+
+        reasoning = ""
+        for pattern in reasoning_patterns:
+            match = re.search(pattern, content.lower(), re.DOTALL)
+            if match:
+                reasoning = match.group(1).strip()
+                break
+
+        # If no specific reasoning, use content after answer
+        if not reasoning:
+            reasoning = content.strip()
+
+        return answer, confidence, reasoning

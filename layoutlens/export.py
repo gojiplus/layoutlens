@@ -663,38 +663,39 @@ class ExportManager:
 
         for fmt in formats:
             try:
-                if fmt.lower() == "json":
-                    json_name = f"{filename_base}_{timestamp}.json"
-                    filename = json_name if filename_base else None
-                    if len(normalized_results) == 1:
-                        filepath = self.json_exporter.export_result(normalized_results[0], filename)
-                    else:
-                        filepath = self.json_exporter.export_batch(normalized_results, filename)
-                    exported_files["json"] = filepath
+                match fmt.lower():
+                    case "json":
+                        json_name = f"{filename_base}_{timestamp}.json"
+                        filename = json_name if filename_base else None
+                        if len(normalized_results) == 1:
+                            filepath = self.json_exporter.export_result(normalized_results[0], filename)
+                        else:
+                            filepath = self.json_exporter.export_batch(normalized_results, filename)
+                        exported_files["json"] = filepath
 
-                elif fmt.lower() == "csv" and analysis_results:
-                    csv_name = f"{filename_base}_{timestamp}.csv"
-                    filename = csv_name if filename_base else None
-                    filepath = self.csv_exporter.export_batch(analysis_results, filename)
-                    exported_files["csv"] = filepath
+                    case "csv" if analysis_results:
+                        csv_name = f"{filename_base}_{timestamp}.csv"
+                        filename = csv_name if filename_base else None
+                        filepath = self.csv_exporter.export_batch(analysis_results, filename)
+                        exported_files["csv"] = filepath
 
-                elif fmt.lower() == "html" and analysis_results:
-                    html_name = f"{filename_base}_{timestamp}.html"
-                    filename = html_name if filename_base else None
-                    filepath = self.html_exporter.export_results(analysis_results, title, filename)
-                    exported_files["html"] = filepath
+                    case "html" if analysis_results:
+                        html_name = f"{filename_base}_{timestamp}.html"
+                        filename = html_name if filename_base else None
+                        filepath = self.html_exporter.export_results(analysis_results, title, filename)
+                        exported_files["html"] = filepath
 
-                elif fmt.lower() == "pdf" and analysis_results:
-                    if not self.pdf_exporter:
-                        msg = "PDF export requires ReportLab: pip install reportlab"
-                        raise ExportError(msg)
-                    pdf_name = f"{filename_base}_{timestamp}.pdf"
-                    filename = pdf_name if filename_base else None
-                    filepath = self.pdf_exporter.export_results(analysis_results, title, filename)
-                    exported_files["pdf"] = filepath
+                    case "pdf" if analysis_results:
+                        if not self.pdf_exporter:
+                            msg = "PDF export requires ReportLab: pip install reportlab"
+                            raise ExportError(msg)
+                        pdf_name = f"{filename_base}_{timestamp}.pdf"
+                        filename = pdf_name if filename_base else None
+                        filepath = self.pdf_exporter.export_results(analysis_results, title, filename)
+                        exported_files["pdf"] = filepath
 
-                else:
-                    raise ExportError(f"Unsupported export format: {fmt}")
+                    case _:
+                        raise ExportError(f"Unsupported export format: {fmt}")
 
             except Exception as e:
                 raise ExportError(f"Failed to export as {fmt}: {str(e)}") from e

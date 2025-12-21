@@ -108,7 +108,7 @@ class TestAPIFunctionality(unittest.TestCase):
 
     @patch("layoutlens.vision.analyzer.openai.OpenAI")
     @patch("layoutlens.vision.capture.URLCapture.capture_url")
-    @patch("layoutlens.providers.openrouter_provider.OpenRouterProvider._encode_image")
+    @patch("layoutlens.providers.litellm_provider.LiteLLMProvider._encode_image")
     def test_analyze_url_flow(self, mock_encode_image, mock_capture, mock_openai):
         """Test the full analyze URL workflow."""
         from layoutlens.api.core import LayoutLens

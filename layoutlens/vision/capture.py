@@ -92,7 +92,20 @@ class URLCapture:
         start_time = time.time()
 
         try:
-            result = asyncio.run(self._capture_url_async(url, viewport, wait_for_selector, wait_time))
+            # Check if we're already in an event loop
+            try:
+                asyncio.get_running_loop()
+                # We're in an event loop, use run_in_executor to avoid nested loops
+                import concurrent.futures
+
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    result = executor.submit(
+                        asyncio.run, self._capture_url_async(url, viewport, wait_for_selector, wait_time)
+                    ).result()
+            except RuntimeError:
+                # No event loop running, safe to use asyncio.run
+                result = asyncio.run(self._capture_url_async(url, viewport, wait_for_selector, wait_time))
+
             duration = time.time() - start_time
 
             log_performance_metric(
@@ -117,6 +130,63 @@ class URLCapture:
                 error=str(e),
             )
             self.logger.error(f"Capture failed: {url} ({viewport}) - {e}")
+            raise
+
+    async def capture_url_async(
+        self,
+        url: str,
+        viewport: str = "desktop",
+        wait_for_selector: str | None = None,
+        wait_time: int | None = None,
+    ) -> str:
+        """
+        Async version of capture_url for use in async contexts like CLI.
+
+        Parameters
+        ----------
+        url : str
+            URL to capture
+        viewport : str, default "desktop"
+            Viewport size (desktop, laptop, tablet, mobile, mobile_landscape)
+        wait_for_selector : str, optional
+            CSS selector to wait for before capturing
+        wait_time : int, optional
+            Additional wait time in milliseconds
+
+        Returns
+        -------
+        str
+            Path to captured screenshot
+        """
+        self.logger.info(f"Starting async capture: {url} ({viewport})")
+        start_time = time.time()
+
+        try:
+            result = await self._capture_url_async(url, viewport, wait_for_selector, wait_time)
+            duration = time.time() - start_time
+
+            log_performance_metric(
+                operation="url_capture_async",
+                duration=duration,
+                url=url[:50] + "..." if len(url) > 50 else url,
+                viewport=viewport,
+                success=True,
+            )
+
+            self.logger.info(f"Async capture successful: {url} -> {result} ({duration:.2f}s)")
+            return result
+
+        except Exception as e:
+            duration = time.time() - start_time
+            log_performance_metric(
+                operation="url_capture_async",
+                duration=duration,
+                url=url[:50] + "..." if len(url) > 50 else url,
+                viewport=viewport,
+                success=False,
+                error=str(e),
+            )
+            self.logger.error(f"Async capture failed: {url} ({viewport}) - {e}")
             raise
 
     async def _capture_url_async(

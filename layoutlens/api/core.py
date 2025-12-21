@@ -109,31 +109,27 @@ class LayoutLens:
         self,
         api_key: str | None = None,
         model: str = "gpt-4o-mini",
-        provider: str = "openrouter",
+        provider: str = "openai",
         output_dir: str = "layoutlens_output",
         cache_enabled: bool = True,
         cache_type: str = "memory",
         cache_ttl: int = 3600,
     ):
-        """
-        Initialize LayoutLens with AI provider credentials.
+        """Initialize LayoutLens with AI provider credentials.
 
-        Parameters
-        ----------
-        api_key : str, optional
-            API key for the provider. If not provided, will try OPENAI_API_KEY or OPENROUTER_API_KEY env vars
-        model : str, default "gpt-4o-mini"
-            Model to use for analysis (provider-specific naming)
-        provider : str, default "openrouter"
-            AI provider to use ("openrouter", "openai", "anthropic", "google")
-        output_dir : str, default "layoutlens_output"
-            Directory for storing screenshots and results
-        cache_enabled : bool, default True
-            Whether to enable result caching for performance
-        cache_type : str, default "memory"
-            Type of cache backend: "memory" or "file"
-        cache_ttl : int, default 3600
-            Cache time-to-live in seconds (1 hour default)
+        Args:
+            api_key: API key for the provider. If not provided, will try OPENAI_API_KEY
+                environment variable.
+            model: Model to use for analysis (LiteLLM naming: "gpt-4o", "anthropic/claude-3-5-sonnet", "google/gemini-1.5-pro").
+            provider: AI provider to use ("openai", "anthropic", "google", "gemini", "litellm").
+            output_dir: Directory for storing screenshots and results.
+            cache_enabled: Whether to enable result caching for performance.
+            cache_type: Type of cache backend: "memory" or "file".
+            cache_ttl: Cache time-to-live in seconds (1 hour default).
+
+        Raises:
+            AuthenticationError: If no valid API key is found.
+            ConfigurationError: If invalid provider or configuration is specified.
         """
         # Initialize logger
         self.logger = get_logger("api.core")
@@ -153,8 +149,7 @@ class LayoutLens:
         if not self.api_key:
             self.logger.error(f"No API key found for {provider} provider")
             raise AuthenticationError(
-                f"API key required for {provider} provider. "
-                f"Set OPENAI_API_KEY/OPENROUTER_API_KEY env var or pass api_key parameter."
+                f"API key required for {provider} provider. " f"Set OPENAI_API_KEY env var or pass api_key parameter."
             )
 
         self.model = model
@@ -181,7 +176,13 @@ class LayoutLens:
         try:
             self.capture = URLCapture(output_dir=str(self.output_dir / "screenshots"))
             self.comparator = LayoutComparator(vision_provider=self.vision_provider)
-            self.logger.debug("Initialized capture and comparator components")
+
+            # Initialize screenshot manager for 2-stage pipeline support
+            from ..utils import ScreenshotManager
+
+            self.screenshot_manager = ScreenshotManager(output_dir=self.output_dir)
+
+            self.logger.debug("Initialized capture, comparator, and screenshot manager components")
         except Exception as e:
             self.logger.error(f"Failed to initialize components: {e}")
             raise
@@ -202,16 +203,7 @@ class LayoutLens:
 
     def _get_api_key_for_provider(self, provider: str) -> str | None:
         """Get appropriate API key based on provider."""
-        if provider.lower() in (
-            "openrouter",
-            "openai",
-            "anthropic",
-            "google",
-            "gemini",
-        ):
-            # OpenRouter can be used for all providers
-            return os.getenv("OPENROUTER_API_KEY") or os.getenv("OPENAI_API_KEY")
-        return None
+        return os.getenv("OPENAI_API_KEY")
 
     def analyze(
         self,
@@ -220,29 +212,20 @@ class LayoutLens:
         viewport: str = "desktop",
         context: dict[str, Any] | None = None,
     ) -> AnalysisResult:
-        """
-        Analyze a URL or screenshot with a natural language query.
+        """Analyze a URL or screenshot with a natural language query.
 
-        Parameters
-        ----------
-        source : str or Path
-            URL to analyze or path to screenshot image
-        query : str
-            Natural language question about the UI
-        viewport : str, default "desktop"
-            Viewport size for URL capture ("desktop", "mobile", "tablet")
-        context : dict, optional
-            Additional context for analysis (user_type, browser, etc.)
+        Args:
+            source: URL to analyze or path to screenshot image.
+            query: Natural language question about the UI.
+            viewport: Viewport size for URL capture ("desktop", "mobile", "tablet").
+            context: Additional context for analysis (user_type, browser, etc.).
 
-        Returns
-        -------
-        AnalysisResult
-            Detailed analysis with answer, confidence, and reasoning
+        Returns:
+            Detailed analysis with answer, confidence, and reasoning.
 
-        Examples
-        --------
-        >>> result = lens.analyze("https://github.com", "Is the search bar easy to find?")
-        >>> result = lens.analyze("screenshot.png", "Are the buttons large enough for mobile?")
+        Example:
+            >>> result = lens.analyze("https://github.com", "Is the search bar easy to find?")
+            >>> result = lens.analyze("screenshot.png", "Are the buttons large enough for mobile?")
         """
         start_time = time.time()
 
@@ -270,7 +253,7 @@ class LayoutLens:
             return cached_result
 
         try:
-            # Determine if source is URL or image file
+            # Determine if source is URL, HTML file, or image file
             if self._is_url(source):
                 self.logger.debug(f"Capturing screenshot from URL: {source}")
                 # Capture screenshot from URL
@@ -281,6 +264,19 @@ class LayoutLens:
                     self.logger.error(f"Screenshot capture failed for {source}: {e}")
                     raise ScreenshotError(
                         f"Failed to capture screenshot from URL: {str(e)}",
+                        source=str(source),
+                        viewport=viewport,
+                    ) from e
+            elif self._is_html_file(source):
+                self.logger.debug(f"Capturing screenshot from HTML file: {source}")
+                # HTML files need special handling - use the capture_only method
+                try:
+                    screenshot_path = self.capture_only(source, viewport=viewport)
+                    self.logger.info(f"Successfully captured HTML file screenshot: {screenshot_path}")
+                except Exception as e:
+                    self.logger.error(f"HTML file capture failed for {source}: {e}")
+                    raise ScreenshotError(
+                        f"Failed to capture screenshot from HTML file: {str(e)}",
                         source=str(source),
                         viewport=viewport,
                     ) from e
@@ -351,6 +347,7 @@ class LayoutLens:
                     "cache_hit": False,
                     "provider": self.provider,
                     "model": self.model,
+                    "pipeline_mode": "one-shot",
                 },
             )
 
@@ -389,31 +386,22 @@ class LayoutLens:
         viewport: str = "desktop",
         context: dict[str, Any] | None = None,
     ) -> ComparisonResult:
-        """
-        Compare multiple URLs or screenshots.
+        """Compare multiple URLs or screenshots.
 
-        Parameters
-        ----------
-        sources : list[str or Path]
-            List of URLs or screenshot paths to compare
-        query : str, default "Are these layouts consistent?"
-            Natural language question for comparison
-        viewport : str, default "desktop"
-            Viewport size for URL captures
-        context : dict, optional
-            Additional context for analysis
+        Args:
+            sources: List of URLs or screenshot paths to compare.
+            query: Natural language question for comparison.
+            viewport: Viewport size for URL captures.
+            context: Additional context for analysis.
 
-        Returns
-        -------
-        ComparisonResult
-            Comparison analysis with overall assessment
+        Returns:
+            Comparison analysis with overall assessment.
 
-        Examples
-        --------
-        >>> result = lens.compare([
-        ...     "https://mysite.com/before",
-        ...     "https://mysite.com/after"
-        ... ], "Did the redesign improve the user experience?")
+        Example:
+            >>> result = lens.compare([
+            ...     "https://mysite.com/before",
+            ...     "https://mysite.com/after"
+            ... ], "Did the redesign improve the user experience?")
         """
         start_time = time.time()
 
@@ -499,24 +487,16 @@ class LayoutLens:
         viewport: str = "desktop",
         context: dict[str, Any] | None = None,
     ) -> BatchResult:
-        """
-        Analyze multiple sources with multiple queries efficiently.
+        """Analyze multiple sources with multiple queries efficiently.
 
-        Parameters
-        ----------
-        sources : list[str or Path]
-            List of URLs or screenshot paths
-        queries : list[str]
-            List of natural language queries
-        viewport : str, default "desktop"
-            Viewport size for URL captures
-        context : dict, optional
-            Additional context for analysis
+        Args:
+            sources: List of URLs or screenshot paths.
+            queries: List of natural language queries.
+            viewport: Viewport size for URL captures.
+            context: Additional context for analysis.
 
-        Returns
-        -------
-        BatchResult
-            Batch analysis results with aggregated metrics
+        Returns:
+            Batch analysis results with aggregated metrics.
         """
         start_time = time.time()
 
@@ -598,24 +578,21 @@ class LayoutLens:
         viewport: str = "desktop",
         context: dict[str, Any] | None = None,
     ) -> AnalysisResult:
-        """
-        Async version of analyze method for concurrent processing.
+        """Async version of analyze method for concurrent processing.
 
-        Parameters
-        ----------
-        source : str or Path
-            URL or path to screenshot file
-        query : str
-            Natural language query about the UI
-        viewport : str, default "desktop"
-            Viewport size for URL captures ("desktop", "mobile_portrait", etc.)
-        context : dict, optional
-            Additional context for analysis
+        Args:
+            source: URL or path to screenshot file.
+            query: Natural language query about the UI.
+            viewport: Viewport size for URL captures ("desktop", "mobile_portrait", etc.).
+            context: Additional context for analysis.
 
-        Returns
-        -------
-        AnalysisResult
-            Analysis result with answer, confidence, and metadata
+        Returns:
+            Analysis result with answer, confidence, and metadata.
+
+        Raises:
+            ValidationError: If query is empty or invalid.
+            LayoutFileNotFoundError: If screenshot file doesn't exist.
+            AnalysisError: If analysis fails.
         """
         # Input validation
         if not query or not query.strip():
@@ -700,26 +677,17 @@ class LayoutLens:
         context: dict[str, Any] | None = None,
         max_concurrent: int = 5,
     ) -> BatchResult:
-        """
-        Analyze multiple sources with multiple queries concurrently.
+        """Analyze multiple sources with multiple queries concurrently.
 
-        Parameters
-        ----------
-        sources : list[str or Path]
-            List of URLs or screenshot paths
-        queries : list[str]
-            List of natural language queries
-        viewport : str, default "desktop"
-            Viewport size for URL captures
-        context : dict, optional
-            Additional context for analysis
-        max_concurrent : int, default 5
-            Maximum number of concurrent analyses
+        Args:
+            sources: List of URLs or screenshot paths.
+            queries: List of natural language queries.
+            viewport: Viewport size for URL captures.
+            context: Additional context for analysis.
+            max_concurrent: Maximum number of concurrent analyses.
 
-        Returns
-        -------
-        BatchResult
-            Batch analysis results with aggregated metrics
+        Returns:
+            Batch analysis results with aggregated metrics.
         """
         start_time = time.time()
 
@@ -789,6 +757,470 @@ class LayoutLens:
         parsed = urlparse(str(source))
         return bool(parsed.scheme and parsed.netloc)
 
+    def _is_html_file(self, source: str | Path) -> bool:
+        """Check if source is an HTML file."""
+        if self._is_url(source):
+            return False
+
+        path = Path(source)
+        return path.suffix.lower() in [".html", ".htm"]
+
+    def _detect_html_complexity(self, html_file_path: Path) -> bool:
+        """Detect if HTML file has external dependencies (CSS, JS, images)."""
+        try:
+            with open(html_file_path, encoding="utf-8") as f:
+                content = f.read().lower()
+
+            # Check for external resources
+            external_indicators = [
+                "<link",
+                "<script src",
+                "<img src",
+                "url(",
+                "href=",
+                "src=",
+                "@import",
+                "background-image",
+            ]
+
+            for indicator in external_indicators:
+                # Check if indicator is present and it's a relative path (not http/https/data)
+                if (
+                    indicator in content
+                    and "http://" not in content
+                    and "https://" not in content
+                    and "data:" not in content
+                ):
+                    return True
+
+            return False
+        except Exception:
+            # If we can't read the file, assume it's complex
+            return True
+
+    async def _serve_html_and_capture(
+        self,
+        html_file_path: str | Path,
+        viewport: str = "desktop",
+        wait_for_selector: str | None = None,
+        wait_time: int | None = None,
+    ) -> str:
+        """Serve HTML file locally and capture screenshot."""
+        html_file_path = Path(html_file_path).resolve()
+        if not html_file_path.exists():
+            raise LayoutFileNotFoundError(
+                f"HTML file not found: {html_file_path}",
+                file_path=str(html_file_path),
+            )
+
+        # Try file:// URL first for simple HTML files (faster)
+        if not self._detect_html_complexity(html_file_path):
+            self.logger.debug(f"Using file:// URL for simple HTML: {html_file_path}")
+            try:
+                file_url = f"file://{html_file_path}"
+                screenshot_path = await self.capture.capture_url_async(
+                    url=file_url, viewport=viewport, wait_for_selector=wait_for_selector, wait_time=wait_time
+                )
+                self.logger.info(f"Successfully captured HTML file via file:// URL: {html_file_path.name}")
+                return screenshot_path
+            except Exception as e:
+                self.logger.debug(f"file:// URL failed, falling back to HTTP server: {e}")
+
+        # Fall back to HTTP server for complex HTML files
+        self.logger.debug(f"Using HTTP server for complex HTML: {html_file_path}")
+
+        import http.server
+        import socket
+        import socketserver
+        import threading
+        import time
+
+        # Find available port
+        def find_free_port():
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.bind(("", 0))
+                s.listen(1)
+                port = s.getsockname()[1]
+            return port
+
+        port = find_free_port()
+
+        # Create a handler that serves files from the HTML file's directory
+        class LocalFileHandler(http.server.SimpleHTTPRequestHandler):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, directory=str(html_file_path.parent), **kwargs)
+
+            def do_GET(self):
+                # If requesting root, serve our HTML file
+                if self.path == "/" or self.path == "":
+                    self.send_response(200)
+                    self.send_header("Content-type", "text/html")
+                    self.end_headers()
+                    with open(html_file_path, "rb") as f:
+                        self.wfile.write(f.read())
+                else:
+                    # Serve other files normally (CSS, JS, images)
+                    super().do_GET()
+
+            def log_message(self, format, *args):
+                # Suppress server logs
+                return
+
+        # Start server in background thread
+        httpd = socketserver.TCPServer(("", port), LocalFileHandler)
+        server_thread = threading.Thread(target=httpd.serve_forever)
+        server_thread.daemon = True
+        server_thread.start()
+
+        try:
+            # Give server time to start
+            await asyncio.sleep(0.5)
+
+            # Capture the served HTML page
+            local_url = f"http://localhost:{port}/"
+            self.logger.debug(f"Serving HTML file at {local_url}")
+
+            screenshot_path = await self.capture.capture_url_async(
+                url=local_url, viewport=viewport, wait_for_selector=wait_for_selector, wait_time=wait_time
+            )
+
+            self.logger.info(f"Successfully captured HTML file via HTTP server: {html_file_path.name}")
+            return screenshot_path
+
+        finally:
+            # Stop the server
+            httpd.shutdown()
+            httpd.server_close()
+            server_thread.join(timeout=1)
+
+    # Pipeline Mode Methods
+
+    def capture_only(
+        self,
+        source: str | Path,
+        viewport: str = "desktop",
+        wait_for_selector: str | None = None,
+        wait_time: int | None = None,
+    ) -> str:
+        """Capture screenshot only without analysis (Stage 1 of 2-stage pipeline).
+
+        Args:
+            source: URL to capture or existing file path to validate.
+            viewport: Viewport size for URL capture ("desktop", "mobile", "tablet").
+            wait_for_selector: CSS selector to wait for before capturing.
+            wait_time: Additional wait time in milliseconds.
+
+        Returns:
+            Path to the captured or validated screenshot file.
+
+        Raises:
+            ScreenshotError: If URL capture fails.
+            LayoutFileNotFoundError: If file doesn't exist.
+
+        Example:
+            >>> lens = LayoutLens(api_key="...")
+            >>> screenshot_path = lens.capture_only("https://example.com")
+            >>> # Later analyze with different queries
+            >>> result1 = lens.analyze_screenshot(screenshot_path, "Is it accessible?")
+            >>> result2 = lens.analyze_screenshot(screenshot_path, "Is it mobile-friendly?")
+        """
+        start_time = time.time()
+
+        log_function_call(
+            "LayoutLens.capture_only",
+            source=str(source)[:50] + "..." if len(str(source)) > 50 else str(source),
+            viewport=viewport,
+        )
+
+        try:
+            if self._is_url(source):
+                self.logger.debug(f"Capturing screenshot from URL: {source}")
+
+                # Try to detect if we're in an async context for better handling
+                try:
+                    import asyncio
+
+                    asyncio.get_running_loop()
+                    # We're in async context, but capture_url handles this now
+                    screenshot_path = self.capture.capture_url(
+                        url=str(source), viewport=viewport, wait_for_selector=wait_for_selector, wait_time=wait_time
+                    )
+                except RuntimeError:
+                    # No event loop, proceed normally
+                    screenshot_path = self.capture.capture_url(
+                        url=str(source), viewport=viewport, wait_for_selector=wait_for_selector, wait_time=wait_time
+                    )
+
+                self.logger.info(f"Successfully captured screenshot: {screenshot_path}")
+
+                # Log performance metrics
+                log_performance_metric(
+                    operation="capture_only",
+                    duration=time.time() - start_time,
+                    source_type="url",
+                    viewport=viewport,
+                )
+
+                return screenshot_path
+            elif self._is_html_file(source):
+                self.logger.debug(f"Capturing screenshot from HTML file: {source}")
+
+                # HTML files need to be served and captured asynchronously
+                # For sync context, we need to handle this differently
+                try:
+                    import asyncio
+
+                    asyncio.get_running_loop()
+                    # We're in an event loop, can't use asyncio.run
+                    # This case should use the async method instead
+                    raise RuntimeError("HTML file capture requires async context - use capture_only_async")
+                except RuntimeError as e:
+                    if "requires async context" in str(e):
+                        raise
+                    # No event loop, use asyncio.run
+                    screenshot_path = asyncio.run(
+                        self._serve_html_and_capture(
+                            html_file_path=source,
+                            viewport=viewport,
+                            wait_for_selector=wait_for_selector,
+                            wait_time=wait_time,
+                        )
+                    )
+
+                self.logger.info(f"Successfully captured HTML file screenshot: {screenshot_path}")
+
+                # Log performance metrics
+                log_performance_metric(
+                    operation="capture_only",
+                    duration=time.time() - start_time,
+                    source_type="html_file",
+                    viewport=viewport,
+                )
+
+                return screenshot_path
+            else:
+                # Validate existing file (image)
+                screenshot_path = str(source)
+                if not Path(screenshot_path).exists():
+                    self.logger.error(f"Screenshot file not found: {screenshot_path}")
+                    raise LayoutFileNotFoundError(
+                        f"Screenshot file not found: {screenshot_path}",
+                        file_path=screenshot_path,
+                    )
+
+                self.logger.info(f"Validated existing screenshot: {screenshot_path}")
+                return screenshot_path
+
+        except LayoutLensError as e:
+            self.logger.debug(f"LayoutLens error in capture_only: {type(e).__name__}")
+            raise
+        except Exception as e:
+            self.logger.error(f"Unexpected error in capture_only: {e}")
+            raise wrap_exception(e, "Screenshot capture failed") from e
+
+    async def capture_only_async(
+        self,
+        source: str | Path,
+        viewport: str = "desktop",
+        wait_for_selector: str | None = None,
+        wait_time: int | None = None,
+    ) -> str:
+        """Async version of capture_only for CLI use (Stage 1 of 2-stage pipeline)."""
+        start_time = time.time()
+
+        log_function_call(
+            "LayoutLens.capture_only_async",
+            source=str(source)[:50] + "..." if len(str(source)) > 50 else str(source),
+            viewport=viewport,
+        )
+
+        try:
+            if self._is_url(source):
+                self.logger.debug(f"Async capturing screenshot from URL: {source}")
+                screenshot_path = await self.capture.capture_url_async(
+                    url=str(source), viewport=viewport, wait_for_selector=wait_for_selector, wait_time=wait_time
+                )
+                self.logger.info(f"Successfully captured screenshot: {screenshot_path}")
+
+                # Log performance metrics
+                log_performance_metric(
+                    operation="capture_only_async",
+                    duration=time.time() - start_time,
+                    source_type="url",
+                    viewport=viewport,
+                )
+
+                return screenshot_path
+            elif self._is_html_file(source):
+                self.logger.debug(f"Async capturing screenshot from HTML file: {source}")
+                screenshot_path = await self._serve_html_and_capture(
+                    html_file_path=source, viewport=viewport, wait_for_selector=wait_for_selector, wait_time=wait_time
+                )
+                self.logger.info(f"Successfully captured HTML file screenshot: {screenshot_path}")
+
+                # Log performance metrics
+                log_performance_metric(
+                    operation="capture_only_async",
+                    duration=time.time() - start_time,
+                    source_type="html_file",
+                    viewport=viewport,
+                )
+
+                return screenshot_path
+            else:
+                # Validate existing file (image)
+                screenshot_path = str(source)
+                if not Path(screenshot_path).exists():
+                    self.logger.error(f"Screenshot file not found: {screenshot_path}")
+                    raise LayoutFileNotFoundError(
+                        f"Screenshot file not found: {screenshot_path}",
+                        file_path=screenshot_path,
+                    )
+
+                self.logger.info(f"Validated existing screenshot: {screenshot_path}")
+                return screenshot_path
+
+        except LayoutLensError as e:
+            self.logger.debug(f"LayoutLens error in capture_only_async: {type(e).__name__}")
+            raise
+        except Exception as e:
+            self.logger.error(f"Unexpected error in capture_only_async: {e}")
+            raise wrap_exception(e, "Async screenshot capture failed") from e
+
+    def analyze_screenshot(
+        self,
+        screenshot_path: str | Path,
+        query: str,
+        context: dict[str, Any] | None = None,
+        source_url: str | None = None,
+        viewport: str = "desktop",
+    ) -> AnalysisResult:
+        """Analyze existing screenshot with natural language query (Stage 2 of 2-stage pipeline).
+
+        Args:
+            screenshot_path: Path to existing screenshot image.
+            query: Natural language question about the UI.
+            context: Additional context for analysis.
+            source_url: Original URL if available (for metadata).
+            viewport: Viewport that was used for capture (for metadata).
+
+        Returns:
+            Detailed analysis with answer, confidence, and reasoning.
+
+        Raises:
+            ValidationError: If query is empty.
+            LayoutFileNotFoundError: If screenshot doesn't exist.
+            AnalysisError: If analysis fails.
+
+        Example:
+            >>> result = lens.analyze_screenshot("screenshot.png", "Is the navigation centered?")
+            >>> result = lens.analyze_screenshot("mobile_screenshot.png", "Are buttons touch-friendly?")
+        """
+        start_time = time.time()
+
+        log_function_call(
+            "LayoutLens.analyze_screenshot",
+            screenshot_path=str(screenshot_path),
+            query=query[:100] + "..." if len(query) > 100 else query,
+        )
+
+        # Input validation
+        if not query or not query.strip():
+            self.logger.error(f"Empty query provided for screenshot: {screenshot_path}")
+            raise ValidationError("Query cannot be empty", field="query", value=query)
+
+        screenshot_path = str(screenshot_path)
+        if not Path(screenshot_path).exists():
+            self.logger.error(f"Screenshot file not found: {screenshot_path}")
+            raise LayoutFileNotFoundError(
+                f"Screenshot file not found: {screenshot_path}",
+                file_path=screenshot_path,
+            )
+
+        # Check cache first (use consistent cache key format)
+        cache_source = source_url or screenshot_path
+        cache_key = self.cache.get_analysis_key(source=cache_source, query=query, viewport=viewport, context=context)
+
+        cached_result = self.cache.get(cache_key)
+        if cached_result and isinstance(cached_result, AnalysisResult):
+            cached_result.execution_time = time.time() - start_time
+            cached_result.metadata["cache_hit"] = True
+            self.logger.info(
+                f"Cache hit for screenshot: {Path(screenshot_path).name} - confidence: {cached_result.confidence}"
+            )
+            return cached_result
+
+        try:
+            # Analyze with vision provider
+            from ..providers import VisionAnalysisRequest
+
+            self.logger.debug(f"Starting vision analysis for screenshot: {Path(screenshot_path).name}")
+            request = VisionAnalysisRequest(
+                image_path=screenshot_path,
+                query=query,
+                context=context,
+                source_url=source_url,
+                viewport=viewport,
+            )
+
+            vision_response = self.vision_provider.analyze_image(request)
+            self.logger.debug(f"Vision analysis completed with confidence: {vision_response.confidence}")
+
+            execution_time = time.time() - start_time
+
+            # Safe type conversion
+            confidence_value = vision_response.confidence
+            confidence = float(confidence_value) if isinstance(confidence_value, int | float) else 0.8
+
+            metadata_dict = vision_response.metadata or {}
+            if not isinstance(metadata_dict, dict):
+                metadata_dict = {}
+
+            result = AnalysisResult(
+                source=source_url or screenshot_path,
+                query=query,
+                answer=str(vision_response.answer),
+                confidence=confidence,
+                reasoning=str(vision_response.reasoning),
+                screenshot_path=screenshot_path,
+                viewport=viewport,
+                execution_time=execution_time,
+                metadata={
+                    **metadata_dict,
+                    "cache_hit": False,
+                    "provider": self.provider,
+                    "model": self.model,
+                    "pipeline_mode": "2-stage",
+                    "source_url": source_url,
+                },
+            )
+
+            # Log performance metrics
+            log_performance_metric(
+                operation="analyze_screenshot",
+                duration=execution_time,
+                confidence=confidence,
+                source_type="screenshot",
+                viewport=viewport,
+                cache_hit=False,
+            )
+
+            self.logger.info(
+                f"Screenshot analysis completed for {Path(screenshot_path).name} - confidence: {confidence:.2f}, time: {execution_time:.2f}s"
+            )
+
+            # Cache the result
+            self.cache.set(cache_key, result)
+
+            return result
+
+        except LayoutLensError as e:
+            self.logger.debug(f"LayoutLens error in analyze_screenshot: {type(e).__name__}")
+            raise
+        except Exception as e:
+            self.logger.error(f"Unexpected error in analyze_screenshot: {e}")
+            raise wrap_exception(e, "Screenshot analysis failed") from e
+
     # Developer convenience methods
     def check_accessibility(self, source: str | Path, viewport: str = "desktop") -> AnalysisResult:
         """Quick accessibility check with common WCAG queries."""
@@ -831,6 +1263,407 @@ class LayoutLens:
         Provide specific recommendations to improve conversions.
         """
         return self.analyze(source, query, viewport)
+
+    # Batch Pipeline Methods
+
+    def capture_batch(
+        self,
+        sources: list[str | Path],
+        viewport: str = "desktop",
+        wait_for_selector: str | None = None,
+        wait_time: int | None = None,
+        max_concurrent: int = 3,
+    ) -> dict[str, str]:
+        """Capture screenshots from multiple URLs (Stage 1 of 2-stage pipeline).
+
+        Args:
+            sources: List of URLs to capture.
+            viewport: Viewport size for captures.
+            wait_for_selector: CSS selector to wait for before capturing.
+            wait_time: Additional wait time in milliseconds.
+            max_concurrent: Maximum concurrent captures.
+
+        Returns:
+            Dictionary mapping source URLs to screenshot paths.
+
+        Example:
+            >>> lens = LayoutLens(api_key="...")
+            >>> screenshots = lens.capture_batch(["https://page1.com", "https://page2.com"])
+            >>> # Later analyze with different queries
+            >>> for url, path in screenshots.items():
+            ...     result = lens.analyze_screenshot(path, "Is it accessible?", source_url=url)
+        """
+        start_time = time.time()
+
+        log_function_call(
+            "LayoutLens.capture_batch",
+            source_count=len(sources),
+            viewport=viewport,
+            max_concurrent=max_concurrent,
+        )
+
+        self.logger.info(f"Starting batch capture of {len(sources)} sources")
+
+        results = {}
+        failed_count = 0
+
+        # Filter URLs only (skip existing files)
+        urls_to_capture = [s for s in sources if self._is_url(s)]
+        existing_files = [s for s in sources if not self._is_url(s)]
+
+        # Validate existing files
+        for file_path in existing_files:
+            if Path(file_path).exists():
+                results[str(file_path)] = str(file_path)
+                self.logger.debug(f"Using existing file: {file_path}")
+            else:
+                failed_count += 1
+                results[str(file_path)] = f"Error: File not found"
+                self.logger.warning(f"File not found: {file_path}")
+
+        # Capture URLs using BatchCapture for efficiency
+        if urls_to_capture:
+            try:
+                from ..vision.capture import BatchCapture
+
+                batch_capture = BatchCapture(output_dir=str(self.output_dir / "screenshots"))
+
+                # Use single viewport batch capture
+                url_results = batch_capture.capture_url_list(
+                    urls=urls_to_capture, viewports=[viewport], max_concurrent=max_concurrent
+                )
+
+                # Extract results for the specified viewport
+                for url, viewport_results in url_results.items():
+                    screenshot_path = viewport_results.get(viewport, "")
+                    if screenshot_path.startswith("Error:"):
+                        failed_count += 1
+                        results[url] = screenshot_path
+                    else:
+                        results[url] = screenshot_path
+
+            except Exception as e:
+                self.logger.error(f"Batch capture failed: {e}")
+                # Fallback to individual captures
+                for url in urls_to_capture:
+                    try:
+                        screenshot_path = self.capture_only(url, viewport, wait_for_selector, wait_time)
+                        results[url] = screenshot_path
+                    except Exception as capture_e:
+                        failed_count += 1
+                        results[url] = f"Error: {str(capture_e)}"
+                        self.logger.warning(f"Individual capture failed for {url}: {capture_e}")
+
+        execution_time = time.time() - start_time
+        successful_count = len(sources) - failed_count
+
+        # Log performance metrics
+        log_performance_metric(
+            operation="capture_batch",
+            duration=execution_time,
+            total_sources=len(sources),
+            successful_captures=successful_count,
+            failed_captures=failed_count,
+            viewport=viewport,
+            max_concurrent=max_concurrent,
+        )
+
+        self.logger.info(
+            f"Batch capture completed: {successful_count}/{len(sources)} successful, time: {execution_time:.2f}s"
+        )
+
+        return results
+
+    async def capture_batch_async(
+        self,
+        sources: list[str | Path],
+        viewport: str = "desktop",
+        wait_for_selector: str | None = None,
+        wait_time: int | None = None,
+        max_concurrent: int = 3,
+    ) -> dict[str, str]:
+        """Async version of capture_batch for CLI use (Stage 1 of 2-stage pipeline)."""
+        start_time = time.time()
+
+        log_function_call(
+            "LayoutLens.capture_batch_async",
+            source_count=len(sources),
+            viewport=viewport,
+            max_concurrent=max_concurrent,
+        )
+
+        self.logger.info(f"Starting async batch capture of {len(sources)} sources")
+
+        results = {}
+
+        # Filter URLs and HTML files vs existing files
+        sources_to_capture = [s for s in sources if (self._is_url(s) or self._is_html_file(s))]
+        existing_files = [s for s in sources if not (self._is_url(s) or self._is_html_file(s))]
+
+        # Validate existing files
+        for file_path in existing_files:
+            if Path(file_path).exists():
+                results[str(file_path)] = str(file_path)
+                self.logger.debug(f"Using existing file: {file_path}")
+            else:
+                results[str(file_path)] = f"Error: File not found"
+                self.logger.warning(f"File not found: {file_path}")
+
+        # Capture sources concurrently
+        if sources_to_capture:
+            semaphore = asyncio.Semaphore(max_concurrent)
+
+            async def capture_single(source):
+                async with semaphore:
+                    try:
+                        return await self.capture_only_async(
+                            source=source, viewport=viewport, wait_for_selector=wait_for_selector, wait_time=wait_time
+                        )
+                    except Exception as e:
+                        self.logger.warning(f"Async capture failed for {source}: {e}")
+                        return f"Error: {str(e)}"
+
+            # Create tasks for all sources
+            tasks = [capture_single(source) for source in sources_to_capture]
+
+            # Execute all tasks concurrently
+            capture_results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            # Process results
+            for i, result in enumerate(capture_results):
+                source = sources_to_capture[i]
+                if isinstance(result, Exception):
+                    results[str(source)] = f"Error: {str(result)}"
+                else:
+                    results[str(source)] = result
+
+        execution_time = time.time() - start_time
+        successful_count = sum(1 for v in results.values() if not str(v).startswith("Error:"))
+        failed_count = len(sources) - successful_count
+
+        # Log performance metrics
+        log_performance_metric(
+            operation="capture_batch_async",
+            duration=execution_time,
+            total_sources=len(sources),
+            successful_captures=successful_count,
+            failed_captures=failed_count,
+            viewport=viewport,
+            max_concurrent=max_concurrent,
+        )
+
+        self.logger.info(
+            f"Async batch capture completed: {successful_count}/{len(sources)} successful, time: {execution_time:.2f}s"
+        )
+
+        return results
+
+    def analyze_captured_batch(
+        self,
+        screenshot_mapping: dict[str, str],
+        queries: list[str],
+        viewport: str = "desktop",
+        context: dict[str, Any] | None = None,
+    ) -> dict[str, list[AnalysisResult]]:
+        """Analyze batch of captured screenshots with multiple queries (Stage 2 of 2-stage pipeline).
+
+        Args:
+            screenshot_mapping: Dictionary mapping source URLs/names to screenshot paths.
+            queries: List of natural language queries to analyze.
+            viewport: Viewport that was used for capture (for metadata).
+            context: Additional context for analysis.
+
+        Returns:
+            Dictionary mapping source names to lists of AnalysisResult objects.
+
+        Example:
+            >>> screenshots = lens.capture_batch(["https://page1.com", "https://page2.com"])
+            >>> queries = ["Is it accessible?", "Is it mobile-friendly?"]
+            >>> results = lens.analyze_captured_batch(screenshots, queries)
+            >>> for source, analysis_results in results.items():
+            ...     for result in analysis_results:
+            ...         print(f"{source}: {result.answer}")
+        """
+        start_time = time.time()
+
+        log_function_call(
+            "LayoutLens.analyze_captured_batch",
+            screenshot_count=len(screenshot_mapping),
+            query_count=len(queries),
+            total_analyses=len(screenshot_mapping) * len(queries),
+        )
+
+        self.logger.info(
+            f"Starting batch analysis of {len(screenshot_mapping)} screenshots × {len(queries)} queries = {len(screenshot_mapping) * len(queries)} total analyses"
+        )
+
+        results = {}
+        total_failed = 0
+
+        for source_name, screenshot_path in screenshot_mapping.items():
+            source_results = []
+
+            # Skip failed captures
+            if isinstance(screenshot_path, str) and screenshot_path.startswith("Error:"):
+                for query in queries:
+                    error_result = AnalysisResult(
+                        source=source_name,
+                        query=query,
+                        answer=f"Cannot analyze: {screenshot_path}",
+                        confidence=0.0,
+                        reasoning="Screenshot capture failed",
+                        viewport=viewport,
+                        metadata={
+                            "error": screenshot_path,
+                            "pipeline_mode": "2-stage",
+                        },
+                    )
+                    source_results.append(error_result)
+                    total_failed += 1
+
+                results[source_name] = source_results
+                continue
+
+            # Analyze with each query
+            for query in queries:
+                try:
+                    result = self.analyze_screenshot(
+                        screenshot_path=screenshot_path,
+                        query=query,
+                        context=context,
+                        source_url=source_name if self._is_url(source_name) else None,
+                        viewport=viewport,
+                    )
+                    source_results.append(result)
+                except Exception as e:
+                    total_failed += 1
+                    self.logger.warning(f"Analysis failed for {source_name} + query '{query[:50]}...': {e}")
+                    error_result = AnalysisResult(
+                        source=source_name,
+                        query=query,
+                        answer=f"Error analyzing screenshot: {str(e)}",
+                        confidence=0.0,
+                        reasoning=f"Analysis failed due to: {str(e)}",
+                        screenshot_path=screenshot_path,
+                        viewport=viewport,
+                        metadata={
+                            "error": str(e),
+                            "error_type": type(e).__name__,
+                            "pipeline_mode": "2-stage",
+                        },
+                    )
+                    source_results.append(error_result)
+
+            results[source_name] = source_results
+
+        execution_time = time.time() - start_time
+        total_analyses = len(screenshot_mapping) * len(queries)
+        successful_analyses = total_analyses - total_failed
+
+        # Log performance metrics
+        log_performance_metric(
+            operation="analyze_captured_batch",
+            duration=execution_time,
+            total_analyses=total_analyses,
+            successful_analyses=successful_analyses,
+            failed_analyses=total_failed,
+            viewport=viewport,
+        )
+
+        self.logger.info(
+            f"Batch analysis completed: {successful_analyses}/{total_analyses} successful, time: {execution_time:.2f}s"
+        )
+
+        return results
+
+    def pipeline_batch(
+        self,
+        sources: list[str | Path],
+        queries: list[str],
+        viewport: str = "desktop",
+        context: dict[str, Any] | None = None,
+        wait_for_selector: str | None = None,
+        wait_time: int | None = None,
+        max_concurrent_capture: int = 3,
+    ) -> dict[str, list[AnalysisResult]]:
+        """Complete 2-stage pipeline: capture then analyze multiple sources with multiple queries.
+
+        Args:
+            sources: List of URLs or paths to analyze.
+            queries: List of natural language queries.
+            viewport: Viewport size for captures.
+            context: Additional context for analysis.
+            wait_for_selector: CSS selector to wait for before capturing.
+            wait_time: Additional wait time in milliseconds.
+            max_concurrent_capture: Maximum concurrent captures.
+
+        Returns:
+            Dictionary mapping source names to lists of AnalysisResult objects.
+
+        Example:
+            >>> results = lens.pipeline_batch(
+            ...     sources=["https://page1.com", "https://page2.com"],
+            ...     queries=["Is it accessible?", "Is it responsive?"]
+            ... )
+            >>> for source, analysis_results in results.items():
+            ...     for result in analysis_results:
+            ...         print(f"{source}: {result.answer}")
+        """
+        start_time = time.time()
+
+        log_function_call(
+            "LayoutLens.pipeline_batch",
+            source_count=len(sources),
+            query_count=len(queries),
+            total_analyses=len(sources) * len(queries),
+            viewport=viewport,
+        )
+
+        self.logger.info(f"Starting complete 2-stage pipeline batch processing")
+
+        # Stage 1: Capture all screenshots
+        self.logger.debug("Stage 1: Capturing screenshots")
+        screenshots = self.capture_batch(
+            sources=sources,
+            viewport=viewport,
+            wait_for_selector=wait_for_selector,
+            wait_time=wait_time,
+            max_concurrent=max_concurrent_capture,
+        )
+
+        # Stage 2: Analyze all screenshots with all queries
+        self.logger.debug("Stage 2: Analyzing screenshots")
+        results = self.analyze_captured_batch(
+            screenshot_mapping=screenshots,
+            queries=queries,
+            viewport=viewport,
+            context=context,
+        )
+
+        execution_time = time.time() - start_time
+
+        # Calculate aggregate metrics
+        total_analyses = sum(len(source_results) for source_results in results.values())
+        successful_analyses = sum(
+            1 for source_results in results.values() for result in source_results if result.confidence > 0
+        )
+
+        # Log performance metrics
+        log_performance_metric(
+            operation="pipeline_batch_complete",
+            duration=execution_time,
+            total_analyses=total_analyses,
+            successful_analyses=successful_analyses,
+            source_count=len(sources),
+            query_count=len(queries),
+            viewport=viewport,
+        )
+
+        self.logger.info(
+            f"Complete 2-stage pipeline completed: {successful_analyses}/{total_analyses} successful analyses, time: {execution_time:.2f}s"
+        )
+
+        return results
 
     # Cache management methods
     def get_cache_stats(self) -> dict[str, Any]:

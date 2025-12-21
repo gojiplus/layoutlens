@@ -14,7 +14,7 @@ from layoutlens.providers import (
     get_available_providers,
     get_provider_info,
 )
-from layoutlens.providers.openrouter_provider import OpenRouterProvider
+from layoutlens.providers.litellm_provider import LiteLLMProvider
 
 
 class TestVisionProviderConfig:
@@ -71,7 +71,7 @@ class TestVisionAnalysisObjects:
             confidence=0.85,
             reasoning="The page has good contrast and clear navigation",
             metadata={"source": "test.png"},
-            provider="openrouter",
+            provider="litellm",
             model="gpt-4o-mini",
             usage_stats={"tokens": 150},
         )
@@ -80,20 +80,20 @@ class TestVisionAnalysisObjects:
         assert response.confidence == 0.85
         assert response.reasoning == "The page has good contrast and clear navigation"
         assert response.metadata == {"source": "test.png"}
-        assert response.provider == "openrouter"
+        assert response.provider == "litellm"
         assert response.model == "gpt-4o-mini"
         assert response.usage_stats == {"tokens": 150}
 
 
-class TestOpenRouterProvider:
-    """Test OpenRouterProvider implementation."""
+class TestLiteLLMProvider:
+    """Test LiteLLMProvider implementation."""
 
     def test_provider_properties(self):
         """Test provider basic properties."""
         config = VisionProviderConfig(api_key="test-key", model="gpt-4o-mini")
-        provider = OpenRouterProvider(config)
+        provider = LiteLLMProvider(config)
 
-        assert provider.provider_name == "openrouter"
+        assert provider.provider_name == "litellm"
         assert "gpt-4o-mini" in provider.supported_models
         assert "claude-3-haiku" in provider.supported_models
         assert "gemini-1.5-flash" in provider.supported_models
@@ -101,14 +101,14 @@ class TestOpenRouterProvider:
     def test_config_validation_success(self):
         """Test successful configuration validation."""
         config = VisionProviderConfig(api_key="test-key", model="gpt-4o-mini")
-        provider = OpenRouterProvider(config)
+        provider = LiteLLMProvider(config)
 
         assert provider.validate_config() is True
 
     def test_config_validation_missing_key(self):
         """Test validation failure with missing API key."""
         config = VisionProviderConfig(api_key="", model="gpt-4o-mini")
-        provider = OpenRouterProvider(config)
+        provider = LiteLLMProvider(config)
 
         with pytest.raises(ValueError, match="API key required"):
             provider.validate_config()
@@ -116,36 +116,36 @@ class TestOpenRouterProvider:
     def test_config_validation_unsupported_model(self):
         """Test validation failure with unsupported model."""
         config = VisionProviderConfig(api_key="test-key", model="unsupported-model")
-        provider = OpenRouterProvider(config)
+        provider = LiteLLMProvider(config)
 
         with pytest.raises(ValueError, match="not supported"):
             provider.validate_config()
 
-    def test_openrouter_model_mapping(self):
-        """Test OpenRouter model name mapping."""
+    def test_litellm_model_mapping(self):
+        """Test LiteLLM model name mapping."""
         config = VisionProviderConfig(api_key="test-key", model="gpt-4o-mini")
-        provider = OpenRouterProvider(config)
+        provider = LiteLLMProvider(config)
 
         # Test known mappings
-        assert provider._get_openrouter_model("gpt-4o-mini") == "openai/gpt-4o-mini"
-        assert provider._get_openrouter_model("claude-3-haiku") == "anthropic/claude-3-haiku"
-        assert provider._get_openrouter_model("gemini-1.5-flash") == "google/gemini-1.5-flash"
+        assert provider._get_litellm_model("gpt-4o-mini") == "openai/gpt-4o-mini"
+        assert provider._get_litellm_model("claude-3-haiku") == "anthropic/claude-3-haiku"
+        assert provider._get_litellm_model("gemini-1.5-flash") == "google/gemini-1.5-flash"
 
         # Test already formatted model names
-        assert provider._get_openrouter_model("openai/gpt-4o") == "openai/gpt-4o"
+        assert provider._get_litellm_model("openai/gpt-4o") == "openai/gpt-4o"
 
         # Test fallback for unknown models
-        assert provider._get_openrouter_model("unknown-model") == "openai/gpt-4o-mini"
+        assert provider._get_litellm_model("unknown-model") == "openai/gpt-4o-mini"
 
     @patch("openai.OpenAI")
     def test_initialize(self, mock_openai):
         """Test provider initialization."""
         config = VisionProviderConfig(api_key="test-key", model="gpt-4o-mini")
-        provider = OpenRouterProvider(config)
+        provider = LiteLLMProvider(config)
 
         provider.initialize()
 
-        mock_openai.assert_called_once_with(base_url="https://openrouter.ai/api/v1", api_key="test-key", timeout=30.0)
+        mock_openai.assert_called_once_with(base_url="https://litellm.ai/api/v1", api_key="test-key", timeout=30.0)
 
     @patch("openai.OpenAI")
     @patch("builtins.open")
@@ -173,7 +173,7 @@ class TestOpenRouterProvider:
 
         # Test analysis
         config = VisionProviderConfig(api_key="test-key", model="gpt-4o-mini")
-        provider = OpenRouterProvider(config)
+        provider = LiteLLMProvider(config)
         provider.initialize()
 
         request = VisionAnalysisRequest(
@@ -187,7 +187,7 @@ class TestOpenRouterProvider:
         assert response.answer == "Yes"
         assert response.confidence == 0.9
         assert response.reasoning == "Good design"
-        assert response.provider == "openrouter"
+        assert response.provider == "litellm"
         assert response.model == "gpt-4o-mini"
         assert response.usage_stats["total_tokens"] == 150
 
@@ -198,7 +198,7 @@ class TestOpenRouterProvider:
         mock_exists.return_value = False
 
         config = VisionProviderConfig(api_key="test-key", model="gpt-4o-mini")
-        provider = OpenRouterProvider(config)
+        provider = LiteLLMProvider(config)
         provider.initialize()
 
         request = VisionAnalysisRequest(image_path="/fake/path/nonexistent.png", query="Is this well designed?")
@@ -234,7 +234,7 @@ class TestOpenRouterProvider:
 
         # Test async analysis
         config = VisionProviderConfig(api_key="test-key", model="gpt-4o-mini")
-        provider = OpenRouterProvider(config)
+        provider = LiteLLMProvider(config)
 
         request = VisionAnalysisRequest(image_path="/fake/path/image.png", query="Is this well designed?")
 
@@ -242,7 +242,7 @@ class TestOpenRouterProvider:
 
         assert response.answer == "Yes"
         assert response.confidence == 0.9
-        assert response.provider == "openrouter"
+        assert response.provider == "litellm"
         mock_client.close.assert_called_once()
 
 
@@ -253,16 +253,16 @@ class TestProviderFactory:
         """Test getting available providers."""
         providers = get_available_providers()
 
-        assert "openrouter" in providers
+        assert "litellm" in providers
         assert "openai" in providers
         assert "anthropic" in providers
-        assert issubclass(providers["openrouter"], VisionProvider)
+        assert issubclass(providers["litellm"], VisionProvider)
 
     def test_create_provider_success(self):
         """Test successful provider creation."""
-        provider = create_provider(provider_name="openrouter", api_key="test-key", model="gpt-4o-mini")
+        provider = create_provider(provider_name="litellm", api_key="test-key", model="gpt-4o-mini")
 
-        assert isinstance(provider, OpenRouterProvider)
+        assert isinstance(provider, LiteLLMProvider)
         assert provider.config.api_key == "test-key"
         assert provider.config.model == "gpt-4o-mini"
 
@@ -274,16 +274,16 @@ class TestProviderFactory:
     def test_create_provider_invalid_model(self):
         """Test creation with invalid model."""
         with pytest.raises(ValueError, match="not supported"):
-            create_provider(provider_name="openrouter", api_key="test-key", model="invalid-model")
+            create_provider(provider_name="litellm", api_key="test-key", model="invalid-model")
 
     def test_get_provider_info(self):
         """Test getting provider information."""
         info = get_provider_info()
 
-        assert "openrouter" in info
-        assert "supported_models" in info["openrouter"]
-        assert isinstance(info["openrouter"]["supported_models"], list)
-        assert len(info["openrouter"]["supported_models"]) > 0
+        assert "litellm" in info
+        assert "supported_models" in info["litellm"]
+        assert isinstance(info["litellm"]["supported_models"], list)
+        assert len(info["litellm"]["supported_models"]) > 0
 
 
 class TestProviderIntegration:
@@ -304,7 +304,7 @@ class TestProviderIntegration:
 
         # Create provider through factory
         provider = create_provider(
-            provider_name="openrouter",
+            provider_name="litellm",
             api_key="test-key",
             model="gpt-4o-mini",
             temperature=0.2,
@@ -319,4 +319,4 @@ class TestProviderIntegration:
         assert provider._client is not None
 
         # Verify OpenAI client was called with correct parameters
-        mock_openai.assert_called_once_with(base_url="https://openrouter.ai/api/v1", api_key="test-key", timeout=30.0)
+        mock_openai.assert_called_once_with(base_url="https://litellm.ai/api/v1", api_key="test-key", timeout=30.0)

@@ -2,11 +2,31 @@
 
 All notable changes to LayoutLens are documented in this file.
 
+## [1.4.0] - 2024-12-21
+
+### 🚀 Major Changes
+- **LiteLLM Integration**: Complete migration to LiteLLM as the unified provider
+  - Removed OpenRouter provider in favor of LiteLLM's unified interface
+  - Support for OpenAI, Anthropic, Google via LiteLLM's standardized API
+  - Simplified architecture with single provider handling all models
+  - Model naming follows LiteLLM conventions (e.g., "anthropic/claude-3-5-sonnet")
+
+### 🎯 Breaking Changes
+- **No backward compatibility** for OpenRouter provider
+- Removed `openrouter` from provider choices
+- Updated default provider to `openai` (via LiteLLM)
+- Changed API key environment variable references (removed OPENROUTER_API_KEY)
+
+### 🔧 Updated Provider Support
+- **Provider Options**: `openai`, `anthropic`, `google`, `gemini`, `litellm`
+- **Unified Interface**: All providers use LiteLLM for consistent behavior
+- **Model Format**: LiteLLM naming convention for all models
+
 ## [1.3.0] - 2024-01-21
 
 ### 🚀 Major Features Added
 - **Multi-Provider Support**: Complete plugin architecture for AI providers
-  - OpenRouter integration for unified access to 25+ AI models
+  - LiteLLM integration for unified access to 25+ AI models
   - Support for OpenAI, Anthropic Claude, Google Gemini, and more
   - Factory pattern for easy provider instantiation and management
   - Backward compatibility with existing OpenAI-only code
@@ -19,15 +39,15 @@ All notable changes to LayoutLens are documented in this file.
   - Command history and help system
 
 ### 🔧 Enhanced CLI Experience
-- **Provider Selection**: `--provider` flag with choices (openrouter, openai, anthropic, google, gemini)
+- **Provider Selection**: `--provider` flag with choices (litellm, openai, anthropic, google, gemini)
 - **Model Selection**: `--model` flag for specifying exact models
 - **Enhanced Info Command**: Shows available providers, models, and API key status
-- **Unified API Keys**: Support for both OPENAI_API_KEY and OPENROUTER_API_KEY
+- **Unified API Keys**: Support for OPENAI_API_KEY environment variable
 
 ### 🏗️ Architecture Improvements
 - **Provider Architecture**: Abstract base classes with unified interface
   - VisionProvider, VisionProviderConfig, VisionAnalysisRequest/Response
-  - OpenRouterProvider as unified gateway to multiple AI services
+  - LiteLLMProvider as unified gateway to multiple AI services
   - Extensible factory pattern for adding new providers
 
 ### 📦 Dependencies

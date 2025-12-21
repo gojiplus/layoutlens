@@ -439,7 +439,7 @@ class TestCLIIntegration:
             api_key="test_key",
             output="output",
             model="gpt-4o-mini",
-            provider="openrouter",
+            provider="litellm",
         )
 
         # Run command

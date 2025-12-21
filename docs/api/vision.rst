@@ -1,30 +1,37 @@
 Vision API
 ==========
 
-The vision module provides AI-powered visual testing capabilities.
+The vision module provides AI-powered visual testing capabilities for analyzing
+screenshots and comparing layouts.
 
-Page Tester
------------
+VisionAnalyzer
+--------------
 
-.. autoclass:: layoutlens.vision.PageTester
+.. autoclass:: layoutlens.vision.VisionAnalyzer
    :members:
    :undoc-members:
    :show-inheritance:
 
-Data Classes
+URLCapture
+----------
+
+.. autoclass:: layoutlens.vision.URLCapture
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+BatchCapture
 ------------
 
-.. autoclass:: layoutlens.vision.TestResult
+.. autoclass:: layoutlens.vision.BatchCapture
    :members:
    :undoc-members:
    :show-inheritance:
 
-.. autoclass:: layoutlens.vision.PageTestResult
+LayoutComparator
+----------------
+
+.. autoclass:: layoutlens.vision.LayoutComparator
    :members:
    :undoc-members:
    :show-inheritance:
-
-Utility Functions
------------------
-
-.. autofunction:: layoutlens.vision.page_tester.test_html_file

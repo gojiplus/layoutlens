@@ -60,7 +60,7 @@ class TestAsyncCore:
             confidence=0.85,
             reasoning="Test reasoning",
             metadata={},
-            provider="openrouter",
+            provider="litellm",
             model="gpt-4o-mini",
         )
         mock_provider.analyze_image_async = AsyncMock(return_value=mock_vision_response)
@@ -217,7 +217,7 @@ class TestAsyncCLI:
         args.viewports = "desktop"
         args.max_concurrent = 3
         args.model = "gpt-4o-mini"  # Add missing attributes
-        args.provider = "openrouter"
+        args.provider = "litellm"
 
         # Test the command
         with patch("builtins.print") as mock_print:
@@ -225,7 +225,7 @@ class TestAsyncCLI:
 
             # Verify LayoutLens was initialized correctly
             mock_lens_class.assert_called_once_with(
-                api_key="test-key", model="gpt-4o-mini", provider="openrouter", output_dir="test_output"
+                api_key="test-key", model="gpt-4o-mini", provider="litellm", output_dir="test_output"
             )
 
             # Verify batch analysis was called

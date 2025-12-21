@@ -3,125 +3,123 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CSS Grid Layout - Broken Implementation</title>
+    <title>CSS Grid Layout Test (Broken)</title>
     <style>
+        /* Reset and base styles */
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
             font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-            background: #f8f9fa;
-            padding: 2rem;
+            line-height: 1.6;
+            color: #333;
+            background: #fff;
         }
 
-        .dashboard-grid {
-            display: grid;
-            grid-template-columns: 250px 1fr; /* Fixed sidebar, flexible main */
-            grid-template-rows: auto 1fr auto; /* Header, content, footer */
-            /* MISSING: grid-template-areas - creates layout confusion */
-            gap: 1.5rem;
-            min-height: 100vh;
+        /* Common utility classes */
+        .container {
             max-width: 1200px;
             margin: 0 auto;
+            padding: 0 1rem;
         }
 
-        .sidebar {
-            /* Without grid-area, elements don't align properly */
-            background: #2c3e50;
-            color: white;
-            padding: 1.5rem;
-            border-radius: 8px;
-            /* Sidebar will be in wrong position without grid-area */
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            border: 0;
+        }
+
+        /* Focus indicators */
+        *:focus {
+            outline: 2px solid #0066cc;
+            outline-offset: 2px;
+        }
+
+
+        .grid-container {
+            display: grid;
+            /* Broken: grid areas don't match the template */
+            grid-template-areas:
+                "header header header"
+                "sidebar main aside"
+                "footer footer footer";
+            grid-template-columns: 200px 1fr 200px;
+            grid-template-rows: 80px 1fr 60px;
+            gap: 1rem;
+            min-height: 100vh;
+            padding: 1rem;
         }
 
         .header {
-            /* No grid-area: header - causes misalignment */
-            background: white;
-            padding: 1.5rem;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            grid-area: top;  /* Wrong area name */
+            background: #3498db;
+            display: flex;
+            align-items: center;
+            padding: 0 2rem;
+            color: white;
         }
 
-        .main-content {
-            /* No grid-area: main - content positioning is unpredictable */
+        .sidebar {
+            grid-area: left;  /* Wrong area name */
+            background: #ecf0f1;
+            padding: 1rem;
+        }
+
+        .main {
+            grid-area: center;  /* Wrong area name */
             background: white;
-            padding: 1.5rem;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 1rem;
-            /* Will appear in wrong order due to missing grid areas */
+            padding: 2rem;
+            border: 1px solid #bdc3c7;
+        }
+
+        .aside {
+            grid-area: right;  /* Wrong area name */
+            background: #ecf0f1;
+            padding: 1rem;
         }
 
         .footer {
-            /* No grid-area: footer - footer positioning breaks */
-            background: #6c757d;
+            grid-area: bottom;  /* Wrong area name */
+            background: #2c3e50;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             color: white;
-            padding: 1rem 1.5rem;
-            border-radius: 8px;
-            text-align: center;
         }
 
-        .card {
-            background: #f8f9fa;
-            padding: 1.5rem;
-            border-radius: 6px;
-            border-left: 4px solid #007bff;
-        }
-
-        .nav-item {
-            padding: 0.75rem 0;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-        }
-
-        /* Responsive behavior is broken without proper grid areas */
-        @media (max-width: 768px) {
-            .dashboard-grid {
-                grid-template-columns: 1fr;
-                /* Missing proper responsive grid-template-areas */
-                /* Layout becomes chaotic on mobile */
-            }
-
-            .main-content {
-                grid-template-columns: 1fr;
-            }
-        }
     </style>
 </head>
 <body>
-    <div class="dashboard-grid">
-        <!-- Without grid-template-areas, DOM order doesn't match visual intention -->
-        <aside class="sidebar">
-            <h2>Navigation</h2>
-            <div class="nav-item">Dashboard</div>
-            <div class="nav-item">Analytics</div>
-            <div class="nav-item">Users</div>
-            <div class="nav-item">Settings</div>
-        </aside>
 
+    <div class="grid-container">
         <header class="header">
-            <h1>Dashboard - Broken Grid Layout</h1>
-            <p>This layout lacks grid-template-areas, causing positioning and responsive issues.</p>
+            <h1>CSS Grid Layout - Broken Structure</h1>
         </header>
-
-        <main class="main-content">
-            <div class="card">
-                <h3>Revenue</h3>
-                <p>Without proper grid areas, elements don't maintain semantic layout order.</p>
-            </div>
-            <div class="card">
-                <h3>Users</h3>
-                <p>Responsive behavior becomes unpredictable and breaks user expectations.</p>
-            </div>
-            <div class="card">
-                <h3>Performance</h3>
-                <p>Grid positioning relies on DOM order instead of semantic structure.</p>
-            </div>
+        <nav class="sidebar">
+            <h2>Sidebar</h2>
+            <ul style="list-style: none; padding: 0;">
+                <li><a href="#">Link 1</a></li>
+                <li><a href="#">Link 2</a></li>
+                <li><a href="#">Link 3</a></li>
+            </ul>
+        </nav>
+        <main class="main">
+            <h2>Main Content Area</h2>
+            <p>This layout has broken CSS Grid area definitions.</p>
+            <p>Elements won't be placed correctly in the grid.</p>
         </main>
-
+        <aside class="aside">
+            <h2>Aside</h2>
+            <p>Related content</p>
+        </aside>
         <footer class="footer">
-            <p>Footer positioning is unreliable without grid-area definition</p>
+            <p>&copy; 2024 Broken Grid Example</p>
         </footer>
     </div>
+
 </body>
 </html>

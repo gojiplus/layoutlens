@@ -7,7 +7,7 @@ import time
 from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import TYPE_CHECKING, Any
 
 # Use TYPE_CHECKING to avoid circular imports
 
@@ -22,7 +22,7 @@ class CacheEntry:
     """Represents a cached analysis result."""
 
     key: str
-    result: Union["AnalysisResult", "ComparisonResult"]
+    result: "AnalysisResult | ComparisonResult"
     timestamp: float
     ttl_seconds: int = 3600  # 1 hour default
     metadata: dict[str, Any] = field(default_factory=dict)
@@ -288,7 +288,7 @@ class AnalysisCache:
         content_str = json.dumps(content, sort_keys=True)
         return hashlib.sha256(content_str.encode()).hexdigest()[:16]
 
-    def get(self, key: str) -> Union["AnalysisResult", "ComparisonResult", None]:
+    def get(self, key: str) -> "AnalysisResult | ComparisonResult | None":
         """Get a cached result."""
         if not self.enabled:
             return None
@@ -304,7 +304,7 @@ class AnalysisCache:
     def set(
         self,
         key: str,
-        result: Union["AnalysisResult", "ComparisonResult"],
+        result: "AnalysisResult | ComparisonResult",
         ttl: int = None,
     ) -> None:
         """Cache a result."""

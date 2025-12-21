@@ -3,38 +3,84 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Misaligned Navigation - Issue Example</title>
+    <title>Misaligned Navigation Test</title>
     <style>
-        .header {
-            background: #f0f0f0;
-            padding: 1rem;
-            text-align: center;
-        }
-        .nav {
-            display: inline-block;
-            position: relative;
-            left: 52%; /* 2% off-center - subtle but wrong */
-            transform: translateX(-50%);
-        }
-        .nav a {
-            margin: 0 1rem;
-            text-decoration: none;
+        /* Reset and base styles */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            line-height: 1.6;
             color: #333;
+            background: #fff;
         }
+
+        /* Common utility classes */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 1rem;
+        }
+
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            border: 0;
+        }
+
+        /* Focus indicators */
+        *:focus {
+            outline: 2px solid #0066cc;
+            outline-offset: 2px;
+        }
+
+
+        nav {
+            position: fixed;
+            top: 0;
+            left: 52%;  /* Intentionally 2% off-center */
+            transform: translateX(-50%);
+            background: #2c3e50;
+            padding: 1rem 2rem;
+            border-radius: 0 0 10px 10px;
+            z-index: 1000;
+        }
+
+        nav ul {
+            display: flex;
+            list-style: none;
+            gap: 2rem;
+        }
+
+        nav a {
+            color: white;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        main { padding-top: 80px; }
+
     </style>
 </head>
 <body>
-    <header class="header">
-        <nav class="nav">
-            <a href="#home">Home</a>
-            <a href="#about">About</a>
-            <a href="#services">Services</a>
-            <a href="#contact">Contact</a>
-        </nav>
-    </header>
-    <main>
-        <h1>Misaligned Navigation</h1>
-        <p>This navigation is 2% off-center (left: 52% instead of 50%)</p>
+
+    <nav role="navigation" aria-label="Main navigation">
+        <ul>
+            <li><a href="#home">Home</a></li>
+            <li><a href="#about">About</a></li>
+            <li><a href="#services">Services</a></li>
+            <li><a href="#contact">Contact</a></li>
+        </ul>
+    </nav>
+    <main class="container">
+        <h1>Slightly Misaligned Navigation</h1>
+        <p>The navigation bar is 2% off-center - a subtle but noticeable issue.</p>
     </main>
+
 </body>
 </html>

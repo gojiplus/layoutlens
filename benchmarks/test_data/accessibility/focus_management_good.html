@@ -3,270 +3,158 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Focus Management - Accessible Modal</title>
+    <title>Focus Management Test (Good)</title>
     <style>
+        /* Reset and base styles */
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
             font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
             line-height: 1.6;
-            color: #212529;
-            background: #f8f9fa;
-            padding: 2rem;
+            color: #333;
+            background: #fff;
         }
 
+        /* Common utility classes */
         .container {
-            max-width: 800px;
+            max-width: 1200px;
             margin: 0 auto;
-            background: white;
-            padding: 2rem;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 0 1rem;
         }
 
-        h1 {
-            color: #2c3e50;
-            margin-bottom: 2rem;
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            border: 0;
         }
 
-        .btn {
-            background: #007bff;
-            color: white;
-            padding: 0.75rem 1.5rem;
-            border: none;
-            border-radius: 4px;
-            font-size: 1rem;
-            cursor: pointer;
-            min-height: 44px;
-            margin: 0.5rem;
-        }
-
-        .btn:focus {
-            outline: 3px solid #ffc107;
+        /* Focus indicators */
+        *:focus {
+            outline: 2px solid #0066cc;
             outline-offset: 2px;
         }
 
-        .btn:hover {
-            background: #0056b3;
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            max-width: 500px;
+            width: 90%;
         }
 
-        /* Modal styles */
+        .modal.open {
+            display: block;
+        }
+
         .modal-overlay {
             display: none;
             position: fixed;
             top: 0;
             left: 0;
-            width: 100%;
-            height: 100%;
+            right: 0;
+            bottom: 0;
             background: rgba(0, 0, 0, 0.5);
-            z-index: 1000;
         }
 
-        .modal-overlay.active {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .modal {
-            background: white;
-            padding: 2rem;
-            border-radius: 8px;
-            max-width: 500px;
-            width: 90%;
-            position: relative;
-        }
-
-        .modal h2 {
-            margin-bottom: 1rem;
-            color: #2c3e50;
-        }
-
-        .modal-close {
-            position: absolute;
-            top: 1rem;
-            right: 1rem;
-            background: none;
-            border: none;
-            font-size: 1.5rem;
-            cursor: pointer;
-            width: 44px;
-            height: 44px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .modal-close:focus {
-            outline: 3px solid #ffc107;
-            outline-offset: 2px;
-            border-radius: 4px;
-        }
-
-        .form-group {
-            margin-bottom: 1.5rem;
-        }
-
-        label {
+        .modal-overlay.open {
             display: block;
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-            color: #2c3e50;
         }
 
-        input[type="text"],
-        input[type="email"] {
-            width: 100%;
-            padding: 0.75rem;
-            border: 2px solid #dee2e6;
-            border-radius: 4px;
+        button {
+            padding: 0.5rem 1rem;
             font-size: 1rem;
-            min-height: 44px;
+            border: 2px solid #3498db;
+            background: #3498db;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
         }
 
-        input:focus {
-            outline: none;
-            border-color: #007bff;
-            box-shadow: 0 0 0 3px rgba(0,123,255,0.25);
+        button:hover {
+            background: #2980b9;
         }
 
-        .skip-link {
-            position: absolute;
-            top: -40px;
-            left: 6px;
-            background: #000;
-            color: #fff;
-            padding: 8px;
-            text-decoration: none;
-            z-index: 1001;
+        .close-btn {
+            background: #e74c3c;
+            border-color: #e74c3c;
+            float: right;
         }
 
-        .skip-link:focus {
-            top: 6px;
-        }
     </style>
 </head>
 <body>
-    <a href="#main" class="skip-link">Skip to main content</a>
 
-    <div class="container">
-        <main id="main">
-            <h1>Accessible Focus Management Demo</h1>
-            <p>This page demonstrates proper focus management in modals with focus trapping and restoration.</p>
+    <main class="container">
+        <h1>Modal with Proper Focus Management</h1>
+        <p>This modal implements proper focus trapping and management.</p>
+        <button onclick="openModal()" id="open-btn">Open Modal</button>
+    </main>
 
-            <button class="btn" onclick="openModal()" id="open-modal-btn">
-                Open Contact Form
-            </button>
-
-            <button class="btn" onclick="alert('Normal button works')" style="background: #28a745;">
-                Regular Button
-            </button>
-        </main>
-    </div>
-
-    <!-- Modal with proper focus management -->
-    <div class="modal-overlay" id="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-        <div class="modal">
-            <button class="modal-close" onclick="closeModal()" aria-label="Close dialog">×</button>
-            <h2 id="modal-title">Contact Form</h2>
-            <form onsubmit="submitForm(event)">
-                <div class="form-group">
-                    <label for="modal-name">Name (required)</label>
-                    <input type="text" id="modal-name" name="name" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="modal-email">Email (required)</label>
-                    <input type="email" id="modal-email" name="email" required>
-                </div>
-
-                <button type="submit" class="btn">Submit</button>
-                <button type="button" class="btn" onclick="closeModal()" style="background: #6c757d;">Cancel</button>
-            </form>
-        </div>
+    <div class="modal-overlay" id="overlay"></div>
+    <div class="modal" id="modal" role="dialog" aria-labelledby="modal-title" aria-modal="true">
+        <button class="close-btn" onclick="closeModal()" aria-label="Close modal">×</button>
+        <h2 id="modal-title">Accessible Modal</h2>
+        <p>This modal properly manages focus. Tab navigation is trapped within the modal.</p>
+        <input type="text" placeholder="Enter your name" aria-label="Name input">
+        <button onclick="closeModal()">Confirm</button>
     </div>
 
     <script>
-        let previousFocus = null;
-        const modalOverlay = document.getElementById('modal-overlay');
-        const modal = modalOverlay.querySelector('.modal');
-        const focusableElements = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+        let previousFocus;
 
         function openModal() {
-            // Store the previously focused element
             previousFocus = document.activeElement;
-
-            // Show modal
-            modalOverlay.classList.add('active');
-
-            // Focus the first focusable element in modal
-            const firstFocusable = modal.querySelector(focusableElements);
-            if (firstFocusable) {
-                firstFocusable.focus();
-            }
+            document.getElementById('overlay').classList.add('open');
+            document.getElementById('modal').classList.add('open');
+            document.getElementById('modal').querySelector('button').focus();
 
             // Add focus trap
-            modalOverlay.addEventListener('keydown', trapFocus);
-
-            // Prevent body scroll
-            document.body.style.overflow = 'hidden';
+            document.addEventListener('keydown', trapFocus);
         }
 
         function closeModal() {
-            // Hide modal
-            modalOverlay.classList.remove('active');
+            document.getElementById('overlay').classList.remove('open');
+            document.getElementById('modal').classList.remove('open');
+            document.removeEventListener('keydown', trapFocus);
 
-            // Remove focus trap
-            modalOverlay.removeEventListener('keydown', trapFocus);
-
-            // Restore focus to previous element
             if (previousFocus) {
                 previousFocus.focus();
             }
-
-            // Restore body scroll
-            document.body.style.overflow = '';
         }
 
         function trapFocus(e) {
-            const focusable = modal.querySelectorAll(focusableElements);
-            const firstFocusable = focusable[0];
-            const lastFocusable = focusable[focusable.length - 1];
-
             if (e.key === 'Escape') {
                 closeModal();
-                return;
             }
 
             if (e.key === 'Tab') {
-                if (e.shiftKey) {
-                    // Shift + Tab
-                    if (document.activeElement === firstFocusable) {
-                        lastFocusable.focus();
-                        e.preventDefault();
-                    }
-                } else {
-                    // Tab
-                    if (document.activeElement === lastFocusable) {
-                        firstFocusable.focus();
-                        e.preventDefault();
-                    }
+                const modal = document.getElementById('modal');
+                const focusable = modal.querySelectorAll('button, input, [tabindex]:not([tabindex="-1"])');
+                const first = focusable[0];
+                const last = focusable[focusable.length - 1];
+
+                if (e.shiftKey && document.activeElement === first) {
+                    e.preventDefault();
+                    last.focus();
+                } else if (!e.shiftKey && document.activeElement === last) {
+                    e.preventDefault();
+                    first.focus();
                 }
             }
         }
-
-        function submitForm(e) {
-            e.preventDefault();
-            alert('Form submitted successfully!');
-            closeModal();
-        }
-
-        // Close modal when clicking outside
-        modalOverlay.addEventListener('click', function(e) {
-            if (e.target === modalOverlay) {
-                closeModal();
-            }
-        });
     </script>
+
 </body>
 </html>

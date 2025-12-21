@@ -6,7 +6,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from layoutlens.api.core import AnalysisResult, LayoutLens
-from layoutlens.interactive import InteractiveSession
+from layoutlens.cli_interactive import InteractiveSession
 from layoutlens.providers import VisionAnalysisResponse
 
 
@@ -16,7 +16,7 @@ class TestInteractiveSession:
     def test_initialization_without_rich(self):
         """Test session initialization without Rich."""
         mock_lens = Mock(spec=LayoutLens)
-        mock_lens.provider = "openrouter"
+        mock_lens.provider = "litellm"
         mock_lens.model = "gpt-4o-mini"
 
         session = InteractiveSession(mock_lens, use_rich=False)
@@ -47,7 +47,7 @@ class TestInteractiveSession:
     def test_session_stats_tracking(self):
         """Test session statistics tracking."""
         mock_lens = Mock(spec=LayoutLens)
-        mock_lens.provider = "openrouter"
+        mock_lens.provider = "litellm"
         mock_lens.model = "gpt-4o-mini"
 
         session = InteractiveSession(mock_lens, use_rich=False)
@@ -71,7 +71,7 @@ class TestInteractiveSession:
 
         # Setup LayoutLens mock
         mock_lens = Mock(spec=LayoutLens)
-        mock_lens.provider = "openrouter"
+        mock_lens.provider = "litellm"
         mock_lens.model = "gpt-4o-mini"
 
         # Mock successful analysis result
@@ -82,7 +82,7 @@ class TestInteractiveSession:
             confidence=0.85,
             reasoning="Good contrast and navigation",
             execution_time=2.5,
-            metadata={"provider": "openrouter", "model": "gpt-4o-mini"},
+            metadata={"provider": "litellm", "model": "gpt-4o-mini"},
         )
         mock_lens.analyze.return_value = mock_result
 
@@ -111,7 +111,7 @@ class TestInteractiveSession:
 
         # Setup LayoutLens mock to raise exception
         mock_lens = Mock(spec=LayoutLens)
-        mock_lens.provider = "openrouter"
+        mock_lens.provider = "litellm"
         mock_lens.model = "gpt-4o-mini"
         mock_lens.analyze.side_effect = RuntimeError("Analysis failed")
 
@@ -128,7 +128,7 @@ class TestInteractiveSession:
     def test_print_fallback_without_rich(self):
         """Test print method fallback when Rich not available."""
         mock_lens = Mock(spec=LayoutLens)
-        mock_lens.provider = "openrouter"
+        mock_lens.provider = "litellm"
         mock_lens.model = "gpt-4o-mini"
 
         session = InteractiveSession(mock_lens, use_rich=False)
@@ -145,7 +145,7 @@ class TestInteractiveSession:
         mock_console_class.return_value = mock_console
 
         mock_lens = Mock(spec=LayoutLens)
-        mock_lens.provider = "openrouter"
+        mock_lens.provider = "litellm"
         mock_lens.model = "gpt-4o-mini"
 
         session = InteractiveSession(mock_lens, use_rich=True)
@@ -187,7 +187,7 @@ class TestInteractiveIntegration:
 
         # Mock LayoutLens
         mock_lens = Mock()
-        mock_lens.provider = "openrouter"
+        mock_lens.provider = "litellm"
         mock_lens.model = "gpt-4o-mini"
         mock_lens_class.return_value = mock_lens
 
@@ -195,7 +195,7 @@ class TestInteractiveIntegration:
         args = Mock()
         args.api_key = "test-key"
         args.model = "gpt-4o-mini"
-        args.provider = "openrouter"
+        args.provider = "litellm"
         args.output = "test_output"
 
         # Test command execution
@@ -204,7 +204,7 @@ class TestInteractiveIntegration:
 
         # Verify LayoutLens was created correctly
         mock_lens_class.assert_called_once_with(
-            api_key="test-key", model="gpt-4o-mini", provider="openrouter", output_dir="test_output"
+            api_key="test-key", model="gpt-4o-mini", provider="litellm", output_dir="test_output"
         )
 
         # Verify interactive session was started

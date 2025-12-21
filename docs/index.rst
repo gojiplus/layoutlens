@@ -30,9 +30,10 @@ LayoutLens is a production-ready AI-powered UI testing framework that enables na
 
    from layoutlens import LayoutLens
 
-   tester = LayoutLens()
-   result = tester.test_page("page.html", queries=["Is the layout responsive?"])
-   print(f"Success rate: {result.success_rate:.1%}")
+   lens = LayoutLens()
+   result = lens.analyze("page.html", "Is the layout responsive?")
+   print(f"Answer: {result.answer}")
+   print(f"Confidence: {result.confidence:.1%}")
 
 ✨ Key Features
 ---------------
@@ -48,44 +49,11 @@ LayoutLens is a production-ready AI-powered UI testing framework that enables na
 
 .. toctree::
    :maxdepth: 2
-   :caption: Getting Started
-
-   quickstart
-   installation
-
-.. toctree::
-   :maxdepth: 2
-   :caption: User Guide
-
-   user-guide/basic-usage
-   user-guide/configuration
-   user-guide/test-suites
-   user-guide/cli-usage
-
-.. toctree::
-   :maxdepth: 2
    :caption: API Reference
 
    api/core
    api/config
    api/vision
-   api/capture
-   api/analysis
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Developer Guide
-
-   developer/contributing
-   developer/architecture
-   developer/testing
-
-.. toctree::
-   :maxdepth: 1
-   :caption: More Info
-
-   changelog
-   license
 
 📊 Performance Metrics
 ----------------------

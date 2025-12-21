@@ -3,163 +3,92 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Viewport Units - Mobile Safari Issues</title>
+    <title>Viewport Units Test (Broken)</title>
     <style>
+        /* Reset and base styles */
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
             font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
             line-height: 1.6;
             color: #333;
-            overflow-x: hidden;
+            background: #fff;
         }
 
-        /* VIOLATION: Using 100vh causes issues on mobile Safari */
-        .hero-section {
-            height: 100vh; /* Problem: doesn't account for mobile browser UI */
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        /* Common utility classes */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 1rem;
+        }
+
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            border: 0;
+        }
+
+        /* Focus indicators */
+        *:focus {
+            outline: 2px solid #0066cc;
+            outline-offset: 2px;
+        }
+
+
+        /* Using vh units without considering mobile browser chrome */
+        .hero {
+            height: 100vh;  /* Will be too tall on mobile with address bar */
             display: flex;
             align-items: center;
             justify-content: center;
-            text-align: center;
-            padding: 2rem;
-        }
-
-        .hero-content {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            max-width: 600px;
+            text-align: center;
         }
 
-        .hero-content h1 {
-            font-size: 4vw; /* VIOLATION: Too large on desktop, too small on mobile */
-            margin-bottom: 1rem;
-            font-weight: 700;
+        .section {
+            min-height: 100vh;  /* Each section forced to viewport height */
+            padding: 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
-        .hero-content p {
-            font-size: 2.5vw; /* VIOLATION: Scales poorly across devices */
-            margin-bottom: 2rem;
-            opacity: 0.9;
-        }
-
-        .cta-button {
-            background: white;
-            color: #667eea;
-            padding: 1rem 2rem;
-            border: none;
-            border-radius: 50px;
-            font-size: 2vw; /* VIOLATION: Button text scales with viewport */
-            font-weight: 600;
-            cursor: pointer;
-            transition: transform 0.3s;
-            min-height: 60px; /* Too large for mobile */
-        }
-
-        .content-section {
-            /* VIOLATION: Using vw for padding causes horizontal scroll */
-            padding: 10vw 5vw;
+        .section:nth-child(even) {
             background: #f8f9fa;
         }
 
-        .content-section h2 {
-            font-size: 5vw; /* VIOLATION: Extreme scaling */
-            text-align: center;
-            margin-bottom: 3rem;
-            color: #2c3e50;
+        /* Font size using vw without limits - will be huge on wide screens */
+        h1 {
+            font-size: 5vw;  /* No max limit */
         }
 
-        .features-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 3rem;
-            max-width: 1200px;
-            margin: 0 auto;
+        p {
+            font-size: 2vw;  /* Will be unreadable on mobile */
         }
 
-        .feature-card {
-            background: white;
-            padding: 3vw; /* VIOLATION: Card padding scales with viewport */
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-            text-align: center;
-        }
-
-        .feature-card h3 {
-            font-size: 3vw; /* VIOLATION: Card titles scale poorly */
-            margin-bottom: 1rem;
-            color: #2c3e50;
-        }
-
-        .feature-card p {
-            font-size: 2vw; /* VIOLATION: Body text scales with viewport */
-            color: #666;
-            line-height: 1.8;
-        }
-
-        .footer {
-            /* VIOLATION: 100vh + other content creates scroll issues */
-            min-height: 100vh;
-            background: #2c3e50;
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            padding: 5vw; /* VIOLATION: Excessive viewport-based padding */
-        }
-
-        .footer h2 {
-            font-size: 8vw; /* VIOLATION: Massive scaling on large screens */
-            margin-bottom: 2rem;
-        }
-
-        .footer p {
-            font-size: 3vw; /* VIOLATION: Footer text scales poorly */
-            max-width: 600px;
-        }
-
-        /* VIOLATION: No proper mobile breakpoints to fix viewport issues */
-
-        /* Viewport units cause problems:
-           - 100vh doesn't work on mobile Safari (address bar)
-           - vw units cause horizontal scrolling
-           - Text scaling is unpredictable
-           - No consideration for minimum/maximum sizes
-        */
     </style>
 </head>
 <body>
-    <section class="hero-section">
-        <div class="hero-content">
-            <h1>Broken Viewport Units</h1>
-            <p>This layout demonstrates common viewport unit problems that break on mobile devices.</p>
-            <button class="cta-button">Experience Issues</button>
-        </div>
-    </section>
 
-    <section class="content-section">
-        <h2>Why This Breaks</h2>
-        <div class="features-grid">
-            <div class="feature-card">
-                <h3>Mobile Safari</h3>
-                <p>100vh doesn't account for the dynamic address bar, causing content to be cut off on mobile Safari.</p>
-            </div>
-            <div class="feature-card">
-                <h3>Viewport Width Issues</h3>
-                <p>Using vw for padding and text creates horizontal scrolling and unpredictable scaling across devices.</p>
-            </div>
-            <div class="feature-card">
-                <h3>Poor Typography</h3>
-                <p>Text sized with viewport units becomes unreadable on some screen sizes and creates accessibility issues.</p>
-            </div>
-        </div>
-    </section>
-
-    <footer class="footer">
+    <section class="hero">
         <div>
-            <h2>Viewport Problems</h2>
-            <p>This footer uses 100vh which compounds scrolling issues and creates an unnecessarily tall page on mobile devices.</p>
+            <h1>Broken Viewport Units</h1>
+            <p>This layout uses viewport units incorrectly, causing issues on mobile devices.</p>
         </div>
-    </footer>
+    </section>
+
+    <section class="section">
+        <div>
+            <h2 style="font-size: 4vw;">Section with Bad Sizing</h2>
+            <p>The text size scales poorly with viewport width, becoming too small on mobile and too large on desktop.</p>
+        </div>
+    </section>
+
 </body>
 </html>

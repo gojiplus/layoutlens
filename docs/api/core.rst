@@ -11,15 +11,38 @@ LayoutLens Class
    :undoc-members:
    :show-inheritance:
 
-Data Classes
-------------
+Result Classes
+--------------
 
-.. autoclass:: layoutlens.TestCase
+.. autoclass:: layoutlens.AnalysisResult
    :members:
    :undoc-members:
    :show-inheritance:
 
-.. autoclass:: layoutlens.TestSuite
+.. autoclass:: layoutlens.ComparisonResult
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. autoclass:: layoutlens.BatchResult
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Test Suite Classes
+------------------
+
+.. autoclass:: layoutlens.UITestCase
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. autoclass:: layoutlens.UITestSuite
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. autoclass:: layoutlens.UITestResult
    :members:
    :undoc-members:
    :show-inheritance:

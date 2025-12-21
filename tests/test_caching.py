@@ -358,7 +358,7 @@ class TestLayoutLensCacheIntegration:
             confidence=0.9,
             reasoning="Good design",
             metadata={},
-            provider="openrouter",
+            provider="litellm",
             model="gpt-4o-mini",
         )
         mock_provider.analyze_image.return_value = mock_vision_response
@@ -403,7 +403,7 @@ class TestLayoutLensCacheIntegration:
             confidence=0.9,
             reasoning="Good design",
             metadata={},
-            provider="openrouter",
+            provider="litellm",
             model="gpt-4o-mini",
         )
         mock_provider.analyze_image.return_value = mock_vision_response

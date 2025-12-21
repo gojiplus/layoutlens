@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{TITLE}}</title>
+    <style>
+        /* Minimal Template - Basic Unstyled HTML */
+
+        /* Only the most essential resets and accessibility */
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: serif;
+            font-size: 16px;
+            line-height: 1.5;
+            color: #000;
+            background: #fff;
+            margin: 8px;
+            padding: 0;
+        }
+
+        /* Basic typography - browser defaults mostly */
+        h1, h2, h3, h4, h5, h6 {
+            font-weight: bold;
+            margin-top: 1em;
+            margin-bottom: 0.5em;
+        }
+
+        h1 { font-size: 2em; }
+        h2 { font-size: 1.5em; }
+        h3 { font-size: 1.17em; }
+        h4 { font-size: 1em; }
+        h5 { font-size: 0.83em; }
+        h6 { font-size: 0.67em; }
+
+        p {
+            margin: 1em 0;
+        }
+
+        /* Basic list styling */
+        ul, ol {
+            margin: 1em 0;
+            padding-left: 40px;
+        }
+
+        li {
+            margin: 0.5em 0;
+        }
+
+        /* Minimal table styling */
+        table {
+            border-collapse: collapse;
+            margin: 1em 0;
+        }
+
+        th, td {
+            border: 1px solid #ccc;
+            padding: 4px 8px;
+            text-align: left;
+        }
+
+        th {
+            background: #f0f0f0;
+            font-weight: bold;
+        }
+
+        /* Basic form elements */
+        input, textarea, select {
+            border: 2px inset #ccc;
+            padding: 2px;
+            margin: 2px;
+            font: inherit;
+        }
+
+        input[type="submit"],
+        input[type="button"],
+        button {
+            border: 2px outset #ccc;
+            padding: 2px 6px;
+            background: #f0f0f0;
+            cursor: pointer;
+        }
+
+        input[type="submit"]:hover,
+        input[type="button"]:hover,
+        button:hover {
+            background: #e0e0e0;
+        }
+
+        /* Basic links */
+        a {
+            color: #0000EE;
+            text-decoration: underline;
+        }
+
+        a:visited {
+            color: #551A8B;
+        }
+
+        a:hover {
+            background: #ffff99;
+        }
+
+        /* Minimal navigation */
+        nav ul {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        nav li {
+            display: inline;
+            margin-right: 10px;
+        }
+
+        /* Basic layout containers */
+        .container {
+            max-width: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Accessibility - screen readers */
+        .sr-only {
+            position: absolute !important;
+            width: 1px !important;
+            height: 1px !important;
+            padding: 0 !important;
+            margin: -1px !important;
+            overflow: hidden !important;
+            clip: rect(0,0,0,0) !important;
+            border: 0 !important;
+        }
+
+        /* Basic focus indicator */
+        *:focus {
+            outline: 2px dotted #000;
+            outline-offset: 2px;
+        }
+
+        /* Minimal responsive behavior */
+        img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        /* Basic blockquote */
+        blockquote {
+            margin: 1em 40px;
+            padding: 0;
+            border-left: 3px solid #ccc;
+            padding-left: 10px;
+        }
+
+        /* Basic code styling */
+        code {
+            font-family: monospace;
+            background: #f0f0f0;
+            padding: 2px 4px;
+            border: 1px solid #ccc;
+        }
+
+        pre {
+            font-family: monospace;
+            background: #f0f0f0;
+            padding: 10px;
+            border: 1px solid #ccc;
+            overflow-x: auto;
+            margin: 1em 0;
+        }
+
+        /* Basic horizontal rule */
+        hr {
+            border: none;
+            border-top: 1px solid #ccc;
+            margin: 1em 0;
+        }
+
+        /* Basic fieldset */
+        fieldset {
+            border: 2px groove #ccc;
+            margin: 1em 0;
+            padding: 10px;
+        }
+
+        legend {
+            font-weight: bold;
+            padding: 0 5px;
+        }
+
+        /* Basic label */
+        label {
+            cursor: pointer;
+        }
+
+        /* Minimal form layout */
+        .form-group {
+            margin: 10px 0;
+        }
+
+        /* No custom styles beyond this point - test pure HTML structure */
+        {{CUSTOM_STYLES}}
+    </style>
+</head>
+<body>
+    {{CONTENT}}
+</body>
+</html>

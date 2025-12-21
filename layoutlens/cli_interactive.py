@@ -57,15 +57,24 @@ class InteractiveSession:
         self.successful_analyses = 0
         self.total_time = 0.0
 
-    def print(self, *args, **kwargs):
-        """Print with Rich if available, fallback to print."""
+    def print(self, *args, **kwargs) -> None:
+        """Print with Rich console if available, fallback to standard print.
+
+        Args:
+            *args: Arguments to pass to print function.
+            **kwargs: Keyword arguments to pass to print function.
+        """
         if self.use_rich and self.console:
             self.console.print(*args, **kwargs)
         else:
             print(*args, **kwargs)
 
-    def show_welcome(self):
-        """Show welcome message and session info."""
+    def show_welcome(self) -> None:
+        """Show welcome message and session information.
+
+        Displays LayoutLens configuration, session start time, and usage instructions
+        with Rich formatting when available.
+        """
         if self.use_rich:
             welcome_panel = Panel.fit(
                 f"[bold blue]LayoutLens Interactive Mode[/bold blue]\n"
@@ -410,8 +419,22 @@ class InteractiveSession:
             print(f"Query: {query}")
 
 
-def run_interactive_session(lens: LayoutLens):
-    """Run an interactive LayoutLens session."""
+def run_interactive_session(lens: LayoutLens) -> None:
+    """Run an interactive LayoutLens session with command processing.
+
+    Starts an interactive session where users can enter commands to analyze URLs
+    and screenshots in real-time. Supports Rich terminal formatting when available.
+
+    Available commands:
+        - analyze <url/path> "<question>" - Analyze single source
+        - batch <url1,url2,...> "<question>" - Batch analysis
+        - stats - Show session statistics
+        - help - Show command help
+        - quit - Exit session
+
+    Args:
+        lens: Initialized LayoutLens instance for analysis.
+    """
     session = InteractiveSession(lens)
     session.show_welcome()
 

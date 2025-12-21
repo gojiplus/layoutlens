@@ -21,8 +21,8 @@ class TestLayoutLensProviderIntegration:
 
             lens = LayoutLens(api_key="test-key")
 
-            mock_create.assert_called_once_with(provider_name="openrouter", api_key="test-key", model="gpt-4o-mini")
-            assert lens.provider == "openrouter"
+            mock_create.assert_called_once_with(provider_name="litellm", api_key="test-key", model="gpt-4o-mini")
+            assert lens.provider == "litellm"
             assert lens.model == "gpt-4o-mini"
             assert lens.vision_provider == mock_provider
 
@@ -38,19 +38,19 @@ class TestLayoutLensProviderIntegration:
             assert lens.provider == "anthropic"
             assert lens.model == "claude-3-haiku"
 
-    def test_api_key_resolution_openrouter(self):
-        """Test API key resolution for OpenRouter."""
+    def test_api_key_resolution_litellm(self):
+        """Test API key resolution for LiteLLM."""
         with (
-            patch.dict("os.environ", {"OPENROUTER_API_KEY": "openrouter-key"}),
+            patch.dict("os.environ", {"OPENAI_API_KEY": "litellm-key"}),
             patch("layoutlens.api.core.create_provider") as mock_create,
         ):
             mock_create.return_value = Mock()
 
-            lens = LayoutLens(provider="openrouter")
+            lens = LayoutLens(provider="litellm")
 
             mock_create.assert_called_once_with(
-                provider_name="openrouter",
-                api_key="openrouter-key",
+                provider_name="litellm",
+                api_key="litellm-key",
                 model="gpt-4o-mini",
             )
 
@@ -62,10 +62,10 @@ class TestLayoutLensProviderIntegration:
         ):
             mock_create.return_value = Mock()
 
-            lens = LayoutLens(provider="openrouter")
+            lens = LayoutLens(provider="litellm")
 
             mock_create.assert_called_once_with(
-                provider_name="openrouter",
+                provider_name="litellm",
                 api_key="openai-key",
                 model="gpt-4o-mini",
             )
@@ -76,7 +76,7 @@ class TestLayoutLensProviderIntegration:
             patch.dict("os.environ", {}, clear=True),
             pytest.raises(AuthenticationError, match="API key required"),
         ):
-            LayoutLens(provider="openrouter")
+            LayoutLens(provider="litellm")
 
     @patch("layoutlens.api.core.URLCapture")
     @patch("layoutlens.api.core.LayoutComparator")
@@ -94,7 +94,7 @@ class TestLayoutLensProviderIntegration:
             confidence=0.85,
             reasoning="Good use of whitespace and clear navigation",
             metadata={"analysis_time": 2.5},
-            provider="openrouter",
+            provider="litellm",
             model="gpt-4o-mini",
             usage_stats={"tokens": 150},
         )
@@ -106,7 +106,7 @@ class TestLayoutLensProviderIntegration:
         mock_capture.return_value = mock_capture_instance
 
         with patch("layoutlens.api.core.create_provider", return_value=mock_provider):
-            lens = LayoutLens(api_key="test-key", provider="openrouter")
+            lens = LayoutLens(api_key="test-key", provider="litellm")
 
             # Mock URL detection and screenshot capture
             with patch.object(lens, "_is_url", return_value=True):
@@ -128,7 +128,7 @@ class TestLayoutLensProviderIntegration:
         assert isinstance(result, AnalysisResult)
         assert result.answer == "The page is well designed"
         assert result.confidence == 0.85
-        assert result.metadata["provider"] == "openrouter"
+        assert result.metadata["provider"] == "litellm"
         assert result.metadata["model"] == "gpt-4o-mini"
         assert result.metadata["cache_hit"] is False
 
@@ -241,7 +241,7 @@ class TestLayoutLensProviderIntegration:
                 confidence=0.8 + i * 0.05,
                 reasoning=f"Analysis for page {i}",
                 metadata={},
-                provider="openrouter",
+                provider="litellm",
                 model="gpt-4o-mini",
             )
             for i in range(3)
@@ -292,8 +292,8 @@ class TestBackwardCompatibility:
         # Old style initialization without provider argument
         lens = LayoutLens(api_key="test-key", model="gpt-4o")
 
-        # Should default to openrouter provider
-        mock_create.assert_called_once_with(provider_name="openrouter", api_key="test-key", model="gpt-4o")
+        # Should default to litellm provider
+        mock_create.assert_called_once_with(provider_name="litellm", api_key="test-key", model="gpt-4o")
 
     @patch("layoutlens.api.core.create_provider")
     @patch("layoutlens.api.core.URLCapture")
@@ -313,7 +313,7 @@ class TestBackwardCompatibility:
             confidence=0.9,
             reasoning="Test reasoning",
             metadata={},
-            provider="openrouter",
+            provider="litellm",
             model="gpt-4o-mini",
         )
         mock_provider.analyze_image.return_value = mock_response

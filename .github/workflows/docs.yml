@@ -35,8 +35,8 @@ jobs:
     - name: Build documentation
       run: |
         cd docs
-        uv run make clean
-        uv run make html
+        rm -rf _build/*
+        uv run sphinx-build -b html . _build/html
 
     - name: Setup Pages
       if: github.ref == 'refs/heads/main'
