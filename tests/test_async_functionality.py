@@ -186,10 +186,10 @@ class TestAsyncCore:
 class TestAsyncCLI:
     """Test async CLI functionality."""
 
-    @patch("layoutlens.cli_async.LayoutLens")
-    async def test_cmd_test_async_single_page(self, mock_lens_class):
+    @patch("layoutlens.cli_commands.LayoutLens")
+    async def test_cmd_test_single_page(self, mock_lens_class):
         """Test async CLI test command for single page."""
-        from layoutlens.cli_async import cmd_test_async
+        from layoutlens.cli_commands import cmd_test
 
         # Setup mock
         mock_lens = Mock()
@@ -221,7 +221,7 @@ class TestAsyncCLI:
 
         # Test the command
         with patch("builtins.print") as mock_print:
-            await cmd_test_async(args)
+            await cmd_test(args)
 
             # Verify LayoutLens was initialized correctly
             mock_lens_class.assert_called_once_with(
@@ -235,10 +235,10 @@ class TestAsyncCLI:
             print_calls = [str(call) for call in mock_print.call_args_list]
             assert any("Analyzing page: test.html" in call for call in print_calls)
 
-    @patch("layoutlens.cli_async.LayoutLens")
-    async def test_cmd_compare_async(self, mock_lens_class):
+    @patch("layoutlens.cli_commands.LayoutLens")
+    async def test_cmd_compare(self, mock_lens_class):
         """Test async CLI compare command."""
-        from layoutlens.cli_async import cmd_compare_async
+        from layoutlens.cli_commands import cmd_compare
 
         # Setup mock
         mock_lens = Mock()
@@ -273,7 +273,7 @@ class TestAsyncCLI:
 
         # Test the command
         with patch("builtins.print") as mock_print:
-            await cmd_compare_async(args)
+            await cmd_compare(args)
 
             # Verify batch analysis was called with both pages
             mock_lens.analyze_batch_async.assert_called_once_with(
@@ -301,7 +301,7 @@ class TestAsyncIntegration:
         # But we can test that the argument parser accepts async flags
         with (
             patch("sys.argv", ["layoutlens", "--async", "test", "--page", "test.html"]),
-            patch("layoutlens.cli_async.cmd_test_async") as mock_async_cmd,
+            patch("layoutlens.cli_commands.cmd_test") as mock_async_cmd,
             patch("asyncio.run") as mock_asyncio_run,
             contextlib.suppress(SystemExit),
         ):

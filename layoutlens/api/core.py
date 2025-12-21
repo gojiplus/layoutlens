@@ -149,7 +149,7 @@ class LayoutLens:
         if not self.api_key:
             self.logger.error(f"No API key found for {provider} provider")
             raise AuthenticationError(
-                f"API key required for {provider} provider. " f"Set OPENAI_API_KEY env var or pass api_key parameter."
+                f"API key required for {provider} provider. Set OPENAI_API_KEY env var or pass api_key parameter."
             )
 
         self.model = model

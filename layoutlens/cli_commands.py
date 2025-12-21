@@ -724,12 +724,12 @@ async def cmd_analyze(args) -> None:
                 for i, result in enumerate(analysis_results):
                     if result.confidence > 0:
                         successful_analyses += 1
-                        print(f"\nQuery {i+1}: {result.query}")
+                        print(f"\nQuery {i + 1}: {result.query}")
                         print(f"Answer: {result.answer}")
                         print(f"Confidence: {result.confidence:.1%}")
                     else:
                         failed_analyses += 1
-                        print(f"\nQuery {i+1}: {result.query}")
+                        print(f"\nQuery {i + 1}: {result.query}")
                         print(f"FAILED: {result.answer}")
 
             execution_time = time.time() - start_time
@@ -849,13 +849,13 @@ async def cmd_pipeline(args) -> None:
                 for i, result in enumerate(analysis_results):
                     if result.confidence > 0:
                         successful_analyses += 1
-                        print(f"\nQuery {i+1}: {result.query}")
+                        print(f"\nQuery {i + 1}: {result.query}")
                         print(f"Answer: {result.answer}")
                         print(f"Confidence: {result.confidence:.1%}")
                         print(f"Pipeline Mode: {result.metadata.get('pipeline_mode', 'N/A')}")
                     else:
                         failed_analyses += 1
-                        print(f"\nQuery {i+1}: {result.query}")
+                        print(f"\nQuery {i + 1}: {result.query}")
                         print(f"FAILED: {result.answer}")
 
             execution_time = time.time() - start_time
@@ -866,7 +866,7 @@ async def cmd_pipeline(args) -> None:
             print(f"Successful: {successful_analyses}/{total_analyses}")
             print(f"Failed: {failed_analyses}/{total_analyses}")
             print(f"Total time: {execution_time:.2f}s")
-            print(f"Average time per analysis: {execution_time/total_analyses:.2f}s")
+            print(f"Average time per analysis: {execution_time / total_analyses:.2f}s")
 
             if failed_analyses > 0:
                 sys.exit(1)

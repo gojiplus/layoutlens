@@ -99,52 +99,43 @@ def sample_html_file():
 class TestFullWorkflow:
     """Test complete LayoutLens workflows."""
 
-    @patch("openai.OpenAI")
-    def test_single_page_analysis(self, mock_openai_class, mock_playwright, sample_html_file):
+    def test_single_page_analysis(self, mock_playwright, sample_html_file):
         """Test analyzing a single HTML page."""
-        # Setup OpenAI mock
-        mock_client = create_mock_openai_client()
-        mock_openai_class.return_value = mock_client
-
         # Initialize LayoutLens
         lens = LayoutLens(api_key="test_api_key")
 
-        # Analyze the page
-        result = lens.analyze(
-            source=sample_html_file,
-            query="Is this page accessible and well-designed?",
-            viewport="desktop",
+        # Mock the vision provider response
+        from layoutlens.providers.base import VisionAnalysisResponse
+
+        mock_response = VisionAnalysisResponse(
+            answer="The page has a clean, modern design with good accessibility features.",
+            confidence=0.85,
+            reasoning="The layout uses semantic HTML, has good color contrast, and follows responsive design principles.",
+            metadata={"tokens_used": 100},
+            provider="openai",
+            model="gpt-4o-mini",
         )
 
-        # Verify results
-        assert result.answer == "The page has a clean, modern design with good accessibility features."
-        assert result.confidence == 0.85
-        assert result.reasoning is not None
-        assert result.source == sample_html_file
-        assert result.query == "Is this page accessible and well-designed?"
+        # Mock both capture and vision provider
+        with patch.object(lens, "capture_only", return_value="/fake/screenshot/path.png") as mock_capture, patch.object(
+            lens.vision_provider, "analyze_image", return_value=mock_response
+        ):
+            # Analyze the page
+            result = lens.analyze(
+                source=sample_html_file,
+                query="Is this page accessible and well-designed?",
+                viewport="desktop",
+            )
 
-        # Verify OpenAI was called
-        mock_client.chat.completions.create.assert_called_once()
+            # Verify results
+            assert result.answer == "The page has a clean, modern design with good accessibility features."
+            assert result.confidence == 0.85
+            assert result.reasoning is not None
+            assert result.source == sample_html_file
+            assert result.query == "Is this page accessible and well-designed?"
 
-    @patch("openai.OpenAI")
-    def test_page_comparison(self, mock_openai_class, mock_playwright, sample_html_file):
+    def test_page_comparison(self, mock_playwright, sample_html_file):
         """Test comparing two pages."""
-        # Setup OpenAI mock for comparison
-        mock_client = Mock()
-        mock_response = Mock()
-        mock_choice = Mock()
-        mock_message = Mock()
-
-        mock_message.content = """ANSWER: The second design is more modern and user-friendly.
-CONFIDENCE: 0.78
-REASONING: The second page has better visual hierarchy and cleaner layout."""
-
-        mock_choice.message = mock_message
-        mock_response.choices = [mock_choice]
-        mock_response.usage.total_tokens = 100
-        mock_client.chat.completions.create.return_value = mock_response
-        mock_openai_class.return_value = mock_client
-
         # Initialize LayoutLens
         lens = LayoutLens(api_key="test_api_key")
 
@@ -154,63 +145,74 @@ REASONING: The second page has better visual hierarchy and cleaner layout."""
             second_file = f.name
 
         try:
-            # Compare pages
-            result = lens.compare(sources=[sample_html_file, second_file], query="Which design is better?")
+            # Mock vision provider responses for individual analyses
+            from layoutlens.providers.base import VisionAnalysisResponse
 
-            # Verify results
-            assert "second" in result.answer.lower() or "modern" in result.answer.lower()
-            assert result.confidence == 0.78
-            assert len(result.sources) == 2
+            mock_response1 = VisionAnalysisResponse(
+                answer="The first page has basic design elements.",
+                confidence=0.60,
+                reasoning="Simple layout but lacks modern design principles.",
+                metadata={"tokens_used": 80},
+                provider="openai",
+                model="gpt-4o-mini",
+            )
+            mock_response2 = VisionAnalysisResponse(
+                answer="The second design is more modern and user-friendly.",
+                confidence=0.78,
+                reasoning="The second page has better visual hierarchy and cleaner layout.",
+                metadata={"tokens_used": 100},
+                provider="openai",
+                model="gpt-4o-mini",
+            )
+
+            # Mock both individual analyses and comparison
+            with patch.object(lens.vision_provider, "analyze_image", side_effect=[mock_response1, mock_response2]):
+                # Compare pages
+                result = lens.compare(sources=[sample_html_file, second_file], query="Which design is better?")
+
+                # Verify results
+                assert "second" in result.answer.lower() or "modern" in result.answer.lower()
+                assert result.confidence == 0.78
+                assert len(result.sources) == 2
 
         finally:
             # Cleanup
             Path(second_file).unlink()
 
-    @patch("openai.OpenAI")
-    def test_batch_analysis(self, mock_openai_class, mock_playwright, sample_html_file):
+    def test_batch_analysis(self, mock_playwright, sample_html_file):
         """Test batch analysis of multiple queries."""
-        # Setup OpenAI mock
-        mock_client = Mock()
-
-        # Different responses for different queries
-        responses = [
-            {
-                "answer": "Yes, the navigation is visible",
-                "confidence": 0.9,
-                "reasoning": "Clear nav elements",
-            },
-            {
-                "answer": "Yes, it is mobile-friendly",
-                "confidence": 0.8,
-                "reasoning": "Responsive design detected",
-            },
-            {
-                "answer": "Good color contrast",
-                "confidence": 0.85,
-                "reasoning": "WCAG compliant",
-            },
-        ]
-
-        def create_response(resp):
-            mock_resp = Mock()
-            mock_resp.choices = [
-                Mock(
-                    message=Mock(
-                        content=f"""ANSWER: {resp["answer"]}
-CONFIDENCE: {resp["confidence"]}
-REASONING: {resp["reasoning"]}"""
-                    )
-                )
-            ]
-            mock_resp.usage.total_tokens = 100
-            return mock_resp
-
-        mock_client.chat.completions.create.side_effect = [create_response(resp) for resp in responses]
-
-        mock_openai_class.return_value = mock_client
-
         # Initialize LayoutLens
         lens = LayoutLens(api_key="test_api_key")
+
+        # Different responses for different queries
+        from layoutlens.providers.base import VisionAnalysisResponse
+
+        mock_responses = [
+            VisionAnalysisResponse(
+                answer="Yes, the navigation is visible",
+                confidence=0.9,
+                reasoning="Clear nav elements",
+                metadata={"tokens_used": 100},
+                provider="openai",
+                model="gpt-4o-mini",
+            ),
+            VisionAnalysisResponse(
+                answer="Yes, it is mobile-friendly",
+                confidence=0.8,
+                reasoning="Responsive design detected",
+                metadata={"tokens_used": 100},
+                provider="openai",
+                model="gpt-4o-mini",
+            ),
+            VisionAnalysisResponse(
+                answer="Good color contrast",
+                confidence=0.85,
+                reasoning="WCAG compliant",
+                metadata={"tokens_used": 100},
+                provider="openai",
+                model="gpt-4o-mini",
+            ),
+        ]
 
         # Run batch analysis
         queries = [
@@ -219,17 +221,21 @@ REASONING: {resp["reasoning"]}"""
             "Does it have good color contrast?",
         ]
 
-        results = lens.analyze_batch(sources=[sample_html_file], queries=queries, viewport="desktop")
+        # Mock vision provider responses
+        with patch.object(lens.vision_provider, "analyze_image", side_effect=mock_responses):
+            results = lens.analyze_batch(sources=[sample_html_file], queries=queries, viewport="desktop")
 
-        # Verify results
-        assert len(results.results) == 3
-        assert results.total_queries == 3
-        assert results.successful_queries == 3
+            # Verify results
+            assert len(results.results) == 3
+            assert results.total_queries == 3
+            assert results.successful_queries == 3
 
-        # Verify each result
-        for i, result in enumerate(results.results):
-            assert result.answer == responses[i]["answer"]
-            assert result.confidence == responses[i]["confidence"]
+            # Verify each result
+            expected_answers = ["Yes, the navigation is visible", "Yes, it is mobile-friendly", "Good color contrast"]
+            expected_confidences = [0.9, 0.8, 0.85]
+            for i, result in enumerate(results.results):
+                assert result.answer == expected_answers[i]
+                assert result.confidence == expected_confidences[i]
 
     @patch("openai.OpenAI")
     def test_test_suite_execution(self, mock_openai_class, mock_playwright, sample_html_file):
@@ -275,40 +281,36 @@ REASONING: {resp["reasoning"]}"""
         assert results[1].test_case_name == "Design Test"
         assert results[1].total_tests == 1  # 1 query × 1 viewport
 
-    @patch("openai.OpenAI")
-    def test_built_in_checks(self, mock_openai_class, mock_playwright):
+    def test_built_in_checks(self, mock_playwright):
         """Test built-in check methods."""
-        # Setup OpenAI mock
-        mock_client = Mock()
-        mock_response = Mock()
-        mock_choice = Mock()
-        mock_message = Mock()
-
-        mock_message.content = """ANSWER: The page is accessible with good color contrast and semantic HTML.
-CONFIDENCE: 0.88
-REASONING: All accessibility checks passed."""
-
-        mock_choice.message = mock_message
-        mock_response.choices = [mock_choice]
-        mock_response.usage.total_tokens = 100
-        mock_client.chat.completions.create.return_value = mock_response
-        mock_openai_class.return_value = mock_client
-
         # Initialize LayoutLens
         lens = LayoutLens(api_key="test_api_key")
 
+        # Mock vision provider response for accessibility check
+        from layoutlens.providers.base import VisionAnalysisResponse
+
+        mock_response = VisionAnalysisResponse(
+            answer="The page is accessible with good color contrast and semantic HTML.",
+            confidence=0.88,
+            reasoning="All accessibility checks passed.",
+            metadata={"tokens_used": 100},
+            provider="openai",
+            model="gpt-4o-mini",
+        )
+
         # Test accessibility check
-        result = lens.check_accessibility("https://example.com")
-        assert result.confidence == 0.88
-        assert "accessible" in result.answer.lower()
+        with patch.object(lens.vision_provider, "analyze_image", return_value=mock_response):
+            result = lens.check_accessibility("https://example.com")
+            assert result.confidence == 0.88
+            assert "accessible" in result.answer.lower()
 
-        # Test mobile-friendly check
-        result = lens.check_mobile_friendly("https://example.com")
-        assert result is not None
+            # Test mobile-friendly check
+            result = lens.check_mobile_friendly("https://example.com")
+            assert result is not None
 
-        # Test conversion optimization check
-        result = lens.check_conversion_optimization("https://example.com")
-        assert result is not None
+            # Test conversion optimization check
+            result = lens.check_conversion_optimization("https://example.com")
+            assert result is not None
 
 
 class TestErrorHandling:
@@ -369,7 +371,7 @@ class TestCLIIntegration:
     """Test CLI command integration."""
 
     @patch("openai.OpenAI")
-    @patch("layoutlens.cli.LayoutLens")
+    @patch("layoutlens.api.core.LayoutLens")
     def test_cli_test_command(self, mock_lens_class, mock_openai_class):
         """Test the CLI test command."""
         from argparse import Namespace
@@ -405,7 +407,7 @@ class TestCLIIntegration:
         mock_lens.analyze.assert_called_once()
 
     @patch("layoutlens.cli.UITestSuite")
-    @patch("layoutlens.cli.LayoutLens")
+    @patch("layoutlens.api.core.LayoutLens")
     def test_cli_suite_command(self, mock_lens_class, mock_suite_class):
         """Test the CLI test suite command."""
         from argparse import Namespace

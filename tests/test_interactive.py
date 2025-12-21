@@ -27,14 +27,14 @@ class TestInteractiveSession:
         assert session.total_analyses == 0
         assert session.successful_analyses == 0
 
-    @patch("layoutlens.interactive.RICH_AVAILABLE", True)
+    @patch("layoutlens.cli_interactive.RICH_AVAILABLE", True)
     def test_initialization_with_rich(self):
         """Test session initialization with Rich available."""
         mock_lens = Mock(spec=LayoutLens)
         mock_lens.provider = "anthropic"
         mock_lens.model = "claude-3-haiku"
 
-        with patch("layoutlens.interactive.Console") as mock_console_class:
+        with patch("layoutlens.cli_interactive.Console") as mock_console_class:
             mock_console = Mock()
             mock_console_class.return_value = mock_console
 
@@ -138,7 +138,7 @@ class TestInteractiveSession:
             session.print("Test message", style="bold")
             mock_print.assert_called_once_with("Test message", style="bold")
 
-    @patch("layoutlens.interactive.Console")
+    @patch("layoutlens.cli_interactive.Console")
     def test_print_with_rich(self, mock_console_class):
         """Test print method with Rich."""
         mock_console = Mock()
@@ -167,11 +167,11 @@ class TestInteractiveSession:
         """Test that session auto-detects Rich availability."""
         mock_lens = Mock(spec=LayoutLens)
 
-        with patch("layoutlens.interactive.RICH_AVAILABLE", True):
+        with patch("layoutlens.cli_interactive.RICH_AVAILABLE", True):
             session = InteractiveSession(mock_lens)
             assert session.use_rich is True
 
-        with patch("layoutlens.interactive.RICH_AVAILABLE", False):
+        with patch("layoutlens.cli_interactive.RICH_AVAILABLE", False):
             session = InteractiveSession(mock_lens)
             assert session.use_rich is False
 
@@ -180,7 +180,7 @@ class TestInteractiveIntegration:
     """Integration tests for interactive mode."""
 
     @patch("layoutlens.cli.run_interactive_session")
-    @patch("layoutlens.cli.LayoutLens")
+    @patch("layoutlens.api.core.LayoutLens")
     def test_interactive_command_integration(self, mock_lens_class, mock_run_session):
         """Test that interactive command integrates properly."""
         from layoutlens.cli import cmd_interactive

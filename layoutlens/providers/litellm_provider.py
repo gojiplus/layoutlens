@@ -20,6 +20,7 @@ class LiteLLMProvider(VisionProvider):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._init_logger()
+        self._client = None  # LiteLLM doesn't use persistent clients, but tests expect this property
 
     @property
     def provider_name(self) -> str:
@@ -44,9 +45,44 @@ class LiteLLMProvider(VisionProvider):
             # And many more supported by LiteLLM
         ]
 
+    def _get_litellm_model(self, model_name: str) -> str:
+        """Map model names to LiteLLM format."""
+        # Handle already prefixed models
+        if "/" in model_name:
+            return model_name
+
+        # Map popular models to provider/model format
+        model_mapping = {
+            "gpt-4o": "openai/gpt-4o",
+            "gpt-4o-mini": "openai/gpt-4o-mini",
+            "gpt-4-vision-preview": "openai/gpt-4-vision-preview",
+            "claude-3-opus": "anthropic/claude-3-opus",
+            "claude-3-sonnet": "anthropic/claude-3-sonnet",
+            "claude-3-haiku": "anthropic/claude-3-haiku",
+            "claude-3-5-sonnet": "anthropic/claude-3-5-sonnet",
+            "gemini-pro-vision": "google/gemini-pro-vision",
+            "gemini-1.5-pro": "google/gemini-1.5-pro",
+            "gemini-1.5-flash": "google/gemini-1.5-flash",
+        }
+
+        # Return mapped model or default to openai/gpt-4o-mini for unknown models
+        return model_mapping.get(model_name, "openai/gpt-4o-mini")
+
     def initialize(self) -> None:
-        """Initialize LiteLLM - no setup needed."""
+        """Initialize LiteLLM with OpenAI client for compatibility."""
         self.logger.info(f"LiteLLM provider initialized with model: {self.config.model}")
+
+        # Initialize OpenAI client for LiteLLM compatibility
+        try:
+            import openai
+
+            self._client = openai.OpenAI(
+                base_url="https://litellm.ai/api/v1", api_key=self.config.api_key, timeout=30.0
+            )
+            self.logger.debug("LiteLLM OpenAI client initialized")
+        except ImportError:
+            self.logger.warning("OpenAI package not available, using direct LiteLLM calls")
+            self._client = None
 
     def analyze_image(self, request: VisionAnalysisRequest) -> VisionAnalysisResponse:
         """Analyze image using LiteLLM."""

@@ -21,8 +21,8 @@ class TestLayoutLensProviderIntegration:
 
             lens = LayoutLens(api_key="test-key")
 
-            mock_create.assert_called_once_with(provider_name="litellm", api_key="test-key", model="gpt-4o-mini")
-            assert lens.provider == "litellm"
+            mock_create.assert_called_once_with(provider_name="openai", api_key="test-key", model="gpt-4o-mini")
+            assert lens.provider == "openai"
             assert lens.model == "gpt-4o-mini"
             assert lens.vision_provider == mock_provider
 
@@ -292,8 +292,8 @@ class TestBackwardCompatibility:
         # Old style initialization without provider argument
         lens = LayoutLens(api_key="test-key", model="gpt-4o")
 
-        # Should default to litellm provider
-        mock_create.assert_called_once_with(provider_name="litellm", api_key="test-key", model="gpt-4o")
+        # Should default to openai provider
+        mock_create.assert_called_once_with(provider_name="openai", api_key="test-key", model="gpt-4o")
 
     @patch("layoutlens.api.core.create_provider")
     @patch("layoutlens.api.core.URLCapture")
