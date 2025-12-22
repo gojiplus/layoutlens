@@ -2,10 +2,57 @@
 Type definitions for LayoutLens JSON schemas and API interfaces.
 
 This module provides TypedDict definitions for all JSON inputs and outputs,
-ensuring type safety and clear documentation of expected data structures.
+plus enums for type-safe parameter validation.
 """
 
+from enum import Enum
 from typing import Any, TypedDict
+
+# Enums for type-safe API parameters
+
+
+class ComplianceLevel(Enum):
+    """WCAG compliance levels for accessibility auditing."""
+
+    A = "A"
+    AA = "AA"
+    AAA = "AAA"
+
+
+class Expert(Enum):
+    """Domain expert personas for specialized analysis."""
+
+    ACCESSIBILITY = "accessibility_expert"
+    CONVERSION = "conversion_expert"
+    MOBILE = "mobile_expert"
+    ECOMMERCE = "ecommerce_expert"
+    HEALTHCARE = "healthcare_expert"
+    FINANCE = "finance_expert"
+
+
+class Viewport(Enum):
+    """Supported viewport configurations for screenshot capture."""
+
+    DESKTOP = "desktop"
+    LAPTOP = "laptop"
+    TABLET = "tablet"
+    MOBILE = "mobile"
+    MOBILE_LANDSCAPE = "mobile_landscape"
+    MOBILE_PORTRAIT = "mobile_portrait"
+
+
+class CacheType(Enum):
+    """Cache backend types."""
+
+    MEMORY = "memory"
+    FILE = "file"
+
+
+# Union types for backward compatibility
+ViewportType = Viewport | str
+ExpertType = Expert | str
+ComplianceLevelType = ComplianceLevel | str
+CacheTypeType = CacheType | str
 
 
 class AnalysisResultJSON(TypedDict):
@@ -249,6 +296,17 @@ class LayoutLensConfigJSON(TypedDict, total=False):
 
 # Export commonly used types
 __all__ = [
+    # Enums
+    "ComplianceLevel",
+    "Expert",
+    "Viewport",
+    "CacheType",
+    # Union types
+    "ViewportType",
+    "ExpertType",
+    "ComplianceLevelType",
+    "CacheTypeType",
+    # TypedDict schemas
     "AnalysisResultJSON",
     "ComparisonResultJSON",
     "BatchResultJSON",

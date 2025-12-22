@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with th
 
  LayoutLens is a production-ready AI-powered UI testing framework that enables natural language visual testing. It captures screenshots using Playwright and analyzes them with OpenAI's GPT-4o Vision API to validate layouts, accessibility, responsive design, and visual consistency.
 
-**Current Version:** v1.4.0 (includes CLI refactor, async-by-default processing, and comprehensive documentation)
+**Current Version:** v1.5.0 (includes major API simplification, architectural cleanup, and enhanced pathlib support)
 
 ## Quick Start Commands
 

@@ -48,6 +48,17 @@ from ..logger import get_logger, log_function_call, log_performance_metric
 # Import enhanced prompt system
 from ..prompts import Instructions, get_expert
 
+# Import types
+from ..types import (
+    CacheType,
+    ComplianceLevel,
+    ComplianceLevelType,
+    Expert,
+    ExpertType,
+    Viewport,
+    ViewportType,
+)
+
 
 @dataclass(slots=True)
 class AnalysisResult:
@@ -391,7 +402,7 @@ Focus on:
         self,
         source: str | Path | list[str | Path],
         query: str | list[str],
-        viewport: str = "desktop",
+        viewport: ViewportType = "desktop",
         context: dict[str, Any] | None = None,
         instructions: Instructions | None = None,
         max_concurrent: int = 5,
@@ -401,7 +412,7 @@ Focus on:
         Args:
             source: Single URL/path or list of URLs/paths to analyze.
             query: Single question or list of questions about the UI.
-            viewport: Viewport size for URL capture ("desktop", "mobile", "tablet").
+            viewport: Viewport for capture (Viewport.DESKTOP, "desktop", etc.).
             context: Additional context for analysis (user_type, browser, etc.). Legacy format.
             instructions: Rich instruction set with expert personas and structured context.
                          Takes precedence over context if both provided.
@@ -423,6 +434,9 @@ Focus on:
             # Multiple sources and queries
             >>> result = await lens.analyze(["page1.html", "page2.html"], ["Accessible?", "Mobile?"])
         """
+        # Handle enum/string for viewport
+        viewport_value = viewport.value if isinstance(viewport, Viewport) else str(viewport)
+
         # Normalize inputs to lists
         sources = [source] if not isinstance(source, list) else source
         queries = [query] if not isinstance(query, list) else query
@@ -437,7 +451,7 @@ Focus on:
             source_count=len(sources),
             query_count=len(queries),
             total_combinations=len(sources) * len(queries),
-            viewport=viewport,
+            viewport=viewport_value,
             is_single_result=is_single_result,
         )
 
@@ -458,7 +472,7 @@ Focus on:
 
                 # Check cache first
                 cache_key = self.cache.get_analysis_key(
-                    source=str(source), query=query, viewport=viewport, context=context
+                    source=str(source), query=query, viewport=viewport_value, context=context
                 )
                 cached_result = self.cache.get(cache_key)
                 if cached_result and isinstance(cached_result, AnalysisResult):
@@ -472,7 +486,7 @@ Focus on:
                     if self._is_url(source):
                         self.logger.debug(f"Capturing screenshot from URL: {source}")
                         capture_engine = Capture(output_dir=self.output_dir / "screenshots")
-                        screenshot_paths = await capture_engine.screenshots([str(source)], viewport)
+                        screenshot_paths = await capture_engine.screenshots([str(source)], viewport_value)
                         screenshot_path = screenshot_paths[0]
                         self.logger.info(f"Successfully captured screenshot: {screenshot_path}")
                     elif self._is_html_file(source):
@@ -510,7 +524,7 @@ Focus on:
                         confidence=float(vision_response["confidence"]),
                         reasoning=str(vision_response["reasoning"]),
                         screenshot_path=screenshot_path,
-                        viewport=viewport,
+                        viewport=viewport_value,
                         execution_time=combination_execution_time,
                         metadata={
                             **vision_response["metadata"],
@@ -602,7 +616,7 @@ Focus on:
         self,
         sources: list[str | Path],
         query: str = "Are these layouts consistent?",
-        viewport: str = "desktop",
+        viewport: ViewportType = "desktop",
         context: dict[str, Any] | None = None,
         instructions: Instructions | None = None,
     ) -> ComparisonResult:
@@ -611,7 +625,7 @@ Focus on:
         Args:
             sources: List of URLs or screenshot paths to compare.
             query: Natural language question for comparison.
-            viewport: Viewport size for URL captures.
+            viewport: Viewport for captures (Viewport.DESKTOP or string).
             context: Additional context for analysis.
             instructions: Rich instructions for expert analysis.
 
@@ -624,13 +638,16 @@ Focus on:
             ...     "https://mysite.com/after"
             ... ], "Did the redesign improve the user experience?")
         """
+        # Handle enum/string for viewport
+        viewport_value = viewport.value if isinstance(viewport, Viewport) else str(viewport)
+
         start_time = time.time()
 
         log_function_call(
             "LayoutLens.compare",
             sources=[str(s)[:30] + "..." if len(str(s)) > 30 else str(s) for s in sources],
             query=query[:100] + "..." if len(query) > 100 else query,
-            viewport=viewport,
+            viewport=viewport_value,
         )
 
         self.logger.info(f"Starting comparison of {len(sources)} sources")
@@ -644,7 +661,7 @@ Focus on:
                 self.logger.debug(f"Processing source {i + 1}/{len(sources)}: {str(source)[:50]}...")
                 if self._is_url(source):
                     capture_engine = Capture(output_dir=self.output_dir / "screenshots")
-                    screenshot_paths_batch = await capture_engine.screenshots([str(source)], viewport)
+                    screenshot_paths_batch = await capture_engine.screenshots([str(source)], viewport_value)
                     screenshot_path = screenshot_paths_batch[0]  # Get first (and only) result
                 else:
                     screenshot_path = str(source)
@@ -652,7 +669,7 @@ Focus on:
                 screenshot_paths.append(screenshot_path)
 
                 # Individual analysis
-                individual_result = await self.analyze(source, query, viewport, context)
+                individual_result = await self.analyze(source, query, viewport_value, context)
                 individual_results.append(individual_result)
 
             # Comparative analysis using first screenshot with comparison query
@@ -694,7 +711,7 @@ Focus on:
                 duration=execution_time,
                 confidence=confidence,
                 source_count=len(sources),
-                viewport=viewport,
+                viewport=viewport_value,
             )
 
             self.logger.info(
@@ -778,7 +795,7 @@ Focus on:
     async def _serve_html_and_capture(
         self,
         html_file_path: str | Path,
-        viewport: str = "desktop",
+        viewport: ViewportType = "desktop",
         wait_for_selector: str | None = None,
         wait_time: int | None = None,
     ) -> str:
@@ -881,7 +898,7 @@ Focus on:
     async def capture(
         self,
         source: str | Path | list[str | Path],
-        viewport: str = "desktop",
+        viewport: ViewportType = "desktop",
         wait_for_selector: str | None = None,
         wait_time: int | None = None,
         max_concurrent: int = 3,
@@ -890,7 +907,7 @@ Focus on:
 
         Args:
             source: Single URL/path or list of URLs/paths to capture.
-            viewport: Viewport size for URL capture ("desktop", "mobile", "tablet").
+            viewport: Viewport for capture (Viewport.DESKTOP, "desktop", etc.).
             wait_for_selector: CSS selector to wait for before capturing.
             wait_time: Additional wait time in milliseconds.
             max_concurrent: Maximum concurrent captures for multiple sources.
@@ -915,6 +932,9 @@ Focus on:
             # Existing images (validation)
             >>> path = await lens.capture("screenshot.png")
         """
+        # Handle enum/string for viewport
+        viewport_value = viewport.value if isinstance(viewport, Viewport) else str(viewport)
+
         # Normalize input to determine return type
         is_single_source = not isinstance(source, list)
         sources = [source] if is_single_source else source
@@ -925,7 +945,7 @@ Focus on:
             "LayoutLens.capture",
             source_count=len(sources),
             is_single_source=is_single_source,
-            viewport=viewport,
+            viewport=viewport_value,
             max_concurrent=max_concurrent,
         )
 
@@ -956,7 +976,7 @@ Focus on:
                 # Create Capture instance for URL processing
                 capture_engine = Capture(output_dir=self.output_dir / "screenshots")
                 screenshot_paths = await capture_engine.screenshots(
-                    urls_to_capture, viewport, max_concurrent, wait_for_selector, wait_time
+                    urls_to_capture, viewport_value, max_concurrent, wait_for_selector, wait_time
                 )
 
                 # Map results back
@@ -981,7 +1001,9 @@ Focus on:
             async def capture_html_file(html_path):
                 async with semaphore:
                     try:
-                        return await self._serve_html_and_capture(html_path, viewport, wait_for_selector, wait_time)
+                        return await self._serve_html_and_capture(
+                            html_path, viewport_value, wait_for_selector, wait_time
+                        )
                     except Exception as e:
                         self.logger.warning(f"HTML capture failed for {html_path}: {e}")
                         return f"Error: {str(e)}"
@@ -1010,7 +1032,7 @@ Focus on:
             total_sources=len(sources),
             successful_captures=successful_count,
             failed_captures=failed_count,
-            viewport=viewport,
+            viewport=viewport_value,
             max_concurrent=max_concurrent,
         )
 
@@ -1027,7 +1049,7 @@ Focus on:
             return results
 
     # Developer convenience methods
-    async def check_accessibility(self, source: str | Path, viewport: str = "desktop") -> AnalysisResult:
+    async def check_accessibility(self, source: str | Path, viewport: ViewportType = "desktop") -> AnalysisResult:
         """Quick accessibility check with common WCAG queries."""
         query = """
         Analyze this page for accessibility issues. Check:
@@ -1055,7 +1077,9 @@ Focus on:
         """
         return await self.analyze(source, query, "mobile")
 
-    async def check_conversion_optimization(self, source: str | Path, viewport: str = "desktop") -> AnalysisResult:
+    async def check_conversion_optimization(
+        self, source: str | Path, viewport: ViewportType = "desktop"
+    ) -> AnalysisResult:
         """Check for conversion-focused design elements."""
         query = """
         Analyze this page for conversion optimization:
@@ -1072,24 +1096,46 @@ Focus on:
     # Enhanced Expert-Based Analysis Methods
 
     async def audit_accessibility(
-        self, source: str | Path, standards: list[str] = None, compliance_level: str = "AA", viewport: str = "desktop"
+        self,
+        source: str | Path,
+        standards: list[str] = None,
+        compliance_level: ComplianceLevelType = "AA",
+        viewport: ViewportType = "desktop",
     ) -> AnalysisResult:
         """Professional accessibility audit using WCAG expert knowledge.
 
         Args:
             source: URL or file path to analyze
             standards: Accessibility standards to apply (default: WCAG 2.1, Section 508)
-            compliance_level: WCAG compliance level (A, AA, AAA)
-            viewport: Viewport for analysis
+            compliance_level: WCAG compliance level (ComplianceLevel.AA or string)
+            viewport: Viewport for analysis (Viewport.DESKTOP or string)
 
         Returns:
             Detailed accessibility assessment with specific WCAG guidance
+
+        Raises:
+            ValueError: If compliance_level is not a valid WCAG level
         """
         from ..prompts import Instructions
 
-        instructions = Instructions.for_accessibility_audit(standards=standards, compliance_level=compliance_level)
+        # Validate and normalize compliance level
+        if isinstance(compliance_level, ComplianceLevel):
+            compliance_level_value = compliance_level.value
+        else:
+            # Handle string input
+            compliance_level_upper = compliance_level.upper()
+            try:
+                compliance_level_enum = ComplianceLevel(compliance_level_upper)
+                compliance_level_value = compliance_level_enum.value
+            except ValueError:
+                valid_levels = [level.value for level in ComplianceLevel]
+                raise ValueError(f"compliance_level must be one of {valid_levels}, got: '{compliance_level}'") from None
 
-        query = f"Perform a comprehensive accessibility audit for WCAG {compliance_level} compliance"
+        instructions = Instructions.for_accessibility_audit(
+            standards=standards, compliance_level=compliance_level_value
+        )
+
+        query = f"Perform a comprehensive accessibility audit for WCAG {compliance_level_upper} compliance"
         return await self.analyze(source, query, viewport=viewport, instructions=instructions)
 
     async def optimize_conversions(
@@ -1098,7 +1144,7 @@ Focus on:
         business_goals: list[str] = None,
         industry: str = None,
         target_audience: str = None,
-        viewport: str = "desktop",
+        viewport: ViewportType = "desktop",
     ) -> AnalysisResult:
         """Conversion rate optimization analysis using CRO expert knowledge.
 
@@ -1107,7 +1153,7 @@ Focus on:
             business_goals: Business objectives (e.g., reduce_cart_abandonment)
             industry: Industry context for specialized recommendations
             target_audience: Target audience for optimization focus
-            viewport: Viewport for analysis
+            viewport: Viewport for analysis (Viewport.DESKTOP or string)
 
         Returns:
             Detailed CRO recommendations with A/B testing suggestions
@@ -1148,7 +1194,7 @@ Focus on:
         source: str | Path,
         page_type: str = "product_page",
         business_model: str = "b2c",
-        viewport: str = "desktop",
+        viewport: ViewportType = "desktop",
     ) -> AnalysisResult:
         """E-commerce UX audit using retail expert knowledge.
 
@@ -1156,7 +1202,7 @@ Focus on:
             source: URL or file path to analyze
             page_type: Type of e-commerce page (product_page, checkout, homepage)
             business_model: Business model (b2c, b2b)
-            viewport: Viewport for analysis
+            viewport: Viewport for analysis (Viewport.DESKTOP or string)
 
         Returns:
             E-commerce specific recommendations for conversion improvement
@@ -1172,25 +1218,31 @@ Focus on:
         self,
         source: str | Path,
         query: str,
-        expert_persona: str,
+        expert_persona: ExpertType,
         focus_areas: list[str] = None,
         user_context: dict[str, Any] = None,
-        viewport: str = "desktop",
+        viewport: ViewportType = "desktop",
     ) -> AnalysisResult:
         """Analyze using a specific domain expert persona.
 
         Args:
             source: URL or file path to analyze
             query: Question to analyze
-            expert_persona: Expert to use (accessibility_expert, conversion_expert, etc.)
+            expert_persona: Expert to use (Expert.ACCESSIBILITY or string)
             focus_areas: Specific areas to focus analysis on
             user_context: Rich context about users and requirements
-            viewport: Viewport for analysis
+            viewport: Viewport for analysis (Viewport.DESKTOP or string)
 
         Returns:
             Expert-level analysis with domain-specific recommendations
         """
         from ..prompts import Instructions, UserContext
+
+        # Handle enum/string for expert_persona
+        expert_persona_value = expert_persona.value if isinstance(expert_persona, Expert) else str(expert_persona)
+
+        # Handle enum/string for viewport
+        viewport_value = viewport.value if isinstance(viewport, Viewport) else str(viewport)
 
         # Convert user_context dict to UserContext object if provided
         context_obj = None
@@ -1198,36 +1250,42 @@ Focus on:
             context_obj = UserContext(**user_context)
 
         instructions = Instructions(
-            expert_persona=expert_persona, focus_areas=focus_areas or [], user_context=context_obj
+            expert_persona=expert_persona_value, focus_areas=focus_areas or [], user_context=context_obj
         )
 
-        return await self.analyze(source, query, viewport=viewport, instructions=instructions)
+        return await self.analyze(source, query, viewport=viewport_value, instructions=instructions)
 
     async def compare_with_expert(
         self,
         sources: list[str | Path],
         query: str,
-        expert_persona: str,
+        expert_persona: ExpertType,
         focus_areas: list[str] = None,
-        viewport: str = "desktop",
+        viewport: ViewportType = "desktop",
     ) -> ComparisonResult:
         """Compare multiple sources using domain expert knowledge.
 
         Args:
             sources: List of URLs or file paths to compare
             query: Comparison question
-            expert_persona: Expert to use for comparison
+            expert_persona: Expert to use for comparison (Expert.ACCESSIBILITY or string)
             focus_areas: Specific areas to focus comparison on
-            viewport: Viewport for analysis
+            viewport: Viewport for analysis (Viewport.DESKTOP or string)
 
         Returns:
             Expert comparison with domain-specific insights
         """
         from ..prompts import Instructions
 
-        instructions = Instructions(expert_persona=expert_persona, focus_areas=focus_areas or [])
+        # Handle enum/string for expert_persona
+        expert_persona_value = expert_persona.value if isinstance(expert_persona, Expert) else str(expert_persona)
 
-        return await self.compare(sources, query, viewport=viewport, instructions=instructions)
+        # Handle enum/string for viewport
+        viewport_value = viewport.value if isinstance(viewport, Viewport) else str(viewport)
+
+        instructions = Instructions(expert_persona=expert_persona_value, focus_areas=focus_areas or [])
+
+        return await self.compare(sources, query, viewport=viewport_value, instructions=instructions)
 
     # Cache management methods
     def get_cache_stats(self) -> dict[str, Any]:

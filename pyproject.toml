@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "layoutlens"
-version = "1.4.0"
+version = "1.5.0"
 description = "AI-powered UI testing framework with natural language visual validation"
 readme = "README.md"
 license = "MIT"

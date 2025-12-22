@@ -33,7 +33,7 @@ class Capture:
         "mobile_portrait": ViewportConfig("mobile_portrait", 375, 667, 2.0, True, True),
     }
 
-    def __init__(self, output_dir: str = "screenshots", timeout: int = 30000):
+    def __init__(self, output_dir: str | Path = "screenshots", timeout: int = 30000):
         """Initialize capture system."""
 
         self.output_dir = Path(output_dir)
