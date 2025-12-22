@@ -43,6 +43,11 @@ class BenchmarkRunner:
             cache_type="file",
         )
 
+        print(f"⚙️  Benchmark Settings:")
+        print(f"   Model: gpt-4o-mini")
+        print(f"   Cache: Enabled (file-based)")
+        print(f"   Output: {self.output_dir}")
+
         # Base paths
         self.base_path = Path(__file__).parent
         self.test_data_path = self.base_path / "test_data"
@@ -95,8 +100,8 @@ class BenchmarkRunner:
 
             # Use LayoutLens batch processing
             batch_result = await self.lens.analyze(
-                sources=sources,
-                queries=queries,
+                source=sources,
+                query=queries,
                 viewport="desktop",
                 max_concurrent=3,  # Limit concurrent requests
             )

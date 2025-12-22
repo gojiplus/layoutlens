@@ -32,6 +32,16 @@ from .logger import (
     get_logger,
     setup_logging,
 )
+from .types import (
+    CacheType,
+    CacheTypeType,
+    ComplianceLevel,
+    ComplianceLevelType,
+    Expert,
+    ExpertType,
+    Viewport,
+    ViewportType,
+)
 
 __all__ = [
     "LayoutLens",
@@ -43,6 +53,15 @@ __all__ = [
     "UITestResult",
     "Capture",
     "Config",
+    # Types and Enums
+    "ComplianceLevel",
+    "Expert",
+    "Viewport",
+    "CacheType",
+    "ViewportType",
+    "ExpertType",
+    "ComplianceLevelType",
+    "CacheTypeType",
     # Exceptions
     "LayoutLensError",
     "APIError",

@@ -292,7 +292,52 @@ class BenchmarkEvaluator:
             with open(result_file) as f:
                 ll_data = json.load(f)
 
-            html_file = ll_data["html_path"]
+            # Handle new benchmark format (has benchmark_info and results array)
+            if "benchmark_info" in ll_data and "results" in ll_data:
+                print(f"📋 Found new benchmark format with {ll_data['benchmark_info']['total_tests']} tests")
+
+                # Process each test result
+                for test_result in ll_data["results"]:
+                    html_file = test_result["html_file"]
+                    category = self._determine_category(html_file)
+
+                    if category not in category_results:
+                        category_results[category] = BenchmarkResults(
+                            category=category,
+                            total_tests=0,
+                            correct_predictions=0,
+                            accuracy=0.0,
+                            high_confidence_correct=0,
+                            medium_confidence_correct=0,
+                            low_confidence_correct=0,
+                            avg_ai_confidence=0.0,
+                        )
+
+                    query = test_result["query"]
+                    answer = test_result["answer"]
+                    confidence = test_result.get("confidence", 1.0)
+
+                    eval_result = self.evaluate_single_result(html_file, query, answer, confidence)
+                    category_results[category].results.append(eval_result)
+                    category_results[category].total_tests += 1
+
+                    if eval_result.is_correct:
+                        category_results[category].correct_predictions += 1
+
+                        if confidence >= 0.8:
+                            category_results[category].high_confidence_correct += 1
+                        elif confidence >= 0.6:
+                            category_results[category].medium_confidence_correct += 1
+                        else:
+                            category_results[category].low_confidence_correct += 1
+
+                continue
+
+            # Handle legacy format
+            html_file = ll_data.get("html_path") or ll_data.get("html_file")
+            if not html_file:
+                print(f"⚠️  Skipping {result_file.name}: No html_file or html_path found")
+                continue
             category = self._determine_category(html_file)
 
             if category not in category_results:

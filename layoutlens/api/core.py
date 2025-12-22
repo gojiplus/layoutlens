@@ -1122,7 +1122,7 @@ Focus on:
         if isinstance(compliance_level, ComplianceLevel):
             compliance_level_value = compliance_level.value
         else:
-            # Handle string input
+            # Handle string input and validate
             compliance_level_upper = compliance_level.upper()
             try:
                 compliance_level_enum = ComplianceLevel(compliance_level_upper)
@@ -1135,7 +1135,7 @@ Focus on:
             standards=standards, compliance_level=compliance_level_value
         )
 
-        query = f"Perform a comprehensive accessibility audit for WCAG {compliance_level_upper} compliance"
+        query = f"Perform a comprehensive accessibility audit for WCAG {compliance_level_value} compliance"
         return await self.analyze(source, query, viewport=viewport, instructions=instructions)
 
     async def optimize_conversions(

@@ -1,17 +1,17 @@
 LayoutLens Documentation
 ========================
 
-.. image:: https://img.shields.io/pypi/v/layoutlens
-   :target: https://pypi.org/project/layoutlens/
+.. image:: https://badge.fury.io/py/layoutlens.svg
+   :target: https://badge.fury.io/py/layoutlens
    :alt: PyPI Version
 
-.. image:: https://img.shields.io/github/license/matmulai/layoutlens
-   :target: https://github.com/gojiplus/layoutlens/blob/main/LICENSE
-   :alt: License
+.. image:: https://img.shields.io/badge/python-3.11+-blue.svg
+   :target: https://www.python.org/downloads/
+   :alt: Python 3.11+
 
-.. image:: https://readthedocs.org/projects/layoutlens/badge/?version=latest
-   :target: https://layoutlens.readthedocs.io/en/latest/?badge=latest
-   :alt: Documentation Status
+.. image:: https://img.shields.io/badge/docs-github.io-blue
+   :target: https://gojiplus.github.io/layoutlens/
+   :alt: Documentation
 
 LayoutLens is a production-ready AI-powered UI testing framework that enables natural language visual testing. It captures screenshots using Playwright and analyzes them with OpenAI's GPT-4 Vision API to validate layouts, accessibility, responsive design, and visual consistency.
 
