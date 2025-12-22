@@ -182,7 +182,7 @@ def main():
 
                         if input_method == "Upload Screenshot":
                             # Handle uploaded screenshot
-                            result = analyze_screenshot(tester, input_file, custom_questions, question_method)
+                            result = analyze_uploaded_file(tester, input_file, custom_questions, question_method)
 
                         elif input_method == "Enter URL":
                             # Handle URL
@@ -202,8 +202,8 @@ def main():
                         st.exception(e)
 
 
-def analyze_screenshot(tester: LayoutLens, uploaded_file, custom_questions: list, question_method: str):
-    """Analyze an uploaded screenshot"""
+def analyze_uploaded_file(tester: LayoutLens, uploaded_file, custom_questions: list, question_method: str):
+    """Analyze an uploaded image file"""
     # For uploaded screenshots, create a temporary image file for analysis
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as temp_file:

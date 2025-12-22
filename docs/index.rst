@@ -55,7 +55,6 @@ LayoutLens is a production-ready AI-powered UI testing framework that enables na
    api/config
    api/analysis
    api/capture
-   api/providers
 
 📊 Performance Metrics
 ----------------------

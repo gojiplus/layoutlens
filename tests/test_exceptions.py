@@ -191,12 +191,12 @@ class TestExceptionMessages:
         """Test error message with details."""
         error = LayoutLensError(
             "Something failed",
-            {"component": "VisionAnalyzer", "operation": "analyze", "retry_count": 3},
+            {"component": "LayoutLens", "operation": "analyze", "retry_count": 3},
         )
 
         message = str(error)
         assert "Something failed" in message
-        assert "component: VisionAnalyzer" in message
+        assert "component: LayoutLens" in message
         assert "operation: analyze" in message
         assert "retry_count: 3" in message
 

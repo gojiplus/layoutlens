@@ -190,14 +190,8 @@ class LayoutLens:
         self.logger.info(f"Initialized LayoutLens with {provider} provider using {model} model")
         self.logger.debug(f"Output directory: {self.output_dir}")
 
-        # Initialize components (no provider needed)
-        try:
-            self.capture = Capture(output_dir=str(self.output_dir / "screenshots"))
-
-            self.logger.debug("Initialized capture and vision components")
-        except Exception as e:
-            self.logger.error(f"Failed to initialize components: {e}")
-            raise
+        # Components will be created as needed (no persistent instances)
+        self.logger.debug("LayoutLens core initialized - components created on demand")
 
         # Initialize cache
         cache_dir = str(self.output_dir / "cache") if cache_type == "file" else "cache"
@@ -477,12 +471,13 @@ Focus on:
                     # Determine if source is URL, HTML file, or image file
                     if self._is_url(source):
                         self.logger.debug(f"Capturing screenshot from URL: {source}")
-                        screenshot_paths = await self.capture.screenshots([str(source)], viewport)
+                        capture_engine = Capture(output_dir=self.output_dir / "screenshots")
+                        screenshot_paths = await capture_engine.screenshots([str(source)], viewport)
                         screenshot_path = screenshot_paths[0]
                         self.logger.info(f"Successfully captured screenshot: {screenshot_path}")
                     elif self._is_html_file(source):
                         self.logger.debug(f"Capturing screenshot from HTML file: {source}")
-                        screenshot_path = await self.capture_only(source, viewport=viewport)
+                        screenshot_path = await self.capture(source, viewport=viewport)
                         self.logger.info(f"Successfully captured HTML file screenshot: {screenshot_path}")
                     else:
                         # Use existing image file
@@ -648,7 +643,8 @@ Focus on:
             for i, source in enumerate(sources):
                 self.logger.debug(f"Processing source {i + 1}/{len(sources)}: {str(source)[:50]}...")
                 if self._is_url(source):
-                    screenshot_paths_batch = await self.capture.screenshots([str(source)], viewport)
+                    capture_engine = Capture(output_dir=self.output_dir / "screenshots")
+                    screenshot_paths_batch = await capture_engine.screenshots([str(source)], viewport)
                     screenshot_path = screenshot_paths_batch[0]  # Get first (and only) result
                 else:
                     screenshot_path = str(source)
@@ -799,7 +795,8 @@ Focus on:
             self.logger.debug(f"Using file:// URL for simple HTML: {html_file_path}")
             try:
                 file_url = f"file://{html_file_path}"
-                screenshot_paths = await self.capture.screenshots(
+                capture_engine = Capture(output_dir=self.output_dir / "screenshots")
+                screenshot_paths = await capture_engine.screenshots(
                     [file_url], viewport, wait_for_selector=wait_for_selector, wait_time=wait_time
                 )
                 screenshot_path = screenshot_paths[0]
@@ -864,7 +861,8 @@ Focus on:
             local_url = f"http://localhost:{port}/"
             self.logger.debug(f"Serving HTML file at {local_url}")
 
-            screenshot_paths = await self.capture.screenshots(
+            capture_engine = Capture(output_dir=str(self.output_dir / "screenshots"))
+            screenshot_paths = await capture_engine.screenshots(
                 [local_url], viewport, wait_for_selector=wait_for_selector, wait_time=wait_time
             )
             screenshot_path = screenshot_paths[0]
@@ -878,178 +876,155 @@ Focus on:
             httpd.server_close()
             server_thread.join(timeout=1)
 
-    # Pipeline Mode Methods
+    # Unified Capture Method
 
-    async def capture_only(
+    async def capture(
         self,
-        source: str | Path,
+        source: str | Path | list[str | Path],
         viewport: str = "desktop",
         wait_for_selector: str | None = None,
         wait_time: int | None = None,
-    ) -> str:
-        """Capture screenshot only without analysis (Stage 1 of 2-stage pipeline).
+        max_concurrent: int = 3,
+    ) -> str | dict[str, str]:
+        """Smart capture method that handles single or multiple sources uniformly.
 
         Args:
-            source: URL to capture or existing file path to validate.
+            source: Single URL/path or list of URLs/paths to capture.
             viewport: Viewport size for URL capture ("desktop", "mobile", "tablet").
             wait_for_selector: CSS selector to wait for before capturing.
             wait_time: Additional wait time in milliseconds.
+            max_concurrent: Maximum concurrent captures for multiple sources.
 
         Returns:
-            Path to the captured or validated screenshot file.
+            Single source: Returns screenshot path as string.
+            Multiple sources: Returns dict mapping source to screenshot path.
 
-        Raises:
-            ScreenshotError: If URL capture fails.
-            LayoutFileNotFoundError: If file doesn't exist.
+        Examples:
+            # Single URL
+            >>> path = await lens.capture("https://example.com")
+            # Returns: "/path/to/screenshot.png"
 
-        Example:
-            >>> lens = LayoutLens(api_key="...")
-            >>> screenshot_path = lens.capture_only("https://example.com")
-            >>> # Later analyze with different queries
-            >>> result1 = lens.analyze_screenshot(screenshot_path, "Is it accessible?")
-            >>> result2 = lens.analyze_screenshot(screenshot_path, "Is it mobile-friendly?")
+            # Multiple URLs
+            >>> paths = await lens.capture(["https://site1.com", "https://site2.com"])
+            # Returns: {"https://site1.com": "/path1.png", "https://site2.com": "/path2.png"}
+
+            # HTML files
+            >>> path = await lens.capture("page.html")
+            >>> paths = await lens.capture(["page1.html", "page2.html"])
+
+            # Existing images (validation)
+            >>> path = await lens.capture("screenshot.png")
         """
+        # Normalize input to determine return type
+        is_single_source = not isinstance(source, list)
+        sources = [source] if is_single_source else source
+
         start_time = time.time()
 
         log_function_call(
-            "LayoutLens.capture_only",
-            source=str(source)[:50] + "..." if len(str(source)) > 50 else str(source),
+            "LayoutLens.capture",
+            source_count=len(sources),
+            is_single_source=is_single_source,
             viewport=viewport,
+            max_concurrent=max_concurrent,
         )
 
-        try:
-            if self._is_url(source):
-                self.logger.debug(f"Capturing screenshot from URL: {source}")
+        self.logger.info(f"Starting capture of {len(sources)} source(s)")
 
-                # Use simplified async capture interface
-                screenshot_paths_batch = await self.capture.screenshots(
-                    [str(source)], viewport, wait_for_selector=wait_for_selector, wait_time=wait_time
-                )
-                screenshot_path = screenshot_paths_batch[0]  # Get first (and only) result
+        results = {}
+        failed_count = 0
 
-                self.logger.info(f"Successfully captured screenshot: {screenshot_path}")
+        # Separate sources by type for optimal processing
+        urls_to_capture = [s for s in sources if self._is_url(s)]
+        html_files = [s for s in sources if self._is_html_file(s)]
+        existing_files = [s for s in sources if not (self._is_url(s) or self._is_html_file(s))]
 
-                # Log performance metrics
-                log_performance_metric(
-                    operation="capture_only",
-                    duration=time.time() - start_time,
-                    source_type="url",
-                    viewport=viewport,
-                )
-
-                return screenshot_path
-            elif self._is_html_file(source):
-                self.logger.debug(f"Capturing screenshot from HTML file: {source}")
-
-                # HTML files need to be served and captured asynchronously
-                # Since this method is async, we can directly await
-                screenshot_path = await self._serve_html_and_capture(
-                    html_file_path=source,
-                    viewport=viewport,
-                    wait_for_selector=wait_for_selector,
-                    wait_time=wait_time,
-                )
-
-                self.logger.info(f"Successfully captured HTML file screenshot: {screenshot_path}")
-
-                # Log performance metrics
-                log_performance_metric(
-                    operation="capture_only",
-                    duration=time.time() - start_time,
-                    source_type="html_file",
-                    viewport=viewport,
-                )
-
-                return screenshot_path
+        # Validate existing files (images)
+        for file_path in existing_files:
+            file_path_obj = Path(file_path)
+            if file_path_obj.exists():
+                results[str(file_path)] = str(file_path)
+                self.logger.debug(f"Using existing file: {file_path}")
             else:
-                # Validate existing file (image)
-                screenshot_path = str(source)
-                if not Path(screenshot_path).exists():
-                    self.logger.error(f"Screenshot file not found: {screenshot_path}")
-                    raise LayoutFileNotFoundError(
-                        f"Screenshot file not found: {screenshot_path}",
-                        file_path=screenshot_path,
-                    )
+                failed_count += 1
+                results[str(file_path)] = f"Error: File not found"
+                self.logger.warning(f"File not found: {file_path}")
 
-                self.logger.info(f"Validated existing screenshot: {screenshot_path}")
-                return screenshot_path
+        # Capture URLs using efficient batch processing
+        if urls_to_capture:
+            try:
+                # Create Capture instance for URL processing
+                capture_engine = Capture(output_dir=self.output_dir / "screenshots")
+                screenshot_paths = await capture_engine.screenshots(
+                    urls_to_capture, viewport, max_concurrent, wait_for_selector, wait_time
+                )
 
-        except LayoutLensError as e:
-            self.logger.debug(f"LayoutLens error in capture_only: {type(e).__name__}")
-            raise
-        except Exception as e:
-            self.logger.error(f"Unexpected error in capture_only: {e}")
-            raise wrap_exception(e, "Screenshot capture failed") from e
+                # Map results back
+                for i, url in enumerate(urls_to_capture):
+                    screenshot_path = screenshot_paths[i]
+                    if screenshot_path.startswith("Error:"):
+                        failed_count += 1
+                    results[str(url)] = screenshot_path
 
-    async def capture_only_async(
-        self,
-        source: str | Path,
-        viewport: str = "desktop",
-        wait_for_selector: str | None = None,
-        wait_time: int | None = None,
-    ) -> str:
-        """Async version of capture_only for CLI use (Stage 1 of 2-stage pipeline)."""
-        start_time = time.time()
+                self.logger.info(f"Captured {len(urls_to_capture)} URL screenshots")
 
-        log_function_call(
-            "LayoutLens.capture_only_async",
-            source=str(source)[:50] + "..." if len(str(source)) > 50 else str(source),
+            except Exception as e:
+                self.logger.error(f"URL capture failed: {e}")
+                for url in urls_to_capture:
+                    failed_count += 1
+                    results[str(url)] = f"Error: {str(e)}"
+
+        # Capture HTML files individually (they need special serving)
+        if html_files:
+            semaphore = asyncio.Semaphore(max_concurrent)
+
+            async def capture_html_file(html_path):
+                async with semaphore:
+                    try:
+                        return await self._serve_html_and_capture(html_path, viewport, wait_for_selector, wait_time)
+                    except Exception as e:
+                        self.logger.warning(f"HTML capture failed for {html_path}: {e}")
+                        return f"Error: {str(e)}"
+
+            # Process HTML files concurrently
+            html_tasks = [capture_html_file(html_path) for html_path in html_files]
+            html_results = await asyncio.gather(*html_tasks, return_exceptions=True)
+
+            for i, result in enumerate(html_results):
+                html_path = html_files[i]
+                if isinstance(result, Exception) or (isinstance(result, str) and result.startswith("Error:")):
+                    failed_count += 1
+                    results[str(html_path)] = f"Error: {str(result)}" if isinstance(result, Exception) else result
+                else:
+                    results[str(html_path)] = result
+
+            self.logger.info(f"Captured {len(html_files)} HTML file screenshots")
+
+        execution_time = time.time() - start_time
+        successful_count = len(sources) - failed_count
+
+        # Log performance metrics
+        log_performance_metric(
+            operation="capture_unified",
+            duration=execution_time,
+            total_sources=len(sources),
+            successful_captures=successful_count,
+            failed_captures=failed_count,
             viewport=viewport,
+            max_concurrent=max_concurrent,
         )
 
-        try:
-            if self._is_url(source):
-                self.logger.debug(f"Async capturing screenshot from URL: {source}")
-                screenshot_paths = await self.capture.screenshots(
-                    [str(source)], viewport, wait_for_selector=wait_for_selector, wait_time=wait_time
-                )
-                screenshot_path = screenshot_paths[0]
-                self.logger.info(f"Successfully captured screenshot: {screenshot_path}")
+        self.logger.info(
+            f"Capture completed: {successful_count}/{len(sources)} successful, time: {execution_time:.2f}s"
+        )
 
-                # Log performance metrics
-                log_performance_metric(
-                    operation="capture_only_async",
-                    duration=time.time() - start_time,
-                    source_type="url",
-                    viewport=viewport,
-                )
-
-                return screenshot_path
-            elif self._is_html_file(source):
-                self.logger.debug(f"Async capturing screenshot from HTML file: {source}")
-                screenshot_path = await self._serve_html_and_capture(
-                    html_file_path=source, viewport=viewport, wait_for_selector=wait_for_selector, wait_time=wait_time
-                )
-                self.logger.info(f"Successfully captured HTML file screenshot: {screenshot_path}")
-
-                # Log performance metrics
-                log_performance_metric(
-                    operation="capture_only_async",
-                    duration=time.time() - start_time,
-                    source_type="html_file",
-                    viewport=viewport,
-                )
-
-                return screenshot_path
-            else:
-                # Validate existing file (image)
-                screenshot_path = str(source)
-                if not Path(screenshot_path).exists():
-                    self.logger.error(f"Screenshot file not found: {screenshot_path}")
-                    raise LayoutFileNotFoundError(
-                        f"Screenshot file not found: {screenshot_path}",
-                        file_path=screenshot_path,
-                    )
-
-                self.logger.info(f"Validated existing screenshot: {screenshot_path}")
-                return screenshot_path
-
-        except LayoutLensError as e:
-            self.logger.debug(f"LayoutLens error in capture_only_async: {type(e).__name__}")
-            raise
-        except Exception as e:
-            self.logger.error(f"Unexpected error in capture_only_async: {e}")
-            raise wrap_exception(e, "Async screenshot capture failed") from e
+        # Return format based on input type
+        if is_single_source:
+            # Single source: return the path directly
+            return results[str(sources[0])]
+        else:
+            # Multiple sources: return the full mapping
+            return results
 
     # Developer convenience methods
     async def check_accessibility(self, source: str | Path, viewport: str = "desktop") -> AnalysisResult:
@@ -1253,289 +1228,6 @@ Focus on:
         instructions = Instructions(expert_persona=expert_persona, focus_areas=focus_areas or [])
 
         return await self.compare(sources, query, viewport=viewport, instructions=instructions)
-
-    # Batch Pipeline Methods
-
-    async def capture_batch(
-        self,
-        sources: list[str | Path],
-        viewport: str = "desktop",
-        wait_for_selector: str | None = None,
-        wait_time: int | None = None,
-        max_concurrent: int = 3,
-    ) -> dict[str, str]:
-        """Capture screenshots from multiple URLs (Stage 1 of 2-stage pipeline).
-
-        Args:
-            sources: List of URLs to capture.
-            viewport: Viewport size for captures.
-            wait_for_selector: CSS selector to wait for before capturing.
-            wait_time: Additional wait time in milliseconds.
-            max_concurrent: Maximum concurrent captures.
-
-        Returns:
-            Dictionary mapping source URLs to screenshot paths.
-
-        Example:
-            >>> lens = LayoutLens(api_key="...")
-            >>> screenshots = lens.capture_batch(["https://page1.com", "https://page2.com"])
-            >>> # Later analyze with different queries
-            >>> for url, path in screenshots.items():
-            ...     result = lens.analyze_screenshot(path, "Is it accessible?", source_url=url)
-        """
-        start_time = time.time()
-
-        log_function_call(
-            "LayoutLens.capture_batch",
-            source_count=len(sources),
-            viewport=viewport,
-            max_concurrent=max_concurrent,
-        )
-
-        self.logger.info(f"Starting batch capture of {len(sources)} sources")
-
-        results = {}
-        failed_count = 0
-
-        # Filter URLs only (skip existing files)
-        urls_to_capture = [s for s in sources if self._is_url(s)]
-        existing_files = [s for s in sources if not self._is_url(s)]
-
-        # Validate existing files
-        for file_path in existing_files:
-            file_path_obj = Path(file_path)
-            if file_path_obj.exists():
-                results[file_path] = file_path
-                self.logger.debug(f"Using existing file: {file_path}")
-            else:
-                failed_count += 1
-                results[file_path] = f"Error: File not found"
-                self.logger.warning(f"File not found: {file_path}")
-
-        # Capture URLs using BatchCapture for efficiency
-        if urls_to_capture:
-            try:
-                batch_capture = Capture(output_dir=str(self.output_dir / "screenshots"))
-
-                # Use unified capture interface
-                url_results = batch_capture.capture(
-                    urls=urls_to_capture, viewports=[viewport], max_concurrent=max_concurrent
-                )
-
-                # Extract results for the specified viewport
-                for url, viewport_results in url_results.items():
-                    screenshot_path = viewport_results.get(viewport, "")
-                    if screenshot_path.startswith("Error:"):
-                        failed_count += 1
-                        results[url] = screenshot_path
-                    else:
-                        results[url] = screenshot_path
-
-            except Exception as e:
-                self.logger.error(f"Batch capture failed: {e}")
-                # Fallback to individual captures
-                for url in urls_to_capture:
-                    try:
-                        screenshot_path = await self.capture_only(url, viewport, wait_for_selector, wait_time)
-                        results[url] = screenshot_path
-                    except Exception as capture_e:
-                        failed_count += 1
-                        results[url] = f"Error: {str(capture_e)}"
-                        self.logger.warning(f"Individual capture failed for {url}: {capture_e}")
-
-        execution_time = time.time() - start_time
-        successful_count = len(sources) - failed_count
-
-        # Log performance metrics
-        log_performance_metric(
-            operation="capture_batch",
-            duration=execution_time,
-            total_sources=len(sources),
-            successful_captures=successful_count,
-            failed_captures=failed_count,
-            viewport=viewport,
-            max_concurrent=max_concurrent,
-        )
-
-        self.logger.info(
-            f"Batch capture completed: {successful_count}/{len(sources)} successful, time: {execution_time:.2f}s"
-        )
-
-        return results
-
-    async def capture_batch_async(
-        self,
-        sources: list[str | Path],
-        viewport: str = "desktop",
-        wait_for_selector: str | None = None,
-        wait_time: int | None = None,
-        max_concurrent: int = 3,
-    ) -> dict[str, str]:
-        """Async version of capture_batch for CLI use (Stage 1 of 2-stage pipeline)."""
-        start_time = time.time()
-
-        log_function_call(
-            "LayoutLens.capture_batch_async",
-            source_count=len(sources),
-            viewport=viewport,
-            max_concurrent=max_concurrent,
-        )
-
-        self.logger.info(f"Starting async batch capture of {len(sources)} sources")
-
-        results = {}
-
-        # Filter URLs and HTML files vs existing files
-        sources_to_capture = [s for s in sources if (self._is_url(s) or self._is_html_file(s))]
-        existing_files = [s for s in sources if not (self._is_url(s) or self._is_html_file(s))]
-
-        # Validate existing files
-        for file_path in existing_files:
-            file_path_obj = Path(file_path)
-            if file_path_obj.exists():
-                results[file_path] = file_path
-                self.logger.debug(f"Using existing file: {file_path}")
-            else:
-                results[file_path] = f"Error: File not found"
-                self.logger.warning(f"File not found: {file_path}")
-
-        # Capture sources concurrently
-        if sources_to_capture:
-            semaphore = asyncio.Semaphore(max_concurrent)
-
-            async def capture_single(source):
-                async with semaphore:
-                    try:
-                        return await self.capture_only_async(
-                            source=source, viewport=viewport, wait_for_selector=wait_for_selector, wait_time=wait_time
-                        )
-                    except Exception as e:
-                        self.logger.warning(f"Async capture failed for {source}: {e}")
-                        return f"Error: {str(e)}"
-
-            # Create tasks for all sources
-            tasks = [capture_single(source) for source in sources_to_capture]
-
-            # Execute all tasks concurrently
-            capture_results = await asyncio.gather(*tasks, return_exceptions=True)
-
-            # Process results
-            for i, result in enumerate(capture_results):
-                source = sources_to_capture[i]
-                if isinstance(result, Exception):
-                    results[str(source)] = f"Error: {str(result)}"
-                else:
-                    results[str(source)] = result
-
-        execution_time = time.time() - start_time
-        successful_count = sum(1 for v in results.values() if not str(v).startswith("Error:"))
-        failed_count = len(sources) - successful_count
-
-        # Log performance metrics
-        log_performance_metric(
-            operation="capture_batch_async",
-            duration=execution_time,
-            total_sources=len(sources),
-            successful_captures=successful_count,
-            failed_captures=failed_count,
-            viewport=viewport,
-            max_concurrent=max_concurrent,
-        )
-
-        self.logger.info(
-            f"Async batch capture completed: {successful_count}/{len(sources)} successful, time: {execution_time:.2f}s"
-        )
-
-        return results
-
-    async def pipeline_batch(
-        self,
-        sources: list[str | Path],
-        queries: list[str],
-        viewport: str = "desktop",
-        context: dict[str, Any] | None = None,
-        wait_for_selector: str | None = None,
-        wait_time: int | None = None,
-        max_concurrent_capture: int = 3,
-    ) -> dict[str, list[AnalysisResult]]:
-        """Complete 2-stage pipeline: capture then analyze multiple sources with multiple queries.
-
-        Args:
-            sources: List of URLs or paths to analyze.
-            queries: List of natural language queries.
-            viewport: Viewport size for captures.
-            context: Additional context for analysis.
-            wait_for_selector: CSS selector to wait for before capturing.
-            wait_time: Additional wait time in milliseconds.
-            max_concurrent_capture: Maximum concurrent captures.
-
-        Returns:
-            Dictionary mapping source names to lists of AnalysisResult objects.
-
-        Example:
-            >>> results = lens.pipeline_batch(
-            ...     sources=["https://page1.com", "https://page2.com"],
-            ...     queries=["Is it accessible?", "Is it responsive?"]
-            ... )
-            >>> for source, analysis_results in results.items():
-            ...     for result in analysis_results:
-            ...         print(f"{source}: {result.answer}")
-        """
-        start_time = time.time()
-
-        log_function_call(
-            "LayoutLens.pipeline_batch",
-            source_count=len(sources),
-            query_count=len(queries),
-            total_analyses=len(sources) * len(queries),
-            viewport=viewport,
-        )
-
-        self.logger.info(f"Starting complete 2-stage pipeline batch processing")
-
-        # Stage 1: Capture all screenshots
-        self.logger.debug("Stage 1: Capturing screenshots")
-        screenshots = await self.capture_batch(
-            sources=sources,
-            viewport=viewport,
-            wait_for_selector=wait_for_selector,
-            wait_time=wait_time,
-            max_concurrent=max_concurrent_capture,
-        )
-
-        # Stage 2: Analyze all screenshots with all queries
-        self.logger.debug("Stage 2: Analyzing screenshots")
-        results = self.analyze_captured_batch(
-            screenshot_mapping=screenshots,
-            queries=queries,
-            viewport=viewport,
-            context=context,
-        )
-
-        execution_time = time.time() - start_time
-
-        # Calculate aggregate metrics
-        total_analyses = sum(len(source_results) for source_results in results.values())
-        successful_analyses = sum(
-            1 for source_results in results.values() for result in source_results if result.confidence > 0
-        )
-
-        # Log performance metrics
-        log_performance_metric(
-            operation="pipeline_batch_complete",
-            duration=execution_time,
-            total_analyses=total_analyses,
-            successful_analyses=successful_analyses,
-            source_count=len(sources),
-            query_count=len(queries),
-            viewport=viewport,
-        )
-
-        self.logger.info(
-            f"Complete 2-stage pipeline completed: {successful_analyses}/{total_analyses} successful analyses, time: {execution_time:.2f}s"
-        )
-
-        return results
 
     # Cache management methods
     def get_cache_stats(self) -> dict[str, Any]:

@@ -56,7 +56,7 @@ class TestImportsAndDependencies(unittest.TestCase):
     def test_vision_components(self):
         """Test vision components can be imported."""
         try:
-            from layoutlens import Capture, VisionAnalyzer
+            from layoutlens import Capture
 
             self.assertTrue(True, "Vision components imported successfully")
         except ImportError as e:
@@ -150,8 +150,8 @@ class TestAPIFunctionality(unittest.TestCase):
                 self.assertLessEqual(result.confidence, 1)
 
     @pytest.mark.asyncio
-    async def test_analyze_screenshot_flow(self):
-        """Test analyzing existing screenshots."""
+    async def test_analyze_existing_file_flow(self):
+        """Test analyzing existing image files."""
         from layoutlens.api.core import LayoutLens
 
         lens = LayoutLens(api_key=self.mock_api_key)
@@ -217,13 +217,12 @@ class TestVisionComponents(unittest.TestCase):
     def setUp(self):
         self.mock_api_key = "sk-test-key-12345"
 
-    @patch("layoutlens.analyzer.openai.OpenAI")
-    def test_vision_analyzer_initialization(self, mock_openai):
-        """Test VisionAnalyzer initialization."""
-        from layoutlens.analyzer import VisionAnalyzer
+    def test_layoutlens_initialization(self):
+        """Test LayoutLens initialization."""
+        from layoutlens.api.core import LayoutLens
 
-        analyzer = VisionAnalyzer(api_key=self.mock_api_key)
-        self.assertEqual(analyzer.model, "gpt-4o-mini")
+        lens = LayoutLens(api_key=self.mock_api_key)
+        self.assertEqual(lens.model, "gpt-4o-mini")
 
     def test_url_capture_viewports(self):
         """Test Capture viewport configurations."""
@@ -284,7 +283,6 @@ class TestFileStructure(unittest.TestCase):
         required_files = [
             "layoutlens/api/__init__.py",
             "layoutlens/api/core.py",
-            "layoutlens/analyzer.py",
             "layoutlens/capture.py",
         ]
 
@@ -311,7 +309,6 @@ class TestFileStructure(unittest.TestCase):
         """Test that all Python files have valid syntax."""
         python_files = [
             "layoutlens/api/core.py",
-            "layoutlens/analyzer.py",
             "layoutlens/capture.py",
         ]
 
@@ -365,7 +362,7 @@ class TestErrorHandling(unittest.TestCase):
         # This test verifies the dependencies are properly declared.
 
         try:
-            from layoutlens.analyzer import VisionAnalyzer
+            from layoutlens.api.core import LayoutLens
             from layoutlens.capture import Capture
 
             # If we can import these, dependencies are available
