@@ -1,8 +1,8 @@
 LayoutLens Documentation
 ========================
 
-.. image:: https://badge.fury.io/py/layoutlens.svg
-   :target: https://badge.fury.io/py/layoutlens
+.. image:: https://img.shields.io/pypi/v/layoutlens.svg
+   :target: https://pypi.org/project/layoutlens/
    :alt: PyPI Version
 
 .. image:: https://img.shields.io/badge/python-3.11+-blue.svg

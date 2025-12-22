@@ -1,6 +1,7 @@
 # LayoutLens: AI-Powered Visual UI Testing
 
-[![PyPI version](https://badge.fury.io/py/layoutlens.svg)](https://badge.fury.io/py/layoutlens)
+[![PyPI version](https://img.shields.io/pypi/v/layoutlens.svg)](https://pypi.org/project/layoutlens/)
+[![Downloads](https://static.pepy.tech/badge/layoutlens)](https://pepy.tech/project/layoutlens)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Documentation](https://img.shields.io/badge/docs-github.io-blue)](https://gojiplus.github.io/layoutlens/)
 
@@ -332,7 +333,7 @@ lens = LayoutLens(
 
 ## Resources
 
-- 📖 **[Full Documentation](https://layoutlens.readthedocs.io/)** - Comprehensive guides and API reference
+- 📖 **[Full Documentation](https://gojiplus.github.io/layoutlens/)** - Comprehensive guides and API reference
 - 🎯 **[Examples](https://github.com/gojiplus/layoutlens/tree/main/examples)** - Real-world usage patterns
 - 🐛 **[Issues](https://github.com/gojiplus/layoutlens/issues)** - Report bugs or request features
 - 💬 **[Discussions](https://github.com/gojiplus/layoutlens/discussions)** - Get help and share ideas
