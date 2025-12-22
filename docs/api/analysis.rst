@@ -7,15 +7,7 @@ understanding and comparing screenshots.
 VisionAnalyzer
 --------------
 
-.. autoclass:: layoutlens.vision.VisionAnalyzer
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-LayoutComparator
-----------------
-
-.. autoclass:: layoutlens.vision.LayoutComparator
+.. autoclass:: layoutlens.analyzer.VisionAnalyzer
    :members:
    :undoc-members:
    :show-inheritance:

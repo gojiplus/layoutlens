@@ -157,14 +157,10 @@ print(f"Average score: {result.average_confidence:.1%}")
 
 ### Cross-Browser Testing
 ```python
-from layoutlens.vision import LayoutComparator
-
-comparator = LayoutComparator(lens.analyzer)
-
-# Screenshots from different browsers
-result = comparator.check_cross_browser_consistency(
-    ["chrome.png", "firefox.png", "safari.png"],
-    ["Chrome", "Firefox", "Safari"]
+# Compare screenshots from different browsers
+result = lens.compare(
+    sources=["chrome.png", "firefox.png", "safari.png"],
+    query="Are these layouts consistent across browsers?"
 )
 ```
 
