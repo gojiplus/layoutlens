@@ -84,12 +84,13 @@ def setup_logging(
         root_logger.removeHandler(handler)
 
     # Choose formatter
-    if format_type == "debug":
-        formatter = logging.Formatter(DEBUG_FORMAT)
-    elif format_type == "console":
-        formatter = logging.Formatter(CONSOLE_FORMAT)
-    else:
-        formatter = logging.Formatter(DEFAULT_FORMAT)
+    match format_type:
+        case "debug":
+            formatter = logging.Formatter(DEBUG_FORMAT)
+        case "console":
+            formatter = logging.Formatter(CONSOLE_FORMAT)
+        case _:
+            formatter = logging.Formatter(DEFAULT_FORMAT)
 
     # Console handler
     if console:

@@ -833,16 +833,18 @@ Focus on:
                 super().__init__(*args, directory=str(html_file_path.parent), **kwargs)
 
             def do_GET(self):
-                # If requesting root, serve our HTML file
-                if self.path == "/" or self.path == "":
-                    self.send_response(200)
-                    self.send_header("Content-type", "text/html")
-                    self.end_headers()
-                    with open(html_file_path, "rb") as f:
-                        self.wfile.write(f.read())
-                else:
-                    # Serve other files normally (CSS, JS, images)
-                    super().do_GET()
+                # Route based on path
+                match self.path:
+                    case "/" | "":
+                        # Serve our HTML file
+                        self.send_response(200)
+                        self.send_header("Content-type", "text/html")
+                        self.end_headers()
+                        with open(html_file_path, "rb") as f:
+                            self.wfile.write(f.read())
+                    case _:
+                        # Serve other files normally (CSS, JS, images)
+                        super().do_GET()
 
             def log_message(self, format, *args):
                 # Suppress server logs
@@ -1301,12 +1303,13 @@ Focus on:
 
         # Validate existing files
         for file_path in existing_files:
-            if Path(file_path).exists():
-                results[str(file_path)] = str(file_path)
+            file_path_obj = Path(file_path)
+            if file_path_obj.exists():
+                results[file_path] = file_path
                 self.logger.debug(f"Using existing file: {file_path}")
             else:
                 failed_count += 1
-                results[str(file_path)] = f"Error: File not found"
+                results[file_path] = f"Error: File not found"
                 self.logger.warning(f"File not found: {file_path}")
 
         # Capture URLs using BatchCapture for efficiency
@@ -1388,11 +1391,12 @@ Focus on:
 
         # Validate existing files
         for file_path in existing_files:
-            if Path(file_path).exists():
-                results[str(file_path)] = str(file_path)
+            file_path_obj = Path(file_path)
+            if file_path_obj.exists():
+                results[file_path] = file_path
                 self.logger.debug(f"Using existing file: {file_path}")
             else:
-                results[str(file_path)] = f"Error: File not found"
+                results[file_path] = f"Error: File not found"
                 self.logger.warning(f"File not found: {file_path}")
 
         # Capture sources concurrently

@@ -197,7 +197,8 @@ class VisionAnalyzer:
 
     def _encode_image(self, image_path: str) -> str:
         """Encode image to base64 string."""
-        with open(image_path, "rb") as image_file:
+        image_file_path = Path(image_path)
+        with image_file_path.open("rb") as image_file:
             return base64.b64encode(image_file.read()).decode("utf-8")
 
     def _get_prompt_template(self, instructions: Instructions | None = None) -> PromptTemplate:
