@@ -25,52 +25,6 @@ LOG_LEVELS = {
     "DEBUG": logging.DEBUG,
 }
 
-# Sensitive data patterns to redact from logs
-SENSITIVE_PATTERNS = [
-    re.compile(r'(api[_-]?key["\']?\s*[:=]\s*["\']?)([a-zA-Z0-9_-]{10,})', re.IGNORECASE),
-    re.compile(r'(authorization["\']?\s*[:=]\s*["\']?)([a-zA-Z0-9_.-]{10,})', re.IGNORECASE),
-    re.compile(r"(bearer\s+)([a-zA-Z0-9_.-]{10,})", re.IGNORECASE),
-    re.compile(r"(sk-[a-zA-Z0-9]{20,})", re.IGNORECASE),  # OpenAI API keys
-]
-
-
-class SensitiveDataFilter(logging.Filter):
-    """Filter to redact sensitive information from log messages."""
-
-    def filter(self, record: logging.LogRecord) -> bool:
-        """Filter and sanitize log record."""
-        if hasattr(record, "msg") and isinstance(record.msg, str):
-            record.msg = self.redact_sensitive_data(record.msg)
-
-        # Also sanitize args if present
-        if hasattr(record, "args") and record.args:
-            if isinstance(record.args, dict):
-                # For dict args, sanitize values
-                sanitized_args = {}
-                for k, v in record.args.items():
-                    if isinstance(v, str):
-                        sanitized_args[k] = self.redact_sensitive_data(v)
-                    else:
-                        sanitized_args[k] = v
-                record.args = sanitized_args
-            elif isinstance(record.args, tuple):
-                # For tuple args, sanitize each element
-                sanitized_args = []
-                for arg in record.args:
-                    if isinstance(arg, str):
-                        sanitized_args.append(self.redact_sensitive_data(arg))
-                    else:
-                        sanitized_args.append(arg)
-                record.args = tuple(sanitized_args)
-
-        return True
-
-    def redact_sensitive_data(self, text: str) -> str:
-        """Redact sensitive data from text using regex patterns."""
-        for pattern in SENSITIVE_PATTERNS:
-            text = pattern.sub(r"\1***REDACTED***", text)
-        return text
-
 
 def get_logger(name: str) -> logging.Logger:
     """Get a configured logger instance for the given name.
@@ -86,10 +40,6 @@ def get_logger(name: str) -> logging.Logger:
         Configured logger instance
     """
     logger = logging.getLogger(f"layoutlens.{name}")
-
-    # Add sensitive data filter if not already present
-    if not any(isinstance(f, SensitiveDataFilter) for f in logger.filters):
-        logger.addFilter(SensitiveDataFilter())
 
     return logger
 
@@ -146,7 +96,6 @@ def setup_logging(
         console_handler = logging.StreamHandler()
         console_handler.setLevel(LOG_LEVELS.get(level.upper(), logging.INFO))
         console_handler.setFormatter(formatter)
-        console_handler.addFilter(SensitiveDataFilter())
         root_logger.addHandler(console_handler)
 
     # File handler with rotation
@@ -160,7 +109,6 @@ def setup_logging(
         )
         file_handler.setLevel(LOG_LEVELS.get(file_level.upper(), logging.DEBUG))
         file_handler.setFormatter(formatter)
-        file_handler.addFilter(SensitiveDataFilter())
         root_logger.addHandler(file_handler)
 
 

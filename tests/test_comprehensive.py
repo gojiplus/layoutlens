@@ -56,7 +56,7 @@ class TestImportsAndDependencies(unittest.TestCase):
     def test_vision_components(self):
         """Test vision components can be imported."""
         try:
-            from layoutlens.vision import Capture, VisionAnalyzer
+            from layoutlens import Capture, VisionAnalyzer
 
             self.assertTrue(True, "Vision components imported successfully")
         except ImportError as e:
@@ -107,7 +107,7 @@ class TestAPIFunctionality(unittest.TestCase):
 
     @pytest.mark.asyncio
     @patch("layoutlens.api.core.acompletion")
-    @patch("layoutlens.vision.capture.Capture.screenshots")
+    @patch("layoutlens.capture.Capture.screenshots")
     async def test_analyze_url_flow(self, mock_capture, mock_acompletion):
         """Test the full analyze URL workflow."""
         from layoutlens.api.core import LayoutLens
@@ -159,7 +159,7 @@ class TestAPIFunctionality(unittest.TestCase):
         with self.assertRaises(LayoutFileNotFoundError):
             await lens.analyze("/nonexistent/file.png", "Test query")
 
-    @patch("layoutlens.vision.analyzer.openai.OpenAI")
+    @patch("layoutlens.analyzer.openai.OpenAI")
     @pytest.mark.asyncio
     async def test_compare_method(self, mock_openai):
         """Test the compare method functionality."""
@@ -216,18 +216,18 @@ class TestVisionComponents(unittest.TestCase):
     def setUp(self):
         self.mock_api_key = "sk-test-key-12345"
 
-    @patch("layoutlens.vision.analyzer.openai.OpenAI")
+    @patch("layoutlens.analyzer.openai.OpenAI")
     def test_vision_analyzer_initialization(self, mock_openai):
         """Test VisionAnalyzer initialization."""
-        from layoutlens.vision.analyzer import VisionAnalyzer
+        from layoutlens.analyzer import VisionAnalyzer
 
         analyzer = VisionAnalyzer(api_key=self.mock_api_key)
         self.assertEqual(analyzer.model, "gpt-4o-mini")
 
     def test_url_capture_viewports(self):
         """Test Capture viewport configurations."""
+        from layoutlens.capture import Capture
         from layoutlens.config import ViewportConfig
-        from layoutlens.vision.capture import Capture
 
         capture = Capture()
 
@@ -260,7 +260,8 @@ class TestVisionComponents(unittest.TestCase):
         # LayoutComparator functionality is now integrated into LayoutLens.compare()
         # This test verifies the old separate class is no longer available
         with self.assertRaises(ImportError):
-            from layoutlens.vision.comparator import LayoutComparator
+            # LayoutComparator was removed in favor of direct API methods
+            from layoutlens.comparator import LayoutComparator
 
 
 class TestGitHubIntegration(unittest.TestCase):
@@ -282,9 +283,8 @@ class TestFileStructure(unittest.TestCase):
         required_files = [
             "layoutlens/api/__init__.py",
             "layoutlens/api/core.py",
-            "layoutlens/vision/__init__.py",
-            "layoutlens/vision/analyzer.py",
-            "layoutlens/vision/capture.py",
+            "layoutlens/analyzer.py",
+            "layoutlens/capture.py",
         ]
 
         for file_path in required_files:
@@ -310,8 +310,8 @@ class TestFileStructure(unittest.TestCase):
         """Test that all Python files have valid syntax."""
         python_files = [
             "layoutlens/api/core.py",
-            "layoutlens/vision/analyzer.py",
-            "layoutlens/vision/capture.py",
+            "layoutlens/analyzer.py",
+            "layoutlens/capture.py",
         ]
 
         for file_path in python_files:
@@ -364,8 +364,8 @@ class TestErrorHandling(unittest.TestCase):
         # This test verifies the dependencies are properly declared.
 
         try:
-            from layoutlens.vision.analyzer import VisionAnalyzer
-            from layoutlens.vision.capture import Capture
+            from layoutlens.analyzer import VisionAnalyzer
+            from layoutlens.capture import Capture
 
             # If we can import these, dependencies are available
             self.assertTrue(True, "Core dependencies are available")

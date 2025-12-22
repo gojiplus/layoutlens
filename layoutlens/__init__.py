@@ -5,9 +5,11 @@ natural language visual testing.
 """
 
 # Import the main API
+from .analyzer import VisionAnalyzer
 from .api.core import AnalysisResult, BatchResult, ComparisonResult, LayoutLens
 from .api.test_suite import UITestCase, UITestResult, UITestSuite
 from .cache import AnalysisCache, create_cache
+from .capture import Capture
 from .config import Config
 from .exceptions import (
     AnalysisError,
@@ -40,6 +42,8 @@ __all__ = [
     "UITestCase",
     "UITestSuite",
     "UITestResult",
+    "VisionAnalyzer",
+    "Capture",
     "Config",
     # Exceptions
     "LayoutLensError",

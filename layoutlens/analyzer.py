@@ -15,9 +15,9 @@ from typing import Any, Optional
 import openai
 from pydantic import BaseModel, Field, ValidationError
 
-from ..logger import get_logger
-from ..prompts import Instructions, PromptTemplate
-from ..prompts.experts import AccessibilityExpert
+from .logger import get_logger
+from .prompts import Instructions, PromptTemplate
+from .prompts.experts import AccessibilityExpert
 
 
 class VisionAnalysisResponse(BaseModel):

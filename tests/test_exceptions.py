@@ -143,7 +143,7 @@ class TestLayoutLensExceptions:
             assert "Error" in result.answer
             assert "nonexistent.png" in result.answer
 
-    @patch("layoutlens.vision.capture.Capture.screenshots")
+    @patch("layoutlens.capture.Capture.screenshots")
     @pytest.mark.asyncio
     async def test_screenshot_error(self, mock_capture):
         """Test graceful handling when screenshot capture fails."""
@@ -160,7 +160,7 @@ class TestLayoutLensExceptions:
             assert "Error" in result.answer
             assert "Browser failed" in result.answer
 
-    @patch("layoutlens.vision.capture.Capture.screenshots")
+    @patch("layoutlens.capture.Capture.screenshots")
     @patch("layoutlens.api.core.acompletion")
     @pytest.mark.asyncio
     async def test_analysis_error(self, mock_acompletion, mock_capture):
@@ -218,7 +218,7 @@ class TestExceptionMessages:
 class TestGracefulDegradation:
     """Test graceful degradation when errors occur."""
 
-    @patch("layoutlens.vision.capture.Capture.screenshots")
+    @patch("layoutlens.capture.Capture.screenshots")
     @patch("layoutlens.api.core.acompletion")
     @pytest.mark.asyncio
     async def test_analysis_failure_handling(self, mock_acompletion, mock_capture):

@@ -13,8 +13,8 @@ from urllib.parse import urlparse
 
 from playwright.async_api import async_playwright
 
-from ..config import ViewportConfig
-from ..logger import get_logger, log_performance_metric
+from .config import ViewportConfig
+from .logger import get_logger, log_performance_metric
 
 
 class Capture:

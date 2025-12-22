@@ -12,7 +12,7 @@ from layoutlens import LayoutLens
 class TestSimpleWorkflow:
     """Test simple LayoutLens workflows with current architecture."""
 
-    @patch("layoutlens.vision.capture.Capture.screenshots")
+    @patch("layoutlens.capture.Capture.screenshots")
     @patch("layoutlens.api.core.acompletion")
     @pytest.mark.asyncio
     async def test_single_page_analysis(self, mock_acompletion, mock_capture):
@@ -56,7 +56,7 @@ class TestSimpleWorkflow:
             # Cleanup
             Path(temp_file).unlink()
 
-    @patch("layoutlens.vision.capture.Capture.screenshots")
+    @patch("layoutlens.capture.Capture.screenshots")
     @patch("layoutlens.api.core.acompletion")
     @pytest.mark.asyncio
     async def test_page_comparison(self, mock_acompletion, mock_capture):

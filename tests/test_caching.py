@@ -342,7 +342,7 @@ class TestCacheFactory:
 class TestLayoutLensCacheIntegration:
     """Test caching integration with LayoutLens."""
 
-    @patch("layoutlens.vision.capture.Capture.screenshots")
+    @patch("layoutlens.capture.Capture.screenshots")
     @patch("layoutlens.api.core.acompletion")
     @pytest.mark.asyncio
     async def test_cache_hit(self, mock_acompletion, mock_capture):
@@ -383,7 +383,7 @@ class TestLayoutLensCacheIntegration:
             assert stats["misses"] == 1
             assert stats["hit_rate"] == 0.5
 
-    @patch("layoutlens.vision.capture.Capture.screenshots")
+    @patch("layoutlens.capture.Capture.screenshots")
     @patch("layoutlens.api.core.acompletion")
     @pytest.mark.asyncio
     async def test_cache_disabled(self, mock_acompletion, mock_capture):

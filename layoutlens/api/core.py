@@ -28,6 +28,9 @@ except ImportError as e:
 # Import caching
 from ..cache import create_cache
 
+# Import vision components
+from ..capture import Capture
+
 # Import custom exceptions
 from ..exceptions import (
     AnalysisError,
@@ -44,9 +47,6 @@ from ..logger import get_logger, log_function_call, log_performance_metric
 
 # Import enhanced prompt system
 from ..prompts import Instructions, get_expert
-
-# Import vision components
-from ..vision.capture import Capture
 
 
 @dataclass(slots=True)
