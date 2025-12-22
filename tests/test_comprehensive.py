@@ -358,28 +358,19 @@ class TestErrorHandling(unittest.TestCase):
     """Test error handling and edge cases."""
 
     def test_missing_dependencies_handling(self):
-        """Test graceful handling of missing dependencies."""
-        # Test that modules handle missing optional dependencies
+        """Test that hard dependencies are required."""
+        # Since OpenAI and Playwright are now hard dependencies in pyproject.toml,
+        # missing dependencies will cause import failures at module level.
+        # This test verifies the dependencies are properly declared.
 
-        # Mock missing OpenAI
-        with (
-            patch.dict("sys.modules", {"openai": None}),
-            patch("layoutlens.vision.analyzer.OPENAI_AVAILABLE", False),
-        ):
+        try:
             from layoutlens.vision.analyzer import VisionAnalyzer
-
-            with self.assertRaises(ImportError):
-                VisionAnalyzer(api_key="test")
-
-        # Mock missing Playwright
-        with (
-            patch.dict("sys.modules", {"playwright.async_api": None}),
-            patch("layoutlens.vision.capture.PLAYWRIGHT_AVAILABLE", False),
-        ):
             from layoutlens.vision.capture import Capture
 
-            with self.assertRaises(ImportError):
-                Capture()
+            # If we can import these, dependencies are available
+            self.assertTrue(True, "Core dependencies are available")
+        except ImportError as e:
+            self.fail(f"Hard dependencies missing: {e}")
 
     @pytest.mark.asyncio
     async def test_invalid_inputs(self):

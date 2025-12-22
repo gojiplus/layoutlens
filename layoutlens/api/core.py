@@ -194,12 +194,7 @@ class LayoutLens:
         try:
             self.capture = Capture(output_dir=str(self.output_dir / "screenshots"))
 
-            # Initialize screenshot manager for 2-stage pipeline support
-            from ..utils import ScreenshotManager
-
-            self.screenshot_manager = ScreenshotManager(output_dir=self.output_dir)
-
-            self.logger.debug("Initialized capture, comparator, and screenshot manager components")
+            self.logger.debug("Initialized capture and vision components")
         except Exception as e:
             self.logger.error(f"Failed to initialize components: {e}")
             raise

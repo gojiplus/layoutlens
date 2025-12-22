@@ -11,15 +11,10 @@ from pathlib import Path
 from typing import Optional
 from urllib.parse import urlparse
 
+from playwright.async_api import async_playwright
+
 from ..config import ViewportConfig
 from ..logger import get_logger, log_performance_metric
-
-try:
-    from playwright.async_api import async_playwright
-
-    PLAYWRIGHT_AVAILABLE = True
-except ImportError:
-    PLAYWRIGHT_AVAILABLE = False
 
 
 class Capture:
@@ -40,10 +35,6 @@ class Capture:
 
     def __init__(self, output_dir: str = "screenshots", timeout: int = 30000):
         """Initialize capture system."""
-        if not PLAYWRIGHT_AVAILABLE:
-            raise ImportError(
-                "Playwright is required for URL capture. Install with: pip install playwright && playwright install"
-            )
 
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
