@@ -1,0 +1,35 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "LayoutLens: AI-Powered UI Testing Framework"
+version: 1.5.0
+date-released: 2025-12-21
+url: "https://github.com/gojiplus/layoutlens"
+repository-code: "https://github.com/gojiplus/layoutlens"
+repository-artifact: "https://pypi.org/project/layoutlens/"
+abstract: "A production-ready AI-powered UI testing framework that enables natural language visual testing. LayoutLens captures screenshots using Playwright and analyzes them with OpenAI's GPT-4 Vision API to validate layouts, accessibility, responsive design, and visual consistency."
+keywords:
+  - "ui testing"
+  - "visual regression"
+  - "ai"
+  - "computer vision"
+  - "web testing"
+  - "layout testing"
+  - "accessibility"
+  - "playwright"
+  - "openai"
+license: MIT
+authors:
+  - family-names: "Sood"
+    given-names: "Gaurav"
+    email: "contact@gsood.com"
+preferred-citation:
+  type: software
+  title: "LayoutLens: AI-Powered UI Testing Framework"
+  authors:
+    - family-names: "Sood"
+      given-names: "Gaurav"
+      email: "contact@gsood.com"
+  version: 1.5.0
+  url: "https://github.com/gojiplus/layoutlens"
+  year: 2025
