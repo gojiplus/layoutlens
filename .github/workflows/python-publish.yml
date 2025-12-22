@@ -22,7 +22,7 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Sync CITATION.cff
-      uses: gojiplus/citation-sync@v1
+      uses: recite/citation-sync@v0.3.0
       with:
         commit: true
 

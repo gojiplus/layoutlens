@@ -35,6 +35,7 @@ dependencies = [
     "pyyaml>=6.0",
     "Pillow>=10.0.0",
     "litellm>=1.80.10",
+    "rich>=13.0.0",
 ]
 
 [dependency-groups]
@@ -56,7 +57,6 @@ test = [
     "coverage[toml]>=7.0.0",
 ]
 interactive = [
-    "rich>=13.0.0",
 ]
 docs = [
     "sphinx>=7.0",
@@ -73,7 +73,7 @@ docs = [
 "Changelog" = "https://github.com/gojiplus/layoutlens/blob/main/CHANGELOG.md"
 
 [project.scripts]
-layoutlens = "layoutlens.cli:main"
+layoutlens = "layoutlens.cli:cli"
 
 [tool.uv.build-backend]
 module-root = ""

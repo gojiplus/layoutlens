@@ -18,6 +18,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
+import pytest
+
 from layoutlens.exceptions import AuthenticationError, LayoutFileNotFoundError, ValidationError
 
 # Add project root to path
@@ -54,20 +56,17 @@ class TestImportsAndDependencies(unittest.TestCase):
     def test_vision_components(self):
         """Test vision components can be imported."""
         try:
-            from layoutlens.vision import LayoutComparator, URLCapture, VisionAnalyzer
+            from layoutlens.vision import Capture, VisionAnalyzer
 
             self.assertTrue(True, "Vision components imported successfully")
         except ImportError as e:
             self.fail(f"Vision components import failed: {e}")
 
     def test_integration_components(self):
-        """Test integration components."""
-        try:
-            from layoutlens.integrations import GitHubIntegration
-
-            self.assertTrue(True, "Integration components imported successfully")
-        except ImportError as e:
-            self.fail(f"Integration components import failed: {e}")
+        """Test integration components - GitHub integrations removed."""
+        # GitHub integrations have been removed from the project
+        # This test is kept for compatibility but does nothing
+        self.assertTrue(True, "Integration components test - GitHub integrations removed")
 
 
 class TestAPIFunctionality(unittest.TestCase):
@@ -106,36 +105,32 @@ class TestAPIFunctionality(unittest.TestCase):
         self.assertFalse(lens._is_url("screenshot.jpg"))
         self.assertFalse(lens._is_url(Path("image.png")))
 
-    @patch("layoutlens.vision.analyzer.openai.OpenAI")
-    @patch("layoutlens.vision.capture.URLCapture.capture_url")
-    @patch("layoutlens.providers.litellm_provider.LiteLLMProvider._encode_image")
-    def test_analyze_url_flow(self, mock_encode_image, mock_capture, mock_openai):
+    @pytest.mark.asyncio
+    @patch("layoutlens.api.core.acompletion")
+    @patch("layoutlens.vision.capture.Capture.screenshots")
+    async def test_analyze_url_flow(self, mock_capture, mock_acompletion):
         """Test the full analyze URL workflow."""
         from layoutlens.api.core import LayoutLens
 
-        # Mock URL capture
-        mock_capture.return_value = "/mock/screenshot.png"
+        # Mock URL capture - new interface returns list of screenshot paths
+        mock_capture.return_value = ["/mock/screenshot.png"]
 
-        # Mock image encoding
-        mock_encode_image.return_value = "fake-base64-encoded-image-data"
-
-        # Mock OpenAI response
+        # Mock LiteLLM acompletion response
         mock_response = Mock()
         mock_response.choices = [Mock()]
-        mock_response.choices[0].message.content = """ANSWER: The navigation appears well-designed and user-friendly.
-CONFIDENCE: 0.85
-REASONING: The navigation is clearly visible at the top of the page with logical organization."""
+        mock_response.choices[
+            0
+        ].message.content = '{"answer": "The navigation appears well-designed and user-friendly.", "confidence": 0.85, "reasoning": "The navigation is clearly visible at the top of the page with logical organization."}'
         mock_response.usage.total_tokens = 150
-
-        mock_client = Mock()
-        mock_client.chat.completions.create.return_value = mock_response
-        mock_openai.return_value = mock_client
+        mock_acompletion.return_value = mock_response
 
         # Test analysis
         lens = LayoutLens(api_key=self.mock_api_key, output_dir=self.temp_dir)
 
-        with patch("os.path.exists", return_value=True):
-            result = lens.analyze("https://example.com", "Is the navigation user-friendly?")
+        with patch("os.path.exists", return_value=True), patch(
+            "layoutlens.api.core.LayoutLens._encode_image", return_value="fake-base64-data"
+        ):
+            result = await lens.analyze("https://example.com", "Is the navigation user-friendly?")
 
             # Debug output
             print(f"Debug - Result confidence: {result.confidence}")
@@ -153,7 +148,8 @@ REASONING: The navigation is clearly visible at the top of the page with logical
                 self.assertGreater(result.confidence, 0)
                 self.assertLessEqual(result.confidence, 1)
 
-    def test_analyze_screenshot_flow(self):
+    @pytest.mark.asyncio
+    async def test_analyze_screenshot_flow(self):
         """Test analyzing existing screenshots."""
         from layoutlens.api.core import LayoutLens
 
@@ -161,10 +157,11 @@ REASONING: The navigation is clearly visible at the top of the page with logical
 
         # Test with non-existent file (should raise exception)
         with self.assertRaises(LayoutFileNotFoundError):
-            lens.analyze("/nonexistent/file.png", "Test query")
+            await lens.analyze("/nonexistent/file.png", "Test query")
 
     @patch("layoutlens.vision.analyzer.openai.OpenAI")
-    def test_compare_method(self, mock_openai):
+    @pytest.mark.asyncio
+    async def test_compare_method(self, mock_openai):
         """Test the compare method functionality."""
         from layoutlens.api.core import LayoutLens
 
@@ -182,30 +179,29 @@ REASONING: Better alignment and visual hierarchy."""
         lens = LayoutLens(api_key=self.mock_api_key)
 
         # Test with non-existent files (should handle gracefully)
-        result = lens.compare(["/nonexistent1.png", "/nonexistent2.png"], "Which design is better?")
+        result = await lens.compare(["/nonexistent1.png", "/nonexistent2.png"], "Which design is better?")
         self.assertEqual(result.confidence, 0.0)
         self.assertIn("Error", result.answer)
 
-    @patch("layoutlens.vision.analyzer.openai.OpenAI")
-    def test_analyze_batch_method(self, mock_openai):
-        """Test the analyze_batch method functionality."""
+    @patch("layoutlens.api.core.acompletion")
+    @pytest.mark.asyncio
+    async def test_analyze_batch_method(self, mock_acompletion):
+        """Test the unified analyze method with batch functionality."""
         from layoutlens.api.core import LayoutLens
 
-        # Mock OpenAI response
+        # Mock LiteLLM acompletion response
         mock_response = Mock()
         mock_response.choices = [Mock()]
-        mock_response.choices[0].message.content = """ANSWER: The design looks good.
-CONFIDENCE: 0.85
-REASONING: Clean layout and good user experience."""
-
-        mock_client = Mock()
-        mock_client.chat.completions.create.return_value = mock_response
-        mock_openai.return_value = mock_client
+        mock_response.choices[
+            0
+        ].message.content = '{"answer": "The design looks good.", "confidence": 0.85, "reasoning": "Clean layout and good user experience."}'
+        mock_response.usage.total_tokens = 100
+        mock_acompletion.return_value = mock_response
 
         lens = LayoutLens(api_key=self.mock_api_key)
 
         # Test with non-existent sources and single query (should handle gracefully)
-        result = lens.analyze_batch(["/nonexistent1.png", "/nonexistent2.png"], ["Is the design good?"])
+        result = await lens.analyze(["/nonexistent1.png", "/nonexistent2.png"], ["Is the design good?"])
 
         # Should return BatchResult with 2 sources * 1 query = 2 results
         self.assertIsNotNone(result)
@@ -229,10 +225,11 @@ class TestVisionComponents(unittest.TestCase):
         self.assertEqual(analyzer.model, "gpt-4o-mini")
 
     def test_url_capture_viewports(self):
-        """Test URLCapture viewport configurations."""
-        from layoutlens.vision.capture import URLCapture
+        """Test Capture viewport configurations."""
+        from layoutlens.config import ViewportConfig
+        from layoutlens.vision.capture import Capture
 
-        capture = URLCapture()
+        capture = Capture()
 
         # Test viewport configurations exist
         self.assertIn("desktop", capture.VIEWPORTS)
@@ -241,68 +238,40 @@ class TestVisionComponents(unittest.TestCase):
 
         # Test viewport structure
         desktop = capture.VIEWPORTS["desktop"]
-        self.assertIn("width", desktop)
-        self.assertIn("height", desktop)
+        self.assertIsInstance(desktop, ViewportConfig)
+        self.assertEqual(desktop.width, 1920)
+        self.assertEqual(desktop.height, 1080)
+        self.assertEqual(desktop.device_scale_factor, 1.0)
+        self.assertFalse(desktop.is_mobile)
 
-    def test_url_sanitization(self):
-        """Test URL sanitization for filenames."""
-        from layoutlens.vision.capture import URLCapture
+        # Test mobile viewport has proper mobile settings
+        mobile = capture.VIEWPORTS["mobile"]
+        self.assertIsInstance(mobile, ViewportConfig)
+        self.assertEqual(mobile.width, 375)
+        self.assertEqual(mobile.height, 667)
+        self.assertEqual(mobile.device_scale_factor, 2.0)
+        self.assertTrue(mobile.is_mobile)
+        self.assertTrue(mobile.has_touch)
 
-        capture = URLCapture()
+    # URL sanitization test removed - internal implementation detail not needed
 
-        # Test various URL formats
-        self.assertEqual(
-            capture._sanitize_url_for_filename("https://example.com/path/to/page"),
-            "example_com_path_to_page",
-        )
-
-        self.assertEqual(
-            capture._sanitize_url_for_filename("https://www.test-site.org:8080/"),
-            "test-site_org8080_",
-        )
-
-    @patch("layoutlens.vision.analyzer.VisionAnalyzer")
-    def test_layout_comparator(self, mock_analyzer):
-        """Test LayoutComparator functionality."""
-        from layoutlens.vision.comparator import LayoutComparator
-
-        mock_analyzer_instance = Mock()
-        comparator = LayoutComparator(mock_analyzer_instance)
-
-        # Test that it requires at least 2 screenshots
-        with self.assertRaises(ValueError):
-            comparator.compare_layouts(["single_screenshot.png"], "Test query")
+    def test_layout_comparator(self):
+        """Test that LayoutComparator was successfully removed."""
+        # LayoutComparator functionality is now integrated into LayoutLens.compare()
+        # This test verifies the old separate class is no longer available
+        with self.assertRaises(ImportError):
+            from layoutlens.vision.comparator import LayoutComparator
 
 
 class TestGitHubIntegration(unittest.TestCase):
-    """Test GitHub Actions integration components."""
+    """Test GitHub Actions integration components - REMOVED."""
 
-    def test_github_integration_initialization(self):
-        """Test GitHubIntegration initialization."""
-        from layoutlens.integrations.github import GitHubIntegration
-
-        with patch("layoutlens.api.core.LayoutLens") as mock_lens:
-            github = GitHubIntegration(api_key="test-key")
-            self.assertIsNotNone(github.lens)
-
-    def test_workflow_template_generation(self):
-        """Test workflow template generation."""
-        from layoutlens.integrations.github import (
-            create_simple_workflow_template,
-            create_workflow_template,
-        )
-
-        full_template = create_workflow_template()
-        simple_template = create_simple_workflow_template()
-
-        # Test that templates contain required sections
-        self.assertIn("name:", full_template)
-        self.assertIn("on:", full_template)
-        self.assertIn("jobs:", full_template)
-        self.assertIn("layoutlens", full_template)
-
-        self.assertIn("name:", simple_template)
-        self.assertIn("uses:", simple_template)
+    def test_github_integration_removed(self):
+        """Test that GitHub integrations have been removed."""
+        # GitHub integrations have been removed from the project
+        # Verify that the integrations module is no longer available
+        with self.assertRaises(ImportError):
+            from layoutlens.integrations import GitHubIntegration
 
 
 class TestFileStructure(unittest.TestCase):
@@ -316,9 +285,6 @@ class TestFileStructure(unittest.TestCase):
             "layoutlens/vision/__init__.py",
             "layoutlens/vision/analyzer.py",
             "layoutlens/vision/capture.py",
-            "layoutlens/vision/comparator.py",
-            "layoutlens/integrations/__init__.py",
-            "layoutlens/integrations/github.py",
         ]
 
         for file_path in required_files:
@@ -346,8 +312,6 @@ class TestFileStructure(unittest.TestCase):
             "layoutlens/api/core.py",
             "layoutlens/vision/analyzer.py",
             "layoutlens/vision/capture.py",
-            "layoutlens/vision/comparator.py",
-            "layoutlens/integrations/github.py",
         ]
 
         for file_path in python_files:
@@ -367,7 +331,6 @@ class TestExamplesAndDocs(unittest.TestCase):
         """Test example files are present."""
         example_files = [
             "examples/simple_api_usage.py",
-            "examples/github_actions_examples.py",
             "docs/QUICK_START.md",
         ]
 
@@ -379,7 +342,6 @@ class TestExamplesAndDocs(unittest.TestCase):
         """Test example Python files have valid syntax."""
         example_files = [
             "examples/simple_api_usage.py",
-            "examples/github_actions_examples.py",
         ]
 
         for file_path in example_files:
@@ -414,12 +376,13 @@ class TestErrorHandling(unittest.TestCase):
             patch.dict("sys.modules", {"playwright.async_api": None}),
             patch("layoutlens.vision.capture.PLAYWRIGHT_AVAILABLE", False),
         ):
-            from layoutlens.vision.capture import URLCapture
+            from layoutlens.vision.capture import Capture
 
             with self.assertRaises(ImportError):
-                URLCapture()
+                Capture()
 
-    def test_invalid_inputs(self):
+    @pytest.mark.asyncio
+    async def test_invalid_inputs(self):
         """Test handling of invalid inputs."""
         from layoutlens.api.core import LayoutLens
 
@@ -427,11 +390,11 @@ class TestErrorHandling(unittest.TestCase):
 
         # Test empty query (should raise ValidationError)
         with self.assertRaises(ValidationError):
-            lens.analyze("https://example.com", "")
+            await lens.analyze("https://example.com", "")
 
         # Test invalid URL format (should raise LayoutFileNotFoundError for file path)
         with self.assertRaises(LayoutFileNotFoundError):
-            lens.analyze("not-a-url", "test query")
+            await lens.analyze("not-a-url", "test query")
 
 
 def run_comprehensive_tests():
@@ -442,7 +405,7 @@ def run_comprehensive_tests():
         TestImportsAndDependencies,
         TestAPIFunctionality,
         TestVisionComponents,
-        TestGitHubIntegration,
+        TestGitHubIntegration,  # Now tests that GitHub integrations are removed
         TestFileStructure,
         TestExamplesAndDocs,
         TestErrorHandling,

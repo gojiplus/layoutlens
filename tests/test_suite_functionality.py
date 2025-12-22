@@ -125,10 +125,11 @@ def test_test_result():
 
 
 @patch("layoutlens.api.core.LayoutLens.analyze")
-def test_run_test_suite(mock_analyze):
+@pytest.mark.asyncio
+async def test_run_test_suite(mock_analyze):
     """Test running a test suite with LayoutLens."""
-    # Setup mock
-    mock_analyze.return_value = AnalysisResult(
+    # Setup async mock for analyze method
+    mock_result = AnalysisResult(
         source="test.html",
         query="Is it good?",
         answer="Test passed",
@@ -136,6 +137,9 @@ def test_run_test_suite(mock_analyze):
         reasoning="Good layout",
         metadata={},
     )
+
+    # Mock analyze as async method
+    mock_analyze.return_value = mock_result
 
     # Create test suite
     test_case = UITestCase(
@@ -147,9 +151,9 @@ def test_run_test_suite(mock_analyze):
 
     suite = UITestSuite(name="Test Suite", description="Test description", test_cases=[test_case])
 
-    # Run the suite
+    # Run the suite - now async
     lens = LayoutLens(api_key="test_key")
-    results = lens.run_test_suite(suite)
+    results = await lens.run_test_suite(suite)
 
     assert len(results) == 1
     result = results[0]
@@ -164,7 +168,8 @@ def test_run_test_suite(mock_analyze):
 
 
 @patch("layoutlens.api.core.LayoutLens.analyze")
-def test_run_test_suite_with_failure(mock_analyze):
+@pytest.mark.asyncio
+async def test_run_test_suite_with_failure(mock_analyze):
     """Test running a test suite with failures."""
     # Setup mock to fail
     mock_analyze.side_effect = Exception("API error")
@@ -179,9 +184,9 @@ def test_run_test_suite_with_failure(mock_analyze):
 
     suite = UITestSuite(name="Failing Suite", description="Test with failures", test_cases=[test_case])
 
-    # Run the suite
+    # Run the suite - now async
     lens = LayoutLens(api_key="test_key")
-    results = lens.run_test_suite(suite)
+    results = await lens.run_test_suite(suite)
 
     assert len(results) == 1
     result = results[0]

@@ -1,264 +1,141 @@
-"""Command-line interface for LayoutLens framework.
-
-This module provides the main CLI entry point for the LayoutLens UI testing system.
-All command implementations are async-by-default for optimal performance.
-"""
+#!/usr/bin/env python3
+"""LayoutLens CLI - Simple and powerful."""
 
 import argparse
 import asyncio
+import json
+import os
 import sys
 from pathlib import Path
 
-from .logger import get_logger, setup_logging
+from .api.core import LayoutLens
+from .exceptions import LayoutLensError
 
 
-def create_parser() -> argparse.ArgumentParser:
-    """Create the command-line argument parser with all subcommands and options.
-
-    Returns:
-        Configured ArgumentParser with all LayoutLens CLI commands and options.
-    """
+async def main():
+    """Main CLI entry point."""
     parser = argparse.ArgumentParser(
-        description="LayoutLens - AI-Enabled UI Test System",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+        prog="layoutlens",
+        description="AI-powered UI testing and analysis",
         epilog="""
 Examples:
-  # Test a single page
-  layoutlens test --page homepage.html --queries "Is the logo centered?"
-
-  # Run a test suite
-  layoutlens test --suite regression_tests.yaml
-
-  # Compare two pages
-  layoutlens compare before.html after.html
-
-  # Generate configuration
-  layoutlens generate config
-
-  # Batch process multiple sources
-  layoutlens batch --sources "page1.html,page2.html" --queries "Good design?"
-
-  # Start interactive session
-  layoutlens interactive
+  layoutlens https://example.com "Is it accessible?"
+  layoutlens page1.html page2.html --compare
+  layoutlens screenshot.png "What issues do you see?"
+  layoutlens *.html "Is the design consistent?" --viewport mobile
         """,
     )
 
-    # Global options
-    parser.add_argument("--config", "-c", help="Configuration file path")
-    parser.add_argument("--api-key", help="API key (or set OPENAI_API_KEY env var)")
-    parser.add_argument("--output", "-o", help="Output directory", default="layoutlens_output")
-    parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
+    # Main arguments
+    parser.add_argument("sources", nargs="*", help="URLs, HTML files, or screenshots to analyze")
+    parser.add_argument("--query", "-q", help="Question to ask about the UI")
+    parser.add_argument("--compare", "-c", action="store_true", help="Compare sources instead of analyzing separately")
+
+    # Options
     parser.add_argument(
-        "--provider",
-        choices=["openai", "anthropic", "google", "gemini", "litellm"],
-        default="openai",
-        help="AI provider to use (default: openai)",
-    )
-    parser.add_argument(
-        "--model",
-        default="gpt-4o-mini",
-        help="Model to use for analysis (default: gpt-4o-mini)",
+        "--viewport",
+        "-v",
+        default="desktop",
+        choices=["desktop", "mobile", "tablet"],
+        help="Viewport size (default: desktop)",
     )
     parser.add_argument(
-        "--max-concurrent",
-        type=int,
-        default=3,
-        help="Maximum concurrent operations (default: 3)",
+        "--output", "-o", default="text", choices=["text", "json"], help="Output format (default: text)"
     )
+    parser.add_argument("--api-key", help="API key (or set OPENAI_API_KEY env)")
+    parser.add_argument("--model", "-m", default="gpt-4o-mini", help="AI model to use")
 
-    # Subcommands
-    subparsers = parser.add_subparsers(dest="command", help="Available commands")
-
-    # Test command
-    test_parser = subparsers.add_parser("test", help="Run UI tests")
-    test_group = test_parser.add_mutually_exclusive_group(required=True)
-    test_group.add_argument("--page", help="Test single HTML page or URL")
-    test_group.add_argument("--suite", help="Test suite YAML file")
-    test_parser.add_argument("--queries", help="Comma-separated list of test queries")
-    test_parser.add_argument("--viewports", help="Comma-separated list of viewport names")
-
-    # Compare command
-    compare_parser = subparsers.add_parser("compare", help="Compare two pages")
-    compare_parser.add_argument("page_a", help="First HTML page")
-    compare_parser.add_argument("page_b", help="Second HTML page")
-    compare_parser.add_argument("--viewport", default="desktop", help="Viewport for comparison")
-    compare_parser.add_argument(
-        "--query",
-        default="Which page has a better layout design?",
-        help="Comparison query",
-    )
-
-    # Batch command
-    batch_parser = subparsers.add_parser("batch", help="Process multiple sources")
-    batch_parser.add_argument("--sources", help="Comma-separated list of sources")
-    batch_parser.add_argument("--sources-file", help="File containing list of sources")
-    batch_parser.add_argument("--queries", help="Comma-separated queries")
-    batch_parser.add_argument("--viewport", default="desktop", help="Viewport for analysis")
-
-    # Generate command
-    generate_parser = subparsers.add_parser("generate", help="Generate files")
-    generate_parser.add_argument(
-        "type",
-        choices=["config", "suite"],
-        help="Type of file to generate",
-    )
-
-    # Info command
-    _ = subparsers.add_parser("info", help="Show system information and check setup")
-
-    # Interactive command
-    _ = subparsers.add_parser("interactive", help="Start interactive analysis session")
-
-    # Validate command
-    validate_parser = subparsers.add_parser("validate", help="Validate configuration or test suite")
-    validate_group = validate_parser.add_mutually_exclusive_group(required=True)
-    validate_group.add_argument("--config", help="Validate configuration file")
-    validate_group.add_argument("--suite", help="Validate test suite file")
-
-    # Pipeline commands for 2-stage processing
-
-    # Capture command - Stage 1 of pipeline
-    capture_parser = subparsers.add_parser("capture", help="Capture screenshots (Stage 1 of 2-stage pipeline)")
-    capture_group = capture_parser.add_mutually_exclusive_group(required=True)
-    capture_group.add_argument("--url", help="Single URL to capture")
-    capture_group.add_argument("--urls", help="Comma-separated list of URLs to capture")
-    capture_group.add_argument("--urls-file", help="File containing list of URLs (one per line)")
-    capture_parser.add_argument("--viewport", default="desktop", help="Viewport for capture")
-    capture_parser.add_argument("--wait-for", help="CSS selector to wait for before capturing")
-    capture_parser.add_argument("--wait-time", type=int, help="Additional wait time in milliseconds")
-
-    # Analyze command - Stage 2 of pipeline
-    analyze_parser = subparsers.add_parser("analyze", help="Analyze screenshots (Stage 2 of 2-stage pipeline)")
-    analyze_group = analyze_parser.add_mutually_exclusive_group(required=True)
-    analyze_group.add_argument("--screenshot", help="Single screenshot to analyze")
-    analyze_group.add_argument("--screenshots", help="Comma-separated list of screenshots to analyze")
-    analyze_group.add_argument("--screenshots-dir", help="Directory containing screenshots to analyze")
-    analyze_parser.add_argument("--queries", required=True, help="Comma-separated list of analysis queries")
-    analyze_parser.add_argument("--viewport", default="desktop", help="Viewport that was used for capture")
-
-    # Pipeline command - Complete 2-stage processing
-    pipeline_parser = subparsers.add_parser("pipeline", help="Complete 2-stage pipeline (capture + analyze)")
-    pipeline_group = pipeline_parser.add_mutually_exclusive_group(required=True)
-    pipeline_group.add_argument("--url", help="Single URL to process")
-    pipeline_group.add_argument("--urls", help="Comma-separated list of URLs to process")
-    pipeline_group.add_argument("--urls-file", help="File containing list of URLs (one per line)")
-    pipeline_parser.add_argument("--queries", required=True, help="Comma-separated list of analysis queries")
-    pipeline_parser.add_argument("--viewport", default="desktop", help="Viewport for capture and analysis")
-    pipeline_parser.add_argument("--wait-for", help="CSS selector to wait for before capturing")
-    pipeline_parser.add_argument("--wait-time", type=int, help="Additional wait time in milliseconds")
-
-    # Screenshots management command
-    screenshots_parser = subparsers.add_parser("screenshots", help="Manage captured screenshots")
-    screenshots_parser.add_argument("action", choices=["list", "info", "cleanup", "stats"], help="Action to perform")
-    screenshots_parser.add_argument("--detailed", action="store_true", help="Show detailed information")
-    screenshots_parser.add_argument("--max-age", type=int, default=30, help="Max age in days for cleanup")
-    screenshots_parser.add_argument("--screenshot-path", help="Path to specific screenshot for info")
-
-    return parser
-
-
-async def main_async() -> None:
-    """Main async CLI entry point with command routing and error handling.
-
-    Parses command line arguments, configures logging, and routes to appropriate
-    command handlers. All commands use async-by-default for optimal performance.
-
-    Raises:
-        SystemExit: If command parsing fails or command execution fails.
-    """
-    parser = create_parser()
     args = parser.parse_args()
 
-    # Configure logging based on verbosity
-    if getattr(args, "verbose", False):
-        setup_logging(
-            level="DEBUG",
-            console=True,
-            file_path=str(Path(args.output) / "cli.log"),
-            format_type="debug",
-        )
-    else:
-        setup_logging(
-            level="WARNING",
-            console=False,
-            file_path=str(Path(args.output) / "cli.log"),
-            format_type="default",
-        )
-
-    logger = get_logger("cli.main")
-    logger.debug(f"CLI started with command: {args.command}")
-
-    # Set up API key from environment if not provided
-    if not args.api_key:
-        import os
-
-        args.api_key = os.getenv("OPENAI_API_KEY")
-
-    if not args.command:
+    # Handle no arguments
+    if not args.sources:
         parser.print_help()
-        sys.exit(1)
+        return 0
 
-    # Import command implementations
-    from . import cli_commands
+    # Extract query from sources if mixed
+    sources = []
+    query = args.query
 
-    # Route to appropriate command
+    for item in args.sources:
+        # If it's a URL or file, it's a source
+        if item.startswith(("http://", "https://")) or Path(item).exists():
+            sources.append(item)
+        # Otherwise treat as query (if no explicit query given)
+        elif not query:
+            query = item
+        else:
+            sources.append(item)
+
+    if not sources:
+        print("Error: No valid sources provided", file=sys.stderr)
+        return 1
+
+    # Default query
+    if not query:
+        query = "Analyze this UI for accessibility, usability, and design quality."
+
+    # Initialize LayoutLens
     try:
-        match args.command:
-            case "test":
-                await cli_commands.cmd_test(args)
-            case "compare":
-                await cli_commands.cmd_compare(args)
-            case "batch":
-                await cli_commands.cmd_batch(args)
-            case "generate":
-                cli_commands.cmd_generate(args)
-            case "info":
-                cli_commands.cmd_info(args)
-            case "interactive":
-                await cli_commands.cmd_interactive(args)
-            case "validate":
-                cli_commands.cmd_validate(args)
-            case "capture":
-                await cli_commands.cmd_capture(args)
-            case "analyze":
-                await cli_commands.cmd_analyze(args)
-            case "pipeline":
-                await cli_commands.cmd_pipeline(args)
-            case "screenshots":
-                cli_commands.cmd_screenshots(args)
-            case _:
-                logger.warning(f"Unknown command: {args.command}")
-                parser.print_help()
-                sys.exit(1)
-
-    except KeyboardInterrupt:
-        logger.debug("Operation cancelled by user")
-        print("\nOperation cancelled by user.", file=sys.stderr)
-        sys.exit(1)
+        lens = LayoutLens(api_key=args.api_key or os.getenv("OPENAI_API_KEY"), model=args.model)
     except Exception as e:
-        logger.error(f"Command execution failed: {e}", exc_info=True)
-        print(f"Error: {e}", file=sys.stderr)
-        sys.exit(1)
+        print(f"Error initializing LayoutLens: {e}", file=sys.stderr)
+        return 1
 
-
-def main() -> None:
-    """Main CLI entry point that wraps async execution.
-
-    Provides the main entry point for the layoutlens command, handling
-    async execution and top-level error catching.
-
-    Raises:
-        SystemExit: If execution fails or is interrupted.
-    """
+    # Execute analysis
     try:
-        asyncio.run(main_async())
-    except KeyboardInterrupt:
-        print("\nOperation cancelled by user.", file=sys.stderr)
-        sys.exit(1)
-    except Exception as e:
+        if args.compare and len(sources) >= 2:
+            # Compare mode
+            result = await lens.compare(
+                sources=sources[:2],  # Compare first two
+                query=query,
+                viewport=args.viewport,
+            )
+        else:
+            # Regular analysis (smart method handles single/multiple)
+            source = sources[0] if len(sources) == 1 else sources
+            result = await lens.analyze(source=source, query=query, viewport=args.viewport)
+
+        # Output results
+        if args.output == "json":
+            print(result.to_json())
+        else:
+            # Human-readable output
+            print()
+            if hasattr(result, "results"):  # BatchResult
+                for r in result.results:
+                    print(f"📍 {r.source}")
+                    print(f"❓ {r.query}")
+                    print(f"✅ {r.answer}")
+                    print(f"📊 Confidence: {r.confidence:.0%}\n")
+            else:  # Single result or ComparisonResult
+                if hasattr(result, "sources"):  # ComparisonResult
+                    print(f"📍 Comparing: {' vs '.join(result.sources)}")
+                else:
+                    print(f"📍 {result.source}")
+                print(f"❓ {query}")
+                print(f"✅ {result.answer}")
+                print(f"📊 Confidence: {result.confidence:.0%}")
+                if result.reasoning and len(result.reasoning) < 200:
+                    print(f"💭 {result.reasoning}")
+            print()
+
+        return 0
+
+    except LayoutLensError as e:
         print(f"Error: {e}", file=sys.stderr)
-        sys.exit(1)
+        return 1
+    except KeyboardInterrupt:
+        print("\nCancelled", file=sys.stderr)
+        return 130
+    except Exception as e:
+        print(f"Unexpected error: {e}", file=sys.stderr)
+        return 1
+
+
+def cli():
+    """Entry point for the CLI."""
+    sys.exit(asyncio.run(main()))
 
 
 if __name__ == "__main__":
-    main()
+    cli()

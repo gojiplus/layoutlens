@@ -132,15 +132,12 @@ layoutlens/
 │   └── test_suite.py    # Test suite execution
 ├── vision/
 │   ├── __init__.py
-│   ├── analyzer.py      # VisionAnalyzer class
 │   ├── capture.py       # URLCapture class
-│   └── comparator.py    # LayoutComparator class
+│   ├── comparator.py    # LayoutComparator class
+│   └── types.py         # VisionAnalysisRequest/Response dataclasses
 ├── providers/
 │   ├── __init__.py
-│   ├── openai.py        # OpenAI provider
-│   ├── openrouter.py    # OpenRouter provider
-│   ├── anthropic.py     # Anthropic provider
-│   └── google.py        # Google provider
+│   └── provider.py      # Simplified LayoutLensProvider (LiteLLM unified)
 ├── integrations/
 │   ├── __init__.py
 │   └── github.py        # GitHub Actions integration

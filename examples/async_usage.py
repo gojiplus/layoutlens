@@ -13,7 +13,7 @@ async def async_single_analysis():
     lens = LayoutLens()  # Uses OPENAI_API_KEY env var
 
     try:
-        result = await lens.analyze_async(
+        result = await lens.analyze(
             source="https://example.com",
             query="Is this page accessible and user-friendly?",
             viewport="desktop",
@@ -56,7 +56,7 @@ async def async_batch_analysis():
         start_time = time.time()
 
         # Use async batch processing
-        result = await lens.analyze_batch_async(
+        result = await lens.analyze(
             sources=sources,
             queries=queries,
             viewport="desktop",
@@ -96,18 +96,18 @@ async def compare_sync_vs_async():
     queries = ["Is this well-designed?", "Is it accessible?"]
 
     try:
-        # Time synchronous batch processing
-        print("Testing synchronous batch processing...")
+        # Simulate synchronous batch processing (sequential calls)
+        print("Testing sequential processing...")
         start_time = time.time()
-        # sync_result = lens.analyze_batch(sources, queries)
+        for source in sources:
+            for query in queries:
+                await lens.analyze(source=source, query=query)
         sync_time = time.time() - start_time
 
         # Time asynchronous batch processing
         print("Testing asynchronous batch processing...")
         start_time = time.time()
-        # async_result = await lens.analyze_batch_async(
-        #     sources, queries, max_concurrent=2
-        # )
+        await lens.analyze(sources=sources, queries=queries, max_concurrent=2)
         async_time = time.time() - start_time
 
         print("\nPerformance Comparison:")
@@ -158,7 +158,7 @@ async def async_test_suite_simulation():
             print(f"\nRunning: {test_case['name']}")
 
             start_time = time.time()
-            result = await lens.analyze_batch_async(
+            result = await lens.analyze(
                 sources=[test_case["source"]],
                 queries=test_case["queries"],
                 max_concurrent=3,

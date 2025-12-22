@@ -1,12 +1,9 @@
 """
-Enhanced vision analysis components for LayoutLens.
+Internal vision analysis components for LayoutLens.
 
-This module provides the core vision analysis capabilities including
-screenshot analysis, URL capture, and layout comparison.
+These are internal implementation details. Users should only import LayoutLens.
 """
 
+# Internal components - not part of public API
 from .analyzer import VisionAnalyzer
-from .capture import BatchCapture, URLCapture
-from .comparator import LayoutComparator
-
-__all__ = ["VisionAnalyzer", "URLCapture", "BatchCapture", "LayoutComparator"]
+from .capture import Capture

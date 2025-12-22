@@ -6,12 +6,13 @@ This file demonstrates the simplified LayoutLens API for
 common UI testing scenarios.
 """
 
+import asyncio
 import os
 
 from layoutlens import LayoutLens
 
 
-def basic_url_analysis():
+async def basic_url_analysis():
     """Basic URL analysis example."""
     print("🔍 Basic URL Analysis")
     print("-" * 40)
@@ -21,7 +22,7 @@ def basic_url_analysis():
         lens = LayoutLens(api_key=os.getenv("OPENAI_API_KEY"))
 
         # Analyze a URL
-        result = lens.analyze(
+        result = await lens.analyze(
             source="https://example.com",
             query="Is the page layout clean and professional?",
         )
@@ -34,7 +35,7 @@ def basic_url_analysis():
     print()
 
 
-def mobile_analysis():
+async def mobile_analysis():
     """Mobile-specific analysis example."""
     print("📱 Mobile Analysis")
     print("-" * 40)
@@ -43,7 +44,7 @@ def mobile_analysis():
         lens = LayoutLens(api_key=os.getenv("OPENAI_API_KEY"))
 
         # Check mobile usability
-        result = lens.check_mobile_friendly("https://example.com")
+        result = await lens.check_mobile_friendly("https://example.com")
 
         print(f"Mobile Analysis: {result.answer[:100]}...")
         print(f"Confidence: {result.confidence:.1%}")
@@ -53,7 +54,7 @@ def mobile_analysis():
     print()
 
 
-def accessibility_check():
+async def accessibility_check():
     """Accessibility analysis example."""
     print("♿ Accessibility Check")
     print("-" * 40)
@@ -62,7 +63,7 @@ def accessibility_check():
         lens = LayoutLens(api_key=os.getenv("OPENAI_API_KEY"))
 
         # Check accessibility
-        result = lens.check_accessibility("https://example.com")
+        result = await lens.check_accessibility("https://example.com")
 
         print(f"Accessibility Analysis: {result.answer[:100]}...")
         print(f"Confidence: {result.confidence:.1%}")
@@ -72,7 +73,7 @@ def accessibility_check():
     print()
 
 
-def before_after_comparison():
+async def before_after_comparison():
     """Before/after comparison example."""
     print("🔄 Before/After Comparison")
     print("-" * 40)
@@ -81,7 +82,7 @@ def before_after_comparison():
         lens = LayoutLens(api_key=os.getenv("OPENAI_API_KEY"))
 
         # Compare two designs
-        result = lens.compare(
+        result = await lens.compare(
             sources=["https://example.com", "https://httpbin.org"],
             query="Which page has a cleaner, more professional design?",
         )
@@ -94,7 +95,7 @@ def before_after_comparison():
     print()
 
 
-def batch_analysis():
+async def batch_analysis():
     """Batch analysis example."""
     print("📊 Batch Analysis")
     print("-" * 40)
@@ -107,10 +108,10 @@ def batch_analysis():
 
         queries = ["Is the navigation clear and user-friendly?"]
 
-        results = lens.analyze_batch(sources, queries)
+        results = await lens.analyze(sources=sources, queries=queries)
 
         print(f"Analyzed {len(sources)} sources with {len(queries)} queries")
-        for i, result in enumerate(results):
+        for i, result in enumerate(results.results):
             print(f"Source {i + 1}: {result.answer[:80]}... (confidence: {result.confidence:.1%})")
 
     except Exception as e:
@@ -118,7 +119,7 @@ def batch_analysis():
     print()
 
 
-def viewport_analysis():
+async def viewport_analysis():
     """Different viewport analysis."""
     print("📱💻 Viewport Analysis")
     print("-" * 40)
@@ -129,7 +130,7 @@ def viewport_analysis():
         viewports = ["desktop", "mobile_portrait"]
 
         for viewport in viewports:
-            result = lens.analyze(
+            result = await lens.analyze(
                 source="https://example.com",
                 query=f"How well does this page work on {viewport}?",
                 viewport=viewport,
@@ -153,7 +154,7 @@ def screenshot_analysis():
     print()
 
 
-def conversion_optimization():
+async def conversion_optimization():
     """Conversion-focused analysis."""
     print("💰 Conversion Optimization")
     print("-" * 40)
@@ -162,7 +163,7 @@ def conversion_optimization():
         lens = LayoutLens()
 
         # Check for conversion optimization
-        result = lens.check_conversion_optimization("https://stripe.com")
+        result = await lens.check_conversion_optimization("https://stripe.com")
 
         print(f"Conversion Analysis: {result.answer[:100]}...")
         print(f"Confidence: {result.confidence:.1%}")
@@ -172,7 +173,7 @@ def conversion_optimization():
     print()
 
 
-def context_aware_analysis():
+async def context_aware_analysis():
     """Analysis with context information."""
     print("🎯 Context-Aware Analysis")
     print("-" * 40)
@@ -183,7 +184,7 @@ def context_aware_analysis():
         # Provide context for more targeted analysis
         context = {"user_type": "elderly_users", "purpose": "accessibility_audit"}
 
-        result = lens.analyze(
+        result = await lens.analyze(
             source="https://example.com",
             query="Is this website suitable for elderly users?",
             context=context,
@@ -197,7 +198,7 @@ def context_aware_analysis():
     print()
 
 
-def main():
+async def main():
     """Run all examples."""
     if not os.getenv("OPENAI_API_KEY"):
         print("⚠️ Please set OPENAI_API_KEY environment variable")
@@ -222,10 +223,13 @@ def main():
 
     for example in examples:
         try:
-            example()
+            if example.__name__ == "screenshot_analysis":
+                example()  # This one is sync - just shows examples
+            else:
+                await example()
         except Exception as e:
             print(f"❌ Error in {example.__name__}: {e}")
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

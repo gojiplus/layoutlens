@@ -3,7 +3,7 @@
 import tempfile
 import time
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
@@ -342,44 +342,40 @@ class TestCacheFactory:
 class TestLayoutLensCacheIntegration:
     """Test caching integration with LayoutLens."""
 
-    @patch("layoutlens.vision.capture.URLCapture.capture_url")
-    @patch("layoutlens.api.core.create_provider")
-    def test_cache_hit(self, mock_create_provider, mock_capture):
+    @patch("layoutlens.vision.capture.Capture.screenshots")
+    @patch("layoutlens.api.core.acompletion")
+    @pytest.mark.asyncio
+    async def test_cache_hit(self, mock_acompletion, mock_capture):
         """Test cache hit behavior."""
         # Setup mocks
-        mock_capture.return_value = "screenshot.png"
+        mock_capture.return_value = ["screenshot.png"]
 
-        # Create mock provider
-        from layoutlens.providers.base import VisionAnalysisResponse
-
-        mock_provider = Mock()
-        mock_vision_response = VisionAnalysisResponse(
-            answer="Yes, it's accessible",
-            confidence=0.9,
-            reasoning="Good design",
-            metadata={},
-            provider="litellm",
-            model="gpt-4o-mini",
-        )
-        mock_provider.analyze_image.return_value = mock_vision_response
-        mock_create_provider.return_value = mock_provider
+        # Mock LiteLLM acompletion response
+        mock_response = Mock()
+        mock_response.choices = [Mock()]
+        mock_response.choices[
+            0
+        ].message.content = '{"answer": "Yes, it\'s accessible", "confidence": 0.9, "reasoning": "Good design"}'
+        mock_response.usage.total_tokens = 150
+        mock_acompletion.return_value = mock_response
 
         with (
             patch.dict("os.environ", {"OPENAI_API_KEY": "test_key"}),
             patch("os.path.exists", return_value=True),
+            patch("layoutlens.api.core.LayoutLens._encode_image", return_value="fake-base64-data"),
         ):
             lens = LayoutLens(cache_enabled=True, cache_type="memory")
 
             # First call - should hit API
-            result1 = lens.analyze("https://example.com", "Is this accessible?")
+            result1 = await lens.analyze("https://example.com", "Is this accessible?")
             assert result1.metadata.get("cache_hit") is False
 
             # Second call - should hit cache
-            result2 = lens.analyze("https://example.com", "Is this accessible?")
+            result2 = await lens.analyze("https://example.com", "Is this accessible?")
             assert result2.metadata.get("cache_hit") is True
 
-            # Should have called provider analyze only once
-            assert mock_provider.analyze_image.call_count == 1
+            # Should have called acompletion only once
+            assert mock_acompletion.call_count == 1
 
             # Check cache stats
             stats = lens.get_cache_stats()
@@ -387,40 +383,36 @@ class TestLayoutLensCacheIntegration:
             assert stats["misses"] == 1
             assert stats["hit_rate"] == 0.5
 
-    @patch("layoutlens.vision.capture.URLCapture.capture_url")
-    @patch("layoutlens.api.core.create_provider")
-    def test_cache_disabled(self, mock_create_provider, mock_capture):
+    @patch("layoutlens.vision.capture.Capture.screenshots")
+    @patch("layoutlens.api.core.acompletion")
+    @pytest.mark.asyncio
+    async def test_cache_disabled(self, mock_acompletion, mock_capture):
         """Test behavior with cache disabled."""
         # Setup mocks
-        mock_capture.return_value = "screenshot.png"
+        mock_capture.return_value = ["screenshot.png"]
 
-        # Create mock provider
-        from layoutlens.providers.base import VisionAnalysisResponse
-
-        mock_provider = Mock()
-        mock_vision_response = VisionAnalysisResponse(
-            answer="Yes, it's accessible",
-            confidence=0.9,
-            reasoning="Good design",
-            metadata={},
-            provider="litellm",
-            model="gpt-4o-mini",
-        )
-        mock_provider.analyze_image.return_value = mock_vision_response
-        mock_create_provider.return_value = mock_provider
+        # Mock LiteLLM acompletion response
+        mock_response = Mock()
+        mock_response.choices = [Mock()]
+        mock_response.choices[
+            0
+        ].message.content = '{"answer": "Yes, it\'s accessible", "confidence": 0.9, "reasoning": "Good design"}'
+        mock_response.usage.total_tokens = 150
+        mock_acompletion.return_value = mock_response
 
         with (
             patch.dict("os.environ", {"OPENAI_API_KEY": "test_key"}),
             patch("os.path.exists", return_value=True),
+            patch("layoutlens.api.core.LayoutLens._encode_image", return_value="fake-base64-data"),
         ):
             lens = LayoutLens(cache_enabled=False)
 
             # Make two identical calls
-            lens.analyze("https://example.com", "Is this accessible?")
-            lens.analyze("https://example.com", "Is this accessible?")
+            await lens.analyze("https://example.com", "Is this accessible?")
+            await lens.analyze("https://example.com", "Is this accessible?")
 
-            # Should have called provider analyze twice
-            assert mock_provider.analyze_image.call_count == 2
+            # Should have called acompletion twice (no caching)
+            assert mock_acompletion.call_count == 2
 
             # Cache stats should show no hits
             stats = lens.get_cache_stats()

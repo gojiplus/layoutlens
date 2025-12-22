@@ -4,6 +4,7 @@ This module demonstrates advanced features and patterns for
 comprehensive UI testing scenarios.
 """
 
+import asyncio
 import os
 import time
 from pathlib import Path
@@ -11,7 +12,7 @@ from pathlib import Path
 from layoutlens import LayoutLens
 
 
-def advanced_analysis_with_context():
+async def advanced_analysis_with_context():
     """Demonstrate analysis with detailed context information."""
 
     # Initialize with custom model and output directory
@@ -25,7 +26,7 @@ def advanced_analysis_with_context():
         "business_context": "healthcare_website",
     }
 
-    result = tester.analyze(
+    result = await tester.analyze(
         source="https://example.com",
         query="Is this website accessible for elderly users with limited tech experience?",
         viewport="desktop",
@@ -37,7 +38,7 @@ def advanced_analysis_with_context():
     print(f"Context-aware reasoning: {result.reasoning[:300]}...")
 
 
-def comprehensive_comparison_workflow():
+async def comprehensive_comparison_workflow():
     """Demonstrate advanced comparison scenarios."""
 
     tester = LayoutLens(output_dir="comparison_analysis")
@@ -48,7 +49,7 @@ def comprehensive_comparison_workflow():
         "comparison_type": "redesign_evaluation",
     }
 
-    result = tester.compare(
+    result = await tester.compare(
         sources=[
             "benchmarks/test_data/layout_alignment/nav_misaligned.html",
             "benchmarks/test_data/layout_alignment/nav_centered.html",
@@ -61,7 +62,7 @@ def comprehensive_comparison_workflow():
     print(f"Analysis confidence: {result.confidence:.1%}")
 
 
-def batch_analysis_workflow():
+async def batch_analysis_workflow():
     """Demonstrate efficient batch processing of multiple pages."""
 
     tester = LayoutLens(output_dir="batch_analysis")
@@ -74,43 +75,47 @@ def batch_analysis_workflow():
     ]
 
     # Run batch analysis
-    results = tester.analyze_batch(
+    results = await tester.analyze(
         sources=pages,
-        query="Does this page follow modern web design best practices?",
+        queries="Does this page follow modern web design best practices?",
         context={"evaluation_focus": "ux_principles"},
     )
 
-    print(f"\nBatch analysis completed for {len(results)} pages:")
-    for i, result in enumerate(results):
+    print(f"\nBatch analysis completed for {len(results.results)} pages:")
+    for i, result in enumerate(results.results):
         page_name = Path(pages[i]).stem
         print(f"  {page_name}: {result.answer[:100]}... (confidence: {result.confidence:.1%})")
 
 
-def specialized_checks_workflow():
+async def specialized_checks_workflow():
     """Demonstrate specialized built-in checks."""
 
     tester = LayoutLens(output_dir="specialized_checks")
 
     # Comprehensive accessibility audit
     print("\n=== Accessibility Analysis ===")
-    accessibility_result = tester.check_accessibility(source="benchmarks/test_data/accessibility/good_contrast.html")
+    accessibility_result = await tester.check_accessibility(
+        source="benchmarks/test_data/accessibility/good_contrast.html"
+    )
     print(f"Accessibility: {accessibility_result.answer}")
     print(f"Confidence: {accessibility_result.confidence:.1%}")
 
     # Mobile experience evaluation
     print("\n=== Mobile-Friendly Analysis ===")
-    mobile_result = tester.check_mobile_friendly(source="benchmarks/test_data/responsive_design/mobile_optimized.html")
+    mobile_result = await tester.check_mobile_friendly(
+        source="benchmarks/test_data/responsive_design/mobile_optimized.html"
+    )
     print(f"Mobile-friendly: {mobile_result.answer}")
     print(f"Confidence: {mobile_result.confidence:.1%}")
 
     # Conversion optimization check
     print("\n=== Conversion Optimization Analysis ===")
-    conversion_result = tester.check_conversion_optimization(source="https://example.com")
+    conversion_result = await tester.check_conversion_optimization(source="https://example.com")
     print(f"Conversion optimization: {conversion_result.answer}")
     print(f"Confidence: {conversion_result.confidence:.1%}")
 
 
-def multi_viewport_analysis():
+async def multi_viewport_analysis():
     """Demonstrate analysis across different viewports."""
 
     tester = LayoutLens(output_dir="viewport_analysis")
@@ -122,7 +127,7 @@ def multi_viewport_analysis():
     for viewport in viewports:
         print(f"\nAnalyzing {viewport} viewport...")
 
-        result = tester.analyze(
+        result = await tester.analyze(
             source=source_page,
             query="How well does the layout adapt to this screen size?",
             viewport=viewport,
@@ -133,7 +138,7 @@ def multi_viewport_analysis():
         print(f"Confidence: {result.confidence:.1%}")
 
 
-def performance_optimized_workflow():
+async def performance_optimized_workflow():
     """Demonstrate performance considerations for large-scale testing."""
 
     # Initialize with performance settings
@@ -151,9 +156,9 @@ def performance_optimized_workflow():
     # Use batch processing for efficiency
     start_time = time.time()
 
-    results = tester.analyze_batch(
+    results = await tester.analyze(
         sources=test_pages,
-        query="Rate the overall design quality on a scale of 1-10 and explain why.",
+        queries="Rate the overall design quality on a scale of 1-10 and explain why.",
     )
 
     elapsed_time = time.time() - start_time
@@ -162,11 +167,11 @@ def performance_optimized_workflow():
     print(f"Processed {len(test_pages)} pages in {elapsed_time:.2f} seconds")
     print(f"Average time per page: {elapsed_time / len(test_pages):.2f} seconds")
 
-    for i, result in enumerate(results):
+    for i, result in enumerate(results.results):
         print(f"Page {i + 1}: {result.answer[:100]}...")
 
 
-def error_handling_patterns():
+async def error_handling_patterns():
     """Demonstrate robust error handling patterns."""
 
     tester = LayoutLens()
@@ -175,7 +180,7 @@ def error_handling_patterns():
 
     # Handle invalid URLs gracefully
     try:
-        result = tester.analyze(
+        result = await tester.analyze(
             source="https://nonexistent-website-12345.com",
             query="Is this page accessible?",
         )
@@ -185,7 +190,7 @@ def error_handling_patterns():
 
     # Handle missing files gracefully
     try:
-        result = tester.analyze(source="nonexistent_file.html", query="How is the layout?")
+        result = await tester.analyze(source="nonexistent_file.html", query="How is the layout?")
         print(f"Result: {result.answer}")
     except Exception as e:
         print(f"Handled file error: {type(e).__name__}")
@@ -194,12 +199,12 @@ def error_handling_patterns():
     try:
         # This would fail with invalid API key
         invalid_tester = LayoutLens(api_key="invalid_key")
-        result = invalid_tester.analyze("https://example.com", "Test query")
+        result = await invalid_tester.analyze("https://example.com", "Test query")
     except ValueError as e:
         print(f"Handled API key error: {e}")
 
 
-def main():
+async def main():
     """Run all advanced examples."""
 
     print("LayoutLens Advanced Usage Examples")
@@ -225,11 +230,20 @@ def main():
         print(f"\n{i}. {name}")
         print("-" * 40)
         try:
-            func()
+            await func()
         except Exception as e:
             print(f"Example failed: {e}")
             print("Note: Some examples require network access or specific files")
 
+    # Add JSON structured examples
+    print(f"\n🔧 JSON Output Examples")
+    print("-" * 40)
+    print("All results support structured JSON output:")
+    print("  result = await lens.analyze('page.html', 'Is it accessible?')")
+    print("  json_data = result.to_json()  # Clean, typed JSON")
+    print("  confidence = json_data['confidence']  # 0.85")
+    print("  answer = json_data['answer']  # Structured response")
+
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

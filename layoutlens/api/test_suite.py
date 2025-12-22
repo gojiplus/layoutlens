@@ -133,11 +133,17 @@ class UITestResult:
             ],
         }
 
+    def to_json(self) -> str:
+        """Export result to JSON string."""
+        return json.dumps(self.to_dict(), indent=2, default=str)
+
 
 def extend_layoutlens_with_test_suite():
     """Extend LayoutLens class with test suite functionality."""
 
-    def run_test_suite(self, suite: UITestSuite, parallel: bool = False, max_workers: int = 4) -> list[UITestResult]:
+    async def run_test_suite(
+        self, suite: UITestSuite, parallel: bool = False, max_workers: int = 4
+    ) -> list[UITestResult]:
         """
         Run a test suite and return results.
 
@@ -162,7 +168,7 @@ def extend_layoutlens_with_test_suite():
                 for query in test_case.queries:
                     try:
                         # Use the existing analyze method
-                        result = self.analyze(
+                        result = await self.analyze(
                             source=test_case.html_path,
                             query=query,
                             viewport=viewport,

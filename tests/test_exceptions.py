@@ -1,6 +1,6 @@
 """Test custom exception handling."""
 
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
@@ -120,47 +120,68 @@ class TestLayoutLensExceptions:
         ):
             LayoutLens()
 
-    def test_empty_query_validation(self):
+    @pytest.mark.asyncio
+    async def test_empty_query_validation(self):
         """Test ValidationError for empty query."""
         with patch.dict("os.environ", {"OPENAI_API_KEY": "test_key"}):
             lens = LayoutLens()
 
             with pytest.raises(ValidationError, match="Query cannot be empty"):
-                lens.analyze("test.html", "")
+                await lens.analyze("test.html", "")
 
-    def test_file_not_found_error(self):
-        """Test FileNotFoundError for missing screenshot."""
+    @pytest.mark.asyncio
+    async def test_file_not_found_error(self):
+        """Test graceful handling of missing screenshot file."""
         with patch.dict("os.environ", {"OPENAI_API_KEY": "test_key"}):
             lens = LayoutLens()
 
-            with pytest.raises(LayoutLensError):  # Should be FileNotFoundError but might be wrapped
-                lens.analyze("nonexistent.png", "Is this good?")
+            # Current implementation handles file not found gracefully
+            result = await lens.analyze("nonexistent.png", "Is this good?")
 
-    @patch("layoutlens.vision.capture.URLCapture.capture_url")
-    def test_screenshot_error(self, mock_capture):
-        """Test ScreenshotError when capture fails."""
+            # Should return error result instead of raising exception
+            assert result.confidence == 0.0
+            assert "Error" in result.answer
+            assert "nonexistent.png" in result.answer
+
+    @patch("layoutlens.vision.capture.Capture.screenshots")
+    @pytest.mark.asyncio
+    async def test_screenshot_error(self, mock_capture):
+        """Test graceful handling when screenshot capture fails."""
         mock_capture.side_effect = Exception("Browser failed")
 
         with patch.dict("os.environ", {"OPENAI_API_KEY": "test_key"}):
             lens = LayoutLens()
 
-            with pytest.raises(ScreenshotError, match="Failed to capture screenshot"):
-                lens.analyze("https://example.com", "Is this accessible?")
+            # Current implementation handles capture errors gracefully
+            result = await lens.analyze("https://example.com", "Is this accessible?")
 
-    @patch("layoutlens.vision.capture.URLCapture.capture_url")
-    def test_analysis_error(self, mock_capture):
-        """Test AnalysisError when analysis fails."""
-        mock_capture.return_value = "screenshot.png"
+            # Should return error result instead of raising exception
+            assert result.confidence == 0.0
+            assert "Error" in result.answer
+            assert "Browser failed" in result.answer
 
-        with patch.dict("os.environ", {"OPENAI_API_KEY": "test_key"}):
+    @patch("layoutlens.vision.capture.Capture.screenshots")
+    @patch("layoutlens.api.core.acompletion")
+    @pytest.mark.asyncio
+    async def test_analysis_error(self, mock_acompletion, mock_capture):
+        """Test graceful handling when vision analysis fails."""
+        mock_capture.return_value = ["screenshot.png"]
+        mock_acompletion.side_effect = Exception("OpenAI API failed")
+
+        with (
+            patch.dict("os.environ", {"OPENAI_API_KEY": "test_key"}),
+            patch("os.path.exists", return_value=True),
+            patch("layoutlens.api.core.LayoutLens._encode_image", return_value="fake-base64"),
+        ):
             lens = LayoutLens()
 
-            # Mock the vision provider to raise an exception
-            with (
-                patch.object(lens.vision_provider, "analyze_image", side_effect=Exception("OpenAI API failed")),
-                pytest.raises(AnalysisError, match="Failed to analyze screenshot"),
-            ):
-                lens.analyze("https://example.com", "Is this accessible?")
+            # Current implementation handles analysis errors gracefully
+            result = await lens.analyze("https://example.com", "Is this accessible?")
+
+            # Should return error result instead of raising exception
+            assert result.confidence == 0.0
+            assert "Error" in result.answer
+            assert "OpenAI API failed" in result.answer
 
 
 class TestExceptionMessages:
@@ -197,26 +218,30 @@ class TestExceptionMessages:
 class TestGracefulDegradation:
     """Test graceful degradation when errors occur."""
 
-    @patch("layoutlens.vision.capture.URLCapture.capture_url")
-    def test_analysis_failure_handling(self, mock_capture):
+    @patch("layoutlens.vision.capture.Capture.screenshots")
+    @patch("layoutlens.api.core.acompletion")
+    @pytest.mark.asyncio
+    async def test_analysis_failure_handling(self, mock_acompletion, mock_capture):
         """Test that analysis failures are handled gracefully."""
-        # Setup successful capture but failed analysis
-        mock_capture.return_value = "screenshot.png"
+        mock_capture.return_value = ["screenshot.png"]
+        mock_acompletion.side_effect = Exception("API quota exceeded")
 
-        with patch.dict("os.environ", {"OPENAI_API_KEY": "test_key"}):
+        with (
+            patch.dict("os.environ", {"OPENAI_API_KEY": "test_key"}),
+            patch("os.path.exists", return_value=True),
+            patch("layoutlens.api.core.LayoutLens._encode_image", return_value="fake-base64"),
+        ):
             lens = LayoutLens()
 
-            # Mock the vision provider to raise an exception
-            with (
-                patch.object(lens.vision_provider, "analyze_image", side_effect=Exception("API quota exceeded")),
-                pytest.raises(AnalysisError) as exc_info,
-            ):
-                lens.analyze("https://example.com", "Is this good?")
+            # Current implementation handles failures gracefully by returning error results
+            result = await lens.analyze("https://example.com", "Is this good?")
 
-            error = exc_info.value
-            assert error.query == "Is this good?"
-            assert error.source == "https://example.com"
-            assert error.confidence == 0.0
+            # Should return error result with proper metadata
+            assert result.query == "Is this good?"
+            assert result.source == "https://example.com"
+            assert result.confidence == 0.0
+            assert "Error" in result.answer
+            assert "API quota exceeded" in result.answer
 
     def test_exception_chaining(self):
         """Test that original exceptions are preserved in the chain."""

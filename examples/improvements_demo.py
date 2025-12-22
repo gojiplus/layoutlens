@@ -11,6 +11,7 @@ This script showcases the major improvements made to LayoutLens:
 Run with: python examples/improvements_demo.py
 """
 
+import asyncio
 import tempfile
 from pathlib import Path
 
@@ -25,7 +26,7 @@ from layoutlens import (
 )
 
 
-def demo_custom_exceptions():
+async def demo_custom_exceptions():
     """Demonstrate improved exception handling."""
     print("🛠️  Custom Exception Handling Demo")
     print("=" * 50)
@@ -39,14 +40,14 @@ def demo_custom_exceptions():
     # Test invalid query
     try:
         lens = LayoutLens(api_key="test_key")
-        lens.analyze("test.html", "")  # Empty query
+        await lens.analyze("test.html", "")  # Empty query
     except ValidationError as e:
         print(f"✅ ValidationError caught: {e}")
 
     print()
 
 
-def demo_test_suite_functionality():
+async def demo_test_suite_functionality():
     """Demonstrate test suite creation and execution."""
     print("📋 Test Suite Functionality Demo")
     print("=" * 50)
@@ -110,7 +111,7 @@ def demo_test_suite_functionality():
     print()
 
 
-def demo_caching_performance():
+async def demo_caching_performance():
     """Demonstrate caching functionality and performance."""
     print("🚀 Caching Performance Demo")
     print("=" * 50)
@@ -159,7 +160,7 @@ def demo_caching_performance():
     print()
 
 
-def demo_layoutlens_with_cache():
+async def demo_layoutlens_with_cache():
     """Demonstrate LayoutLens with caching enabled."""
     print("🎯 LayoutLens with Caching Demo")
     print("=" * 50)
@@ -197,7 +198,7 @@ def demo_layoutlens_with_cache():
     print()
 
 
-def demo_integration_testing():
+async def demo_integration_testing():
     """Show how to write integration tests."""
     print("🧪 Integration Testing Demo")
     print("=" * 50)
@@ -216,10 +217,16 @@ def demo_integration_testing():
     print("   - tests/integration/test_full_workflow.py (10 tests)")
 
     print("\n🎯 All tests demonstrate production-ready functionality")
+
+    # Add structured JSON examples
+    print("\n📋 Example structured JSON usage:")
+    print("   result = await lens.analyze('page.html', 'Is it accessible?')")
+    print("   json_output = result.to_json()  # Clean, typed JSON")
+    print("   print(json_output['answer'])    # Access structured data")
     print()
 
 
-def main():
+async def main():
     """Run all improvement demonstrations."""
     print("🎉 LayoutLens Improvements Demonstration")
     print("=" * 60)
@@ -232,11 +239,11 @@ def main():
     print()
 
     try:
-        demo_custom_exceptions()
-        demo_test_suite_functionality()
-        demo_caching_performance()
-        demo_layoutlens_with_cache()
-        demo_integration_testing()
+        await demo_custom_exceptions()
+        await demo_test_suite_functionality()
+        await demo_caching_performance()
+        await demo_layoutlens_with_cache()
+        await demo_integration_testing()
 
         print("🎯 Summary of Improvements")
         print("=" * 50)
@@ -244,7 +251,7 @@ def main():
         print("✅ Test suites enable organized, repeatable testing")
         print("✅ Caching reduces API costs and improves performance")
         print("✅ Integration tests ensure reliability")
-        print("✅ All improvements maintain backward compatibility")
+        print("✅ Simplified async-only architecture for performance")
         print()
         print("🚀 LayoutLens is now more robust, efficient, and developer-friendly!")
 
@@ -254,4 +261,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
