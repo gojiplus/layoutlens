@@ -127,8 +127,9 @@ class TestAPIFunctionality(unittest.TestCase):
         # Test analysis
         lens = LayoutLens(api_key=self.mock_api_key, output_dir=self.temp_dir)
 
-        with patch("os.path.exists", return_value=True), patch(
-            "layoutlens.api.core.LayoutLens._encode_image", return_value="fake-base64-data"
+        with (
+            patch("os.path.exists", return_value=True),
+            patch("layoutlens.api.core.LayoutLens._encode_image", return_value="fake-base64-data"),
         ):
             result = await lens.analyze("https://example.com", "Is the navigation user-friendly?")
 
