@@ -180,3 +180,13 @@ test_env/
 test_homepage.html
 test_basic_functionality.py
 RELEASE_CLEANUP_PLAN.md
+demo_output/
+poc_output/
+output/
+test_output/
+validation_output/
+replay_output/
+layoutlens_exports/
+screenshots/
+sample_results.json
+.superpowers/
