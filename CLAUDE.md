@@ -1,380 +1,195 @@
-# CLAUDE.md - LayoutLens v1.6.0
+# CLAUDE.md - LayoutLens v1.7.0
 
-This file provides guidance to Claude Code (claude.ai/code) when working with the LayoutLens codebase.
+Guidance for Claude Code when working in this repository. Describes what the
+code actually does — verify against source before trusting older assumptions;
+this file has drifted from reality before.
 
 ## Project Overview
 
- LayoutLens is a production-ready AI-powered UI testing framework that enables natural language visual testing. It captures screenshots using Playwright and analyzes them with OpenAI's GPT-4o Vision API to validate layouts, accessibility, responsive design, and visual consistency.
+LayoutLens is an AI-powered UI testing framework: it captures screenshots with
+Playwright and answers natural-language questions about them via a
+vision-capable LLM (through LiteLLM; `gpt-4o-mini` by default). It also ships
+a fully deterministic, keyless WCAG 2.1 A/AA accessibility engine built on a
+vendored axe-core bundle.
 
-**Current Version:** v1.6.0 (includes Browser Use integration for AI agent validation)
-
-## Quick Start Commands
-
-### Installation
-```bash
-pip install layoutlens>=1.4.0
-playwright install chromium
-```
-
-### Basic Usage
-```bash
-# Set API key
-export OPENAI_API_KEY="your_key_here"
-
-# Basic analysis
-python -c "
-from layoutlens import LayoutLens
-lens = LayoutLens()
-result = lens.analyze('https://example.com', 'Is the navigation user-friendly?')
-print(f'Answer: {result.answer}')
-print(f'Confidence: {result.confidence:.1%}')
-"
-```
-
-### CLI Usage (v1.4.0 - Async-by-Default)
-```bash
-# Show system info and check setup
-layoutlens info
-
-# Analyze a single page with concurrent processing
-layoutlens test --page https://example.com --queries "Is this page accessible?,Is the design professional?"
-
-# Test with multiple viewports concurrently
-layoutlens test --page mysite.com --queries "Good mobile UX?" --viewports "mobile_portrait,desktop"
-
-# Compare two pages with async processing
-layoutlens compare page1.html page2.html --query "Which design is better?"
-
-# Batch process multiple sources efficiently
-layoutlens batch --sources "site1.com,site2.com" --queries "Is it accessible?"
-
-# Start interactive session with Rich formatting
-layoutlens interactive
-
-# Generate configuration file
-layoutlens generate config --output my_config.yaml
-
-# Validate configuration
-layoutlens validate --config my_config.yaml
-```
-
-## Current API Structure (v1.4.0)
-
-### Core LayoutLens Class
-```python
-from layoutlens import LayoutLens
-
-# Initialize with LiteLLM unified provider support
-lens = LayoutLens(
-    api_key="your-key",        # Optional if OPENAI_API_KEY env var set
-    model="gpt-4o-mini",       # Model to use (LiteLLM naming)
-    provider="openai",         # "openai", "anthropic", "google", "gemini", "litellm"
-    output_dir="custom_dir",   # Output directory for screenshots
-    cache_enabled=True,        # Enable result caching for performance
-    cache_type="memory"        # "memory" or "file"
-)
-```
-
-### Main API Methods
-```python
-# Single page analysis
-result = lens.analyze(
-    source="https://example.com",  # URL or file path
-    query="Is this page user-friendly?",
-    viewport="desktop",            # "desktop", "mobile_portrait", "tablet_landscape"
-    context={"user_type": "elderly"}  # Optional context
-)
-
-# Compare multiple sources
-result = lens.compare(
-    sources=["page1.html", "page2.html"],
-    query="Which layout is better?",
-    context={"focus": "accessibility"}
-)
-
-# Batch analysis (sync)
-results = lens.analyze_batch(
-    sources=["page1.html", "page2.html"],
-    queries=["Is it accessible?", "Is it mobile-friendly?"],
-    viewport="desktop"
-)
-
-# Async batch analysis for better performance
-results = await lens.analyze_batch_async(
-    sources=["page1.html", "page2.html"],
-    queries=["Is it accessible?", "Is it mobile-friendly?"],
-    max_concurrent=5
-)
-
-# Built-in checks
-result = lens.check_accessibility("https://example.com")
-result = lens.check_mobile_friendly("https://example.com")
-result = lens.check_conversion_optimization("https://example.com")
-```
-
-### Result Objects
-All analysis methods return objects with these properties:
-```python
-result.answer      # String: Natural language answer
-result.confidence  # Float: Confidence score (0.0-1.0)
-result.reasoning   # String: Detailed explanation
-result.metadata    # Dict: Additional information
-```
-
-## Package Structure (v1.4.0)
+## Package Structure (real, as of v1.7.0)
 
 ```
 layoutlens/
-├── __init__.py           # Main exports
+├── __init__.py                    # Public exports
 ├── api/
-│   ├── __init__.py
-│   ├── core.py          # LayoutLens class with async support
-│   └── test_suite.py    # Test suite execution
-├── vision/
-│   ├── __init__.py
-│   ├── capture.py       # URLCapture class
-│   ├── comparator.py    # LayoutComparator class
-│   └── types.py         # VisionAnalysisRequest/Response dataclasses
-├── providers/
-│   ├── __init__.py
-│   └── provider.py      # Simplified LayoutLensProvider (LiteLLM unified)
+│   ├── core.py                    # LayoutLens class (analyze/compare/capture/checks)
+│   └── test_suite.py              # UITestCase/UITestSuite/UITestResult + run_test_suite
+├── a11y/
+│   ├── axe.py                     # AxeAuditor, AXE_VERSION
+│   ├── types.py                   # A11yFinding, A11yReport
+│   └── assets/                    # Vendored axe-core bundle (axe.min.js, LICENSE-axe.txt)
+├── prompts/                       # Expert persona system (Instructions, get_expert, ...)
 ├── integrations/
-│   ├── __init__.py
-│   ├── github.py        # GitHub Actions integration
-│   └── browser_use/     # Browser agent validation
-│       ├── __init__.py
-│       ├── types.py     # ValidationPolicy, ValidationSession, etc.
-│       ├── validator.py # AgentValidator class
-│       ├── session.py   # SessionRecorder, SessionReplayer
-│       └── reports.py   # HTML/JSON report generation
-├── cli.py               # Main CLI entry point
-├── cli_commands.py      # Unified async command implementations
-├── cli_interactive.py   # Interactive mode with Rich formatting
-├── config.py            # Configuration management
-├── cache.py             # Result caching system
-├── logger.py            # Structured logging
-└── exceptions.py        # Custom exception classes
+│   └── browser_use/               # AgentValidator, SessionRecorder/Replayer, reports
+├── browser.py                     # Shared Playwright page lifecycle (open_page)
+├── capture.py                     # Capture: screenshot capture for URLs/HTML files
+├── cli.py                         # The entire CLI (one file, one command)
+├── config.py                      # Config / layoutlens.yaml handling
+├── cache.py                       # AnalysisCache (memory/file backends)
+├── logger.py                      # Structured logging setup
+├── exceptions.py                  # Custom exception hierarchy
+└── types.py                       # Enums (Viewport, Expert, ComplianceLevel, ...) + TypedDicts
 ```
 
-## CLI Commands (v1.4.0 - Async-by-Default)
+There is **no** `vision/`, `providers/`, `cli_commands.py`, `cli_interactive.py`,
+or `integrations/github.py` — those belonged to an earlier architecture and no
+longer exist. Don't reintroduce them or write docs that assume they exist.
 
-### test command
+## CLI
+
+The CLI is a single flat command — there are no subcommands (`test`, `batch`,
+`interactive`, `generate`, `validate` do not exist):
+
 ```bash
-# Analyze single page with custom queries (concurrent processing)
-layoutlens test --page https://example.com --queries "Is it accessible?,Is it responsive?"
-
-# Analyze with multiple viewports concurrently
-layoutlens test --page mypage.html --queries "How's the mobile layout?" --viewports "mobile_portrait,desktop"
-
-# Run test suite with async processing
-layoutlens test --suite test_suite.yaml --max-concurrent 5
+layoutlens SOURCES... [--query TEXT] [--compare] \
+  [--viewport {desktop,mobile,tablet}] [--a11y {hybrid,axe,llm}] \
+  [--output {text,json}] [--api-key KEY] [--model MODEL]
 ```
 
-### compare command
-```bash
-# Compare two pages with async processing
-layoutlens compare before.html after.html --query "Which design is more user-friendly?"
-```
+- Positional args that are URLs or existing paths become sources; a leftover
+  positional string (if `--query` wasn't given) becomes the query.
+- `--a11y {hybrid,axe,llm}` runs the built-in WCAG checks instead of a
+  free-form query; it is an error to combine `--a11y` with `--query`.
+  `--a11y axe` is fully deterministic and needs no API key.
+- `--compare` compares the first two sources; `compare()` (CLI and Python)
+  expects URLs or already-captured screenshots — passing a raw local `.html`
+  path skips screenshot rendering and fails with an "unsupported image" error
+  from the vision API. Capture first (`lens.capture(...)`) when comparing
+  local HTML files.
 
-### batch command
-```bash
-# Process multiple sources efficiently
-layoutlens batch --sources "site1.com,site2.com,site3.com" --queries "Is it accessible?"
+Run `layoutlens --help` for the authoritative flag reference.
 
-# Load sources from file
-layoutlens batch --sources-file urls.txt --queries "Good UX?,Mobile friendly?"
-```
+## API
 
-### interactive command
-```bash
-# Start interactive session with Rich terminal formatting
-layoutlens interactive
-```
+Everything on `LayoutLens` that touches the network or a browser is `async` —
+call with `await` inside an `async def`, or wrap top-level scripts in
+`asyncio.run(...)`.
 
-### info command
-```bash
-# Check system setup, dependencies, and API keys
-layoutlens info
-```
-
-### generate command
-```bash
-# Generate default configuration
-layoutlens generate config
-
-# Generate test suite template
-layoutlens generate suite
-```
-
-### validate command
-```bash
-# Validate configuration file
-layoutlens validate --config layoutlens.yaml
-
-# Validate test suite file
-layoutlens validate --suite test_suite.yaml
-```
-
-## Examples and Testing
-
-### Running Examples
-```bash
-# Basic usage patterns
-python examples/basic_usage.py
-
-# Advanced scenarios
-python examples/advanced_usage.py
-
-# Simple API demonstrations
-python examples/simple_api_usage.py
-```
-
-### Benchmark Evaluation
-```bash
-# The package includes a benchmark system
-python benchmarks/evaluation/evaluator.py
-```
-
-## Configuration
-
-### Environment Variables
-- `OPENAI_API_KEY` - Required for OpenAI Vision API access
-
-### Custom Configuration
 ```python
-# Pass parameters during initialization
+from layoutlens import LayoutLens
+
 lens = LayoutLens(
-    model="gpt-4o",           # Use more powerful model
-    provider="openai",        # Choose AI provider
-    output_dir="screenshots",  # Custom output directory
-    cache_enabled=True,       # Enable caching for performance
-    cache_type="file",        # Use file-based caching
-    cache_ttl=7200           # Cache for 2 hours
+    api_key=None,             # optional; falls back to the provider's env var.
+                               # NOT required at construction (see below)
+    model="gpt-4o-mini",
+    provider="openai",        # "openai" | "anthropic" | "google" | "gemini" | "litellm"
+    output_dir="layoutlens_output",
+    cache_enabled=True,
+    cache_type="memory",      # "memory" | "file"
 )
 
-# LiteLLM unified provider examples
-lens = LayoutLens(provider="anthropic", model="anthropic/claude-3-5-sonnet")
-lens = LayoutLens(provider="google", model="google/gemini-1.5-pro")
-lens = LayoutLens(provider="litellm", model="gpt-4o")  # Direct LiteLLM access
+result = await lens.analyze(source, query, viewport="desktop", max_concurrent=5)
 ```
 
-## Security Notes (v1.4.0)
+- `analyze(source, query, ...)` is the one method for single/batch analysis:
+  pass a list to `source` and/or `query` to fan out every combination
+  concurrently. Single source + single query returns `AnalysisResult`;
+  anything else returns `BatchResult`. There is no `analyze_batch` /
+  `analyze_batch_async` — those were removed.
+- `compare(sources, query, ...)` returns `ComparisonResult`. Takes URLs or
+  screenshot paths, not raw local HTML (see CLI section above).
+- `capture(source, viewport=...)` renders a URL/HTML file to a PNG and
+  returns the path (or a dict of `source -> path` for a list of sources).
+- **API key is deferred to first LLM use.** `LayoutLens()` never raises for a
+  missing key at construction — `AuthenticationError` is only raised inside
+  `_call_vision_api` when an LLM call actually happens. This keeps
+  `check_accessibility(..., mode="axe")` and `AxeAuditor` fully keyless.
 
-- ✅ **API key logging fixed** - CLI no longer exposes API keys in logs
-- ✅ **Secure by default** - No sensitive information logged
-- ✅ **Comprehensive error handling** - Custom exception hierarchy with proper logging
-- ✅ **Input validation** - All user inputs validated before processing
-- ⚠️ **Always use v1.4.0+** - Previous versions had security vulnerabilities
+## Deterministic Accessibility (axe-core)
 
-## New Features in v1.6.0
-
-### Browser Use Integration
-LayoutLens now serves as the "intelligent eyes" for browser automation agents:
+`layoutlens/a11y/` wraps a vendored axe-core bundle
+(`layoutlens/a11y/assets/axe.min.js` + `LICENSE-axe.txt`, version pinned in
+`AXE_VERSION` in `layoutlens/a11y/axe.py`), injected into a live Playwright
+page via `AxeAuditor`.
 
 ```python
-from layoutlens.integrations.browser_use import AgentValidator, ValidationPolicy
-
-# Create validator with expert personas
-validator = AgentValidator(
-    experts=["accessibility_expert", "mobile_expert"],
-    policy=ValidationPolicy(capture_on_click=True)
-)
-
-# Get hooks for Browser Use agent
-hooks = validator.get_hooks()
-await agent.run(**hooks)
-
-# Get validation results
-session = validator.get_session()
-print(f"Found {session.total_findings} issues")
+from layoutlens import AxeAuditor
+report = await AxeAuditor(run_only=["wcag2a", "wcag2aa"]).audit(source, viewport)
 ```
 
-Key components:
-- **AgentValidator** - Hooks into Browser Use's action loop for real-time validation
-- **SessionRecorder** - Record sessions for replay/regression testing
-- **SessionReplayer** - Replay recordings with validation for regression detection
-- **ValidationReportGenerator** - Generate HTML/JSON reports with embedded screenshots
+`check_accessibility` / `audit_accessibility` on `LayoutLens` take a `mode`:
+- `"axe"` — deterministic axe-core only, no API key, `confidence` always `1.0`.
+- `"hybrid"` (default) — axe-core + LLM vision; axe findings are injected into
+  the LLM prompt as grounding context, and **if axe finds any violation the
+  final verdict is forced to "no"** (confidence `1.0`) regardless of what the
+  LLM said. If axe finds nothing, the LLM's own answer/confidence stand.
+- `"llm"` — legacy vision-only check, no axe involved, needs an API key.
 
-### v1.4.0 Features (still available)
+**To update the vendored axe-core version:** download the new
+`axe.min.js`/license from the [axe-core releases](https://github.com/dequelabs/axe-core/releases),
+replace the files in `layoutlens/a11y/assets/`, and bump `AXE_VERSION` in
+`layoutlens/a11y/axe.py` to match. Re-run
+`uv run python benchmarks/generators/generate_a11y_ground_truth.py --check`
+(see Benchmarks below) to confirm the accessibility fixtures' ground truth
+still matches.
 
-#### CLI Improvements
-- ✅ **Async-by-default processing** - All commands use concurrent execution for optimal performance
-- ✅ **Test suite support** - Full YAML-based test suite execution with async processing
-- ✅ **Interactive mode** - Real-time analysis with Rich terminal formatting
-- ✅ **Batch processing** - Efficient concurrent analysis of multiple sources
-- ✅ **Unified command structure** - Single entry point with consistent async processing
+## Test Suites (YAML/JSON)
 
-#### Architecture Improvements
-- ✅ **LiteLLM unified provider** - Support for OpenAI, Anthropic, and Google via LiteLLM
-- ✅ **Result caching** - Memory and file-based caching for improved performance
-- ✅ **Structured logging** - Comprehensive logging with performance metrics
-- ✅ **Custom exceptions** - Detailed error handling with proper context
-- ✅ **Google-style docstrings** - Comprehensive documentation throughout codebase
+`UITestSuite.from_dict(...)` / `UITestSuite.load(...)` (JSON) load a suite;
+there is no CLI for suites — `await lens.run_test_suite(suite)` is Python-only.
 
-### Architecture Notes
-- **Screenshot capture**: Uses Playwright for reliable browser automation
-- **AI Analysis**: Unified access to multiple providers via LiteLLM
-- **Output format**: Natural language responses with confidence scores
-- **File support**: URLs, local HTML files, and image files
-- **Async processing**: Concurrent execution for optimal performance
+**Breaking change (v1.7.0):** every test case must declare `expected_results`
+(`answer: "yes"|"no"` and/or `contains: [...]`) — a case with neither raises
+`ValidationError` at load time. There is no confidence-only fallback anymore.
+See `examples/sample_test_suite.yaml` for a complete example, and
+`layoutlens/api/test_suite.py` (`_evaluate_case_assertions`) for exactly how
+assertions are graded (`assertion_detail` is attached to each result's
+metadata and included in `UITestResult.to_json()`).
 
-## Development Notes
+## Benchmarks
 
-### What Works (v1.6.0)
-- ✅ Core analysis API (`analyze`, `compare`, `analyze_batch`, `analyze_batch_async`)
-- ✅ Built-in checks (accessibility, mobile-friendly, conversion)
-- ✅ Full CLI command suite (test, compare, batch, interactive, info, generate, validate)
-- ✅ Test suite execution with YAML configuration
-- ✅ Interactive mode with Rich terminal formatting
-- ✅ Async-by-default processing with concurrent execution
-- ✅ LiteLLM unified provider support
-- ✅ Result caching system
-- ✅ Screenshot capture and analysis
-- ✅ Multiple viewport support
-- ✅ Context-aware analysis
-- ✅ Comprehensive error handling
-- ✅ Examples and documentation
-- ✅ Structured logging and performance metrics
-- ✅ **Browser Use integration** for AI agent validation
-- ✅ Session recording and replay for regression testing
-- ✅ HTML/JSON validation reports
+`benchmarks/` holds 18 HTML fixtures / 74 labeled yes/no queries across 4
+categories, with answer keys in `benchmarks/answer_keys/`.
 
-### Development Standards
-- ✅ **Google-style docstrings** throughout codebase
-- ✅ **Comprehensive CLI tests** with 95%+ coverage
-- ✅ **Async-first architecture** for optimal performance
-- ✅ **Type hints** and proper error handling
-- ✅ **Clean CLI separation** - thin entry point with modular commands
-
-## Performance Characteristics
-
-- **Processing Time**: ~10-20 seconds per analysis (improved with caching)
-- **Concurrent Processing**: 3-5 analyses simultaneously by default
-- **Caching**: Memory and file-based caching for repeated analyses
-- **Accuracy**: High confidence on well-formed pages
-- **Dependencies**: OpenAI, Playwright, BeautifulSoup4, PyYAML, Pillow, Rich (optional)
-- **Python Compatibility**: 3.11+
-
-## Development Guidelines
-
-### Code Quality
-- **Use async-by-default** for all new CLI commands
-- **Include comprehensive docstrings** (Google style)
-- **Add proper error handling** with custom exceptions
-- **Test CLI functionality** with pytest
-- **Follow performance patterns** with caching and concurrency
-
-### Testing Commands
 ```bash
-# Run linting and formatting
-uv run ruff check --fix
-uv run ruff format
+# 1. Run LayoutLens over all fixtures
+uv run python benchmarks/run_benchmark.py --no-batch --output benchmarks/run_out
 
-# Run tests with coverage
-uv run pytest tests/ -v --cov=layoutlens
-
-# Run CLI-specific tests
-uv run pytest tests/test_cli.py -v
+# 2. Score deterministically (leading yes/no token vs. answer key;
+#    ambiguous/unparseable answers count as INCORRECT, never free "no" credit)
+uv run python benchmarks/evaluation/evaluator.py \
+  --answer-keys benchmarks/answer_keys \
+  --results benchmarks/run_out \
+  --output benchmarks/results/$(date +%F)_gpt-4o-mini.json
 ```
 
-This codebase is production-ready with async-by-default CLI, comprehensive error handling, and performance optimizations fully implemented and tested.
+**Honest-numbers policy:** only commit a results artifact from a real
+measured run. The current committed artifact
+(`benchmarks/results/2026-07-21_gpt-4o-mini.json`) is real: 81.1% (60/74,
+gpt-4o-mini, 7 ambiguous counted incorrect). Do not hand-edit accuracy
+numbers in docs — regenerate the artifact and update the number together, in
+the same commit, from an actual run.
+
+## Testing Commands
+
+```bash
+uv run ruff check --fix && uv run ruff format   # Lint + format, zero tolerance for failures
+uv run pytest tests/ -v                          # Full suite
+uv run pytest tests/ -v -m "not browser"         # Skip tests that launch a real Chromium browser
+uv build                                         # Build the wheel/sdist
+```
+
+The `browser` pytest marker (`pytest.mark.browser`) flags tests that launch a
+real Chromium instance via Playwright — slower and require
+`playwright install chromium` first.
+
+## Development Standards
+
+- Google-style docstrings throughout.
+- Async-first: any new method that captures a screenshot or calls an LLM
+  must be `async`.
+- No backward-compatibility shims unless explicitly requested — breaking
+  changes are fine when they're the correct fix; document them clearly in
+  `CHANGELOG.md`.
+- Docs (`README.md`, `docs/`, this file) must match actual code behavior,
+  verified by running the commands/snippets, not by inference. When you
+  change a public signature, CLI flag, or module layout, update the docs in
+  the same change.
+- Don't fabricate benchmark or accuracy numbers — they must come from a real
+  run of the evaluator, committed as an artifact under `benchmarks/results/`.
