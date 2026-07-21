@@ -1,0 +1,373 @@
+"""Tests for wiring the axe-core engine into the public API, validator, and CLI.
+
+Unit tests mock the auditor and the LLM so mode semantics can be asserted
+without a browser or API key. Browser-marked tests run real chromium with the
+vendored axe-core bundle and require no API key at all.
+"""
+
+from __future__ import annotations
+
+import asyncio
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
+
+import pytest
+
+from layoutlens import AXE_VERSION, LayoutLens
+from layoutlens.a11y import A11yFinding, A11yReport
+from layoutlens.api.core import AnalysisResult
+from layoutlens.integrations.browser_use import AgentValidator, ValidationPolicy
+from layoutlens.integrations.browser_use.validator import normalize_wcag_reference
+
+FIXTURE_DIR = Path(__file__).parent.parent / "benchmarks" / "test_data" / "accessibility"
+VIOLATIONS_HTML = FIXTURE_DIR / "wcag_violations.html"
+
+
+def _finding(rule_id: str, refs: list[str]) -> A11yFinding:
+    return A11yFinding(
+        rule_id=rule_id,
+        impact="serious",
+        wcag_refs=refs,
+        description=f"{rule_id} description",
+        help_url=f"https://example.com/{rule_id}",
+        nodes=[{"target": [f"#{rule_id}"], "html": f"<div id='{rule_id}'></div>"}],
+    )
+
+
+def _report(violations: list[A11yFinding]) -> A11yReport:
+    return A11yReport(
+        source="page.html",
+        viewport="desktop",
+        engine_version=AXE_VERSION,
+        violations=violations,
+        incomplete=[],
+        passes_count=5,
+    )
+
+
+# ---------------------------------------------------------------------------
+# check_accessibility / audit_accessibility mode semantics (mocked auditor+LLM)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+class TestCheckAccessibilityModes:
+    """Mode semantics for check_accessibility with a mocked auditor and LLM."""
+
+    async def test_axe_mode_deterministic_never_calls_llm(self):
+        lens = LayoutLens()
+        report = _report(
+            [_finding("image-alt", ["wcag2a", "wcag111"]), _finding("color-contrast", ["wcag2aa", "wcag143"])]
+        )
+
+        with (
+            patch("layoutlens.api.core.AxeAuditor") as mock_auditor_cls,
+            patch("layoutlens.api.core.acompletion", new=AsyncMock()) as mock_llm,
+        ):
+            mock_auditor_cls.return_value.audit = AsyncMock(return_value=report)
+            result = await lens.check_accessibility("page.html", mode="axe")
+
+        # No LLM was touched.
+        mock_llm.assert_not_called()
+        # WCAG A/AA tags requested.
+        mock_auditor_cls.assert_called_once_with(run_only=["wcag2a", "wcag2aa"])
+
+        assert result.answer.lower().startswith("no")
+        assert "image-alt" in result.answer and "color-contrast" in result.answer
+        assert result.confidence == 1.0
+        assert result.reasoning == report.summary()
+        assert result.metadata["mode"] == "axe"
+        assert result.metadata["engine"] == f"axe-core {AXE_VERSION}"
+        assert result.metadata["a11y"]["violations"][0]["rule_id"] == "image-alt"
+
+    async def test_axe_mode_clean_answers_yes(self):
+        lens = LayoutLens()
+        report = _report([])
+
+        with (
+            patch("layoutlens.api.core.AxeAuditor") as mock_auditor_cls,
+            patch("layoutlens.api.core.acompletion", new=AsyncMock()) as mock_llm,
+        ):
+            mock_auditor_cls.return_value.audit = AsyncMock(return_value=report)
+            result = await lens.check_accessibility("page.html", mode="axe")
+
+        mock_llm.assert_not_called()
+        assert result.answer.lower().startswith("yes")
+        assert result.confidence == 1.0
+        assert result.metadata["mode"] == "axe"
+
+    async def test_hybrid_override_forces_no_when_violations(self):
+        lens = LayoutLens()
+        report = _report([_finding("color-contrast", ["wcag2aa", "wcag143"])])
+
+        llm_result = AnalysisResult(
+            source="page.html",
+            query="q",
+            answer="Yes, this page looks accessible",
+            confidence=0.6,
+            reasoning="The layout appears clean and usable.",
+        )
+        lens.analyze = AsyncMock(return_value=llm_result)
+
+        with patch("layoutlens.api.core.AxeAuditor") as mock_auditor_cls:
+            mock_auditor_cls.return_value.audit = AsyncMock(return_value=report)
+            result = await lens.check_accessibility("page.html", mode="hybrid")
+
+        # LLM was consulted, and its query carried the axe context block.
+        lens.analyze.assert_awaited_once()
+        injected_query = lens.analyze.call_args.args[1]
+        assert "Deterministic axe-core scan results" in injected_query
+
+        # Deterministic override wins.
+        assert result.answer.lower().startswith("no")
+        assert result.confidence == 1.0
+        assert "LLM assessment" in result.reasoning
+        assert "color-contrast" in result.reasoning
+        assert result.metadata["mode"] == "hybrid"
+        assert result.metadata["a11y"]["violations"][0]["rule_id"] == "color-contrast"
+        assert result.metadata["engine"] == f"axe-core {AXE_VERSION}"
+
+    async def test_hybrid_keeps_llm_answer_when_clean(self):
+        lens = LayoutLens()
+        report = _report([])
+
+        llm_result = AnalysisResult(
+            source="page.html",
+            query="q",
+            answer="Yes, fully accessible",
+            confidence=0.72,
+            reasoning="Good contrast and structure.",
+        )
+        lens.analyze = AsyncMock(return_value=llm_result)
+
+        with patch("layoutlens.api.core.AxeAuditor") as mock_auditor_cls:
+            mock_auditor_cls.return_value.audit = AsyncMock(return_value=report)
+            result = await lens.check_accessibility("page.html", mode="hybrid")
+
+        assert result.answer == "Yes, fully accessible"
+        assert result.confidence == 0.72
+        assert result.metadata["mode"] == "hybrid"
+        assert "a11y" in result.metadata
+
+    async def test_llm_mode_never_constructs_auditor(self):
+        lens = LayoutLens()
+
+        llm_result = AnalysisResult(
+            source="page.html",
+            query="q",
+            answer="Mostly accessible",
+            confidence=0.8,
+            reasoning="Some minor issues.",
+        )
+        lens.analyze = AsyncMock(return_value=llm_result)
+
+        with patch("layoutlens.api.core.AxeAuditor", new=MagicMock()) as mock_auditor_cls:
+            result = await lens.check_accessibility("page.html", mode="llm")
+
+        mock_auditor_cls.assert_not_called()
+        assert result.metadata["mode"] == "llm"
+        assert "a11y" not in result.metadata
+
+    @pytest.mark.parametrize(
+        "level,expected",
+        [
+            ("A", ["wcag2a"]),
+            ("AA", ["wcag2a", "wcag2aa"]),
+            ("AAA", ["wcag2a", "wcag2aa", "wcag2aaa"]),
+        ],
+    )
+    async def test_audit_accessibility_honors_compliance_level(self, level, expected):
+        lens = LayoutLens()
+        report = _report([_finding("image-alt", ["wcag2a", "wcag111"])])
+
+        with (
+            patch("layoutlens.api.core.AxeAuditor") as mock_auditor_cls,
+            patch("layoutlens.api.core.acompletion", new=AsyncMock()) as mock_llm,
+        ):
+            mock_auditor_cls.return_value.audit = AsyncMock(return_value=report)
+            result = await lens.audit_accessibility("page.html", compliance_level=level, mode="axe")
+
+        mock_llm.assert_not_called()
+        mock_auditor_cls.assert_called_once_with(run_only=expected)
+        assert result.confidence == 1.0
+        assert result.metadata["mode"] == "axe"
+
+
+# ---------------------------------------------------------------------------
+# WCAG reference normalization
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestWcagNormalization:
+    """normalize_wcag_reference maps free-text refs to axe tag form."""
+
+    @pytest.mark.parametrize(
+        "reference,expected",
+        [
+            ("WCAG 1.4.3", "wcag143"),
+            ("wcag 1.4.3", "wcag143"),
+            ("wcag 2.1 SC 1.4.3", "wcag143"),
+            ("wcag 2.1 SC 4.1.2", "wcag412"),
+            ("WCAG 1.4.11", "wcag1411"),
+            ("WCAG 2.4.7", "wcag247"),
+            ("WCAG AA", None),
+            ("wcag aaa", None),
+            ("no criterion here", None),
+        ],
+    )
+    def test_normalization(self, reference, expected):
+        assert normalize_wcag_reference(reference) == expected
+
+
+# ---------------------------------------------------------------------------
+# Validator machine-verification (mocked auditor + expert analysis)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+class TestValidatorVerification:
+    """validate_state cross-checks LLM findings against axe violations."""
+
+    def _make_validator(self, tmp_path) -> AgentValidator:
+        policy = ValidationPolicy(include_screenshots=False, experts=["accessibility_expert"])
+        return AgentValidator(policy=policy, output_dir=str(tmp_path))
+
+    def _mock_page(self):
+        page = Mock()
+        page.url = "http://localhost/page"
+        page.screenshot = AsyncMock()
+        return page
+
+    async def test_verified_true_when_tag_matches(self, tmp_path):
+        validator = self._make_validator(tmp_path)
+        validator._analyze_with_expert = AsyncMock(
+            return_value=AnalysisResult(
+                source="s",
+                query="q",
+                answer="Low contrast text",
+                confidence=0.7,
+                reasoning="This is a serious wcag 1.4.3 color contrast failure.",
+            )
+        )
+        report = _report([_finding("color-contrast", ["wcag2aa", "wcag143"])])
+
+        with patch("layoutlens.integrations.browser_use.validator.AxeAuditor") as mock_auditor_cls:
+            mock_auditor_cls.return_value.audit_page = AsyncMock(return_value=report)
+            step = await validator.validate_state(self._mock_page())
+
+        assert step.findings, "expected an extracted finding"
+        assert step.findings[0].wcag_reference is not None
+        assert step.findings[0].verified is True
+        assert step.metadata["a11y"]["violations"][0]["rule_id"] == "color-contrast"
+
+    async def test_verified_false_when_tag_absent(self, tmp_path):
+        validator = self._make_validator(tmp_path)
+        validator._analyze_with_expert = AsyncMock(
+            return_value=AnalysisResult(
+                source="s",
+                query="q",
+                answer="Low contrast text",
+                confidence=0.7,
+                reasoning="This is a serious wcag 1.4.3 color contrast failure.",
+            )
+        )
+        # axe reports a different criterion (1.1.1), not 1.4.3.
+        report = _report([_finding("image-alt", ["wcag2a", "wcag111"])])
+
+        with patch("layoutlens.integrations.browser_use.validator.AxeAuditor") as mock_auditor_cls:
+            mock_auditor_cls.return_value.audit_page = AsyncMock(return_value=report)
+            step = await validator.validate_state(self._mock_page())
+
+        assert step.findings[0].verified is False
+
+    async def test_verified_none_without_wcag_reference(self, tmp_path):
+        validator = self._make_validator(tmp_path)
+        validator._analyze_with_expert = AsyncMock(
+            return_value=AnalysisResult(
+                source="s",
+                query="q",
+                answer="Serious usability problem",
+                confidence=0.6,
+                reasoning="This is a serious layout problem with no criterion cited.",
+            )
+        )
+        report = _report([_finding("image-alt", ["wcag2a", "wcag111"])])
+
+        with patch("layoutlens.integrations.browser_use.validator.AxeAuditor") as mock_auditor_cls:
+            mock_auditor_cls.return_value.audit_page = AsyncMock(return_value=report)
+            step = await validator.validate_state(self._mock_page())
+
+        assert step.findings[0].wcag_reference is None
+        assert step.findings[0].verified is None
+
+    async def test_verified_none_when_axe_fails(self, tmp_path):
+        validator = self._make_validator(tmp_path)
+        validator._analyze_with_expert = AsyncMock(
+            return_value=AnalysisResult(
+                source="s",
+                query="q",
+                answer="Low contrast text",
+                confidence=0.7,
+                reasoning="This is a serious wcag 1.4.3 color contrast failure.",
+            )
+        )
+
+        with patch("layoutlens.integrations.browser_use.validator.AxeAuditor") as mock_auditor_cls:
+            mock_auditor_cls.return_value.audit_page = AsyncMock(side_effect=RuntimeError("axe boom"))
+            step = await validator.validate_state(self._mock_page())
+
+        # WCAG reference present but no axe data to check against -> stays None.
+        assert step.findings[0].wcag_reference is not None
+        assert step.findings[0].verified is None
+        assert "a11y" not in step.metadata
+
+
+# ---------------------------------------------------------------------------
+# Browser-marked: real chromium + vendored axe-core, no API key required.
+# ---------------------------------------------------------------------------
+
+
+def _chromium_available() -> bool:
+    """Return True if a headless chromium can be launched."""
+    from playwright.async_api import async_playwright
+
+    async def _check() -> bool:
+        try:
+            async with async_playwright() as p:
+                browser = await p.chromium.launch(headless=True)
+                await browser.close()
+            return True
+        except Exception:
+            return False
+
+    return asyncio.run(_check())
+
+
+requires_chromium = pytest.mark.skipif(
+    not _chromium_available(),
+    reason="chromium is not available for Playwright",
+)
+
+
+@pytest.mark.browser
+@requires_chromium
+class TestCheckAccessibilityBrowser:
+    """End-to-end axe mode with a real browser and no API key."""
+
+    def test_axe_mode_keyless_end_to_end(self, monkeypatch):
+        # Prove the headline promise: deterministic WCAG checks, no API key.
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+        lens = LayoutLens()
+        assert lens.api_key is None
+
+        result = asyncio.run(lens.check_accessibility(str(VIOLATIONS_HTML), mode="axe"))
+
+        assert result.answer.lower().startswith("no")
+        assert result.confidence == 1.0
+        assert result.metadata["mode"] == "axe"
+        assert result.metadata["engine"] == f"axe-core {AXE_VERSION}"
+        assert len(result.metadata["a11y"]["violations"]) > 0

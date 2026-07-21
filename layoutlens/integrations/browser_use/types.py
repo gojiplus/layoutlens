@@ -88,6 +88,9 @@ class ValidationFinding:
         location: Visual location or element reference if applicable.
         recommendation: Suggested fix for the issue.
         wcag_reference: WCAG guideline reference if applicable.
+        verified: Deterministic cross-check status against axe-core. ``True`` if the
+            finding's WCAG reference matches an axe violation, ``False`` if it does
+            not, ``None`` if there was no WCAG reference or no axe data to check.
         metadata: Additional context.
     """
 
@@ -98,6 +101,7 @@ class ValidationFinding:
     location: str | None = None
     recommendation: str | None = None
     wcag_reference: str | None = None
+    verified: bool | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
 

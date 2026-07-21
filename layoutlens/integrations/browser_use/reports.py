@@ -190,6 +190,7 @@ class ValidationReportGenerator:
                     "location": f.location,
                     "recommendation": f.recommendation,
                     "wcag_reference": f.wcag_reference,
+                    "verified": f.verified,
                 }
                 for f in step.findings
             ],
@@ -233,10 +234,17 @@ class ValidationReportGenerator:
             findings_html = ""
             for finding in step.findings:
                 color = severity_colors.get(finding.severity.value, "#6c757d")
+                if finding.verified is True:
+                    verified_html = '<span class="verified verified-yes">✓ machine-verified</span>'
+                elif finding.verified is False:
+                    verified_html = '<span class="verified verified-no">✗ not axe-confirmed</span>'
+                else:
+                    verified_html = ""
                 findings_html += f"""
                 <div class="finding" style="border-left: 4px solid {color};">
                     <span class="severity" style="background-color: {color};">{finding.severity.value.upper()}</span>
                     <span class="expert">[{finding.expert}]</span>
+                    {verified_html}
                     <p class="issue">{finding.issue[:300]}...</p>
                     {f'<p class="recommendation">Recommendation: {finding.recommendation}</p>' if finding.recommendation else ""}
                     {f'<p class="wcag">WCAG: {finding.wcag_reference}</p>' if finding.wcag_reference else ""}
@@ -365,6 +373,16 @@ class ValidationReportGenerator:
             font-weight: bold;
         }}
         .expert {{ color: #666; margin-left: 10px; }}
+        .verified {{
+            display: inline-block;
+            margin-left: 10px;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 0.8em;
+            font-weight: bold;
+        }}
+        .verified-yes {{ background-color: #28a745; color: white; }}
+        .verified-no {{ background-color: #e9ecef; color: #6c757d; }}
         .issue {{ margin: 10px 0; }}
         .recommendation {{ color: #28a745; font-style: italic; }}
         .wcag {{ color: #6610f2; }}

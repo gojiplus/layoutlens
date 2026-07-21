@@ -7,12 +7,15 @@ Provides hooks to validate agent actions in real-time using LayoutLens analysis.
 from __future__ import annotations
 
 import asyncio
+import re
 import time
 import uuid
 from collections.abc import Callable, Coroutine
+from dataclasses import asdict
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from ...a11y import AxeAuditor
 from ...api.core import AnalysisResult, LayoutLens
 from ...logger import get_logger
 from ...prompts import Instructions
@@ -29,6 +32,39 @@ from .types import (
 
 if TYPE_CHECKING:
     from playwright.async_api import Page
+
+
+def normalize_wcag_reference(reference: str) -> str | None:
+    """Normalize a free-text WCAG reference to an axe tag form.
+
+    Examples:
+        "WCAG 1.4.3" -> "wcag143"; "wcag 2.1 SC 1.4.3" -> "wcag143";
+        "WCAG 1.4.11" -> "wcag1411". The WCAG *version* (e.g. the "2.1" in
+        "wcag 2.1 sc ...") is ignored in favor of the success-criterion digits.
+
+    Args:
+        reference: A human-written WCAG reference (may include a version and an
+            "SC" marker).
+
+    Returns:
+        The axe tag (e.g. ``"wcag143"``) or ``None`` if no success criterion
+        could be extracted (e.g. a level-only reference like "WCAG AA").
+    """
+    ref = reference.lower()
+
+    # Prefer the criterion that follows an explicit "sc" marker.
+    sc_match = re.search(r"sc\s*(\d+(?:\.\d+)+)", ref)
+    if sc_match:
+        criterion = sc_match.group(1)
+    else:
+        # Otherwise take the last dotted number group; any leading group is the
+        # WCAG version (e.g. "2.1") which must not be treated as a criterion.
+        groups = re.findall(r"\d+(?:\.\d+)+", ref)
+        if not groups:
+            return None
+        criterion = groups[-1]
+
+    return "wcag" + "".join(criterion.split("."))
 
 
 class AgentValidator:
@@ -193,6 +229,16 @@ class AgentValidator:
             Path(screenshot_path).parent.mkdir(parents=True, exist_ok=True)
             await page.screenshot(path=screenshot_path, full_page=True)
 
+        # Deterministic axe-core cross-check on the live page. Findings stay
+        # unverified (verified=None) if the audit fails.
+        a11y_report = None
+        axe_tags: set[str] = set()
+        try:
+            a11y_report = await AxeAuditor().audit_page(page)
+            axe_tags = {tag for violation in a11y_report.violations for tag in violation.wcag_refs}
+        except Exception as e:
+            self.logger.warning(f"axe-core cross-check failed: {e}")
+
         findings: list[ValidationFinding] = []
         all_answers: list[str] = []
         all_reasoning: list[str] = []
@@ -231,9 +277,21 @@ class AgentValidator:
         num_analyses = len(self.policy.experts) + len(self.policy.custom_queries)
         avg_confidence = total_confidence / num_analyses if num_analyses > 0 else 0.0
 
+        # Machine-verify LLM findings against the deterministic axe report.
+        if a11y_report is not None:
+            for finding in findings:
+                if finding.wcag_reference:
+                    tag = normalize_wcag_reference(finding.wcag_reference)
+                    if tag is not None:
+                        finding.verified = tag in axe_tags
+
         filtered_findings = [f for f in findings if f.confidence >= self.policy.confidence_threshold]
 
         execution_time = time.time() - start_time
+
+        step_metadata: dict[str, Any] = {}
+        if a11y_report is not None:
+            step_metadata["a11y"] = asdict(a11y_report)
 
         step_result = ValidationStepResult(
             step_number=step_number,
@@ -246,6 +304,7 @@ class AgentValidator:
             reasoning="\n".join(all_reasoning),
             action_context=action_context or {},
             execution_time=execution_time,
+            metadata=step_metadata,
         )
 
         self._session.steps.append(step_result)
@@ -561,4 +620,4 @@ class AgentValidator:
         return self.get_session()
 
 
-__all__ = ["AgentValidator"]
+__all__ = ["AgentValidator", "normalize_wcag_reference"]
