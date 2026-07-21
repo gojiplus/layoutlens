@@ -199,16 +199,11 @@ class TestAxeBrowser:
 
         auditor = AxeAuditor(run_only=["wcag2a", "wcag2aa"])
         report = asyncio.run(auditor.audit(str(COMPLIANT_HTML)))
-        violations_report = asyncio.run(auditor.audit(str(VIOLATIONS_HTML)))
 
-        # The compliant fixture must have strictly fewer violations than the
-        # violations fixture, and must not repeat its image-alt failure.
-        assert len(report.violations) < len(violations_report.violations)
-        compliant_ids = {f.rule_id for f in report.violations}
-        assert "image-alt" not in compliant_ids
-        # NOTE: axe 4.10.3 still reports a real `color-contrast` violation on the
-        # "compliant" fixture, so report.ok is False. This is surfaced as a
-        # concern for the benchmark task rather than silently masked.
+        # The compliant fixture is genuinely clean under axe wcag2a+wcag2aa
+        # (the submit button's contrast was fixed to exceed 4.5:1 in Task 5).
+        assert report.ok is True, f"unexpected violations: {[f.rule_id for f in report.violations]}"
+        assert report.violations == []
 
     def test_open_page_serves_local_html(self):
         import asyncio
