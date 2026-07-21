@@ -35,7 +35,7 @@ Instead of writing complex selectors and assertions, just ask questions like:
 
 Get expert-level insights from built-in domain knowledge in **accessibility**, **conversion optimization**, **mobile UX**, and more.
 
-**✅ 95.2% accuracy** on real-world UI testing benchmarks
+**81.1% accuracy** (60/74 labeled queries, `gpt-4o-mini`, measured 2026-07-21) on the bundled benchmark suite — see [`benchmarks/results/2026-07-21_gpt-4o-mini.json`](benchmarks/results/2026-07-21_gpt-4o-mini.json)
 
 ## Quick Start
 
@@ -261,31 +261,30 @@ python benchmarks/evaluation/evaluator.py \
   --output evaluation_report.json
 ```
 
-### 3. Structured Benchmark Results
-The benchmark runner outputs clean JSON for analysis:
-```python
-# Example benchmark result structure
+### 3. Evaluated Benchmark Artifact
+The evaluator scores every answer deterministically (leading yes/no token vs the
+answer key; ambiguous answers count as incorrect) and writes an artifact with
+per-category and overall accuracy. The committed
+[`benchmarks/results/2026-07-21_gpt-4o-mini.json`](benchmarks/results/2026-07-21_gpt-4o-mini.json)
+is a real measured run:
+```json
 {
-  "benchmark_info": {
-    "total_tests": 150,
-    "successful_tests": 143,
-    "failed_tests": 7,
-    "success_rate": 0.953,
-    "batch_processing_used": true,
-    "model_used": "gpt-4o-mini"
+  "evaluation_summary": {
+    "date": "2026-07-21",
+    "model": "gpt-4o-mini",
+    "total_queries": 74,
+    "total_correct": 60,
+    "ambiguous_answers": 7,
+    "overall_accuracy": 0.811,
+    "evaluator_version": "2.0",
+    "evaluator_method": "Deterministic structured yes/no; ambiguous answers count as incorrect."
   },
-  "results": [
-    {
-      "html_file": "good_contrast.html",
-      "query": "Is this page accessible?",
-      "answer": "Yes, the page has good color contrast...",
-      "confidence": 0.89,
-      "reasoning": "WCAG guidelines are followed...",
-      "success": true,
-      "error": null,
-      "metadata": {"category": "accessibility"}
-    }
-  ]
+  "category_results": {
+    "responsive_design": {"total_queries": 21, "correct_predictions": 20, "accuracy": 0.952},
+    "layout_alignment":  {"total_queries": 24, "correct_predictions": 19, "accuracy": 0.792},
+    "accessibility":     {"total_queries": 21, "correct_predictions": 16, "accuracy": 0.762},
+    "ui_components":      {"total_queries": 8,  "correct_predictions": 5,  "accuracy": 0.625}
+  }
 }
 ```
 
@@ -348,7 +347,7 @@ lens = LayoutLens(
 - **Async-by-Default** - Concurrent processing for optimal performance
 - **Simple API** - One analyze method handles single pages, batches, and comparisons
 - **Structured JSON Output** - TypedDict schemas for full type safety in automation
-- **Comprehensive Benchmarking** - Built-in evaluation system with 95.2% accuracy
+- **Comprehensive Benchmarking** - Built-in evaluation system (81.1% measured accuracy, gpt-4o-mini, 74 queries)
 - **Production Ready** - Used by teams for real-world applications
 
 ---

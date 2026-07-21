@@ -62,22 +62,37 @@ python3 benchmarks_new/evaluation/evaluator.py \\
 
 ## 📊 Test Categories
 
-### Layout Alignment (4 tests)
-- **nav_centered.html** ✅ Perfect navigation centering
-- **nav_misaligned.html** ❌ 2% off-center (subtle issue)
-- **logo_correct.html** ✅ Logo on left (follows web conventions)
-- **logo_wrong.html** ❌ Logo on right (violates conventions)
+The suite has **18 HTML fixtures** with **74 labeled yes/no queries** across 4
+categories. Counts below reflect the answer keys in `answer_keys/`.
 
-### Accessibility (2 tests)
-- **wcag_compliant.html** ✅ Meets WCAG AA standards
-- **wcag_violations.html** ❌ Multiple accessibility violations
+### Layout Alignment (8 fixtures / 24 queries)
+- `nav_centered.html`, `nav_misaligned.html`, `logo_correct.html`, `logo_wrong.html`,
+  `flexbox_center_correct.html`, `flexbox_center_broken.html`,
+  `grid_layout_correct.html`, `grid_layout_broken.html`
 
-### Responsive Design (2 tests)
-- **mobile_friendly.html** ✅ Adapts perfectly to all screen sizes
-- **mobile_broken.html** ❌ Fixed width causes mobile issues
+### Accessibility (4 fixtures / 21 queries)
+- `wcag_compliant.html` ✅ Clean under axe-core (wcag2a+wcag2aa)
+- `wcag_violations.html` ❌ color-contrast + image-alt (axe-confirmed)
+- `focus_management_good.html`, `focus_management_broken.html`
 
-### UI Components (1 test)
-- **form_well_designed.html** ✅ Professional form with best practices
+### Responsive Design (5 fixtures / 21 queries)
+- `mobile_friendly.html`, `mobile_broken.html`, `container_queries_good.html`,
+  `viewport_units_broken.html`, `fluid_typography_good.html`
+
+### UI Components (1 fixture / 8 queries)
+- `form_well_designed.html` ✅ Professional form with best practices
+
+### Axe ground truth (accessibility)
+
+Each accessibility fixture's answer-key entry carries an `axe_ground_truth`
+block written by `generators/generate_a11y_ground_truth.py` — the real axe-core
+findings (rule ids, impacts, WCAG refs, engine version) so labels are
+machine-traceable. Regenerate/verify with:
+
+```bash
+uv run python benchmarks/generators/generate_a11y_ground_truth.py          # write
+uv run python benchmarks/generators/generate_a11y_ground_truth.py --check  # CI guard
+```
 
 ## 🎯 Answer Key Format
 
@@ -103,34 +118,35 @@ Each answer key contains structured ground truth data:
 
 ## 🔬 Evaluation Features
 
-### Semantic Answer Matching
-- Understands "No, the navigation is not properly centered" matches expected "no"
-- Handles various response formats and confidence levels
-- Accounts for AI explanation styles
+### Deterministic yes/no scoring (evaluator v2.0)
+- Every answer key `expected` is `"yes"` or `"no"`.
+- The evaluator parses the **leading yes/no token** of the model answer
+  (word-boundary parse, same parser as the runtime test suite) and compares it
+  to `expected`.
+- **Ambiguous / unparseable answers count as INCORRECT** — they are never
+  silently mapped to "no" (the old keyword-sentiment matcher did exactly that,
+  handing out free "no" credit).
 
 ### Comprehensive Reporting
 - Overall accuracy across all categories
-- Per-category breakdown
-- Confidence-based analysis
-- Detailed mismatch analysis
+- Per-category breakdown, with an ambiguous-answer count
+- Model, date, query count, and evaluator version/method recorded in the artifact
 
-### Example Evaluation Output:
+### Measured Evaluation Output (real run):
 ```
-📊 BENCHMARK EVALUATION SUMMARY
-========================================
-Overall Accuracy: 87.5% (14/16)
+BENCHMARK EVALUATION SUMMARY
+============================================================
+Model: gpt-4o-mini
+Overall Accuracy: 81.1% (60/74)
+Ambiguous (unparseable) answers: 7
 Categories Evaluated: 4
 
-📂 Layout Alignment:
-  Accuracy: 100.0% (4/4)
-  High Confidence Correct: 4
-  Avg AI Confidence: 0.95
-
-📂 Accessibility:
-  Accuracy: 75.0% (6/8)
-  High Confidence Correct: 5
-  Avg AI Confidence: 0.88
+Responsive Design:  95.2% (20/21)
+Layout Alignment:   79.2% (19/24)
+Accessibility:      76.2% (16/21)
+Ui Components:       62.5% (5/8)
 ```
+See the committed artifact: `results/2026-07-21_gpt-4o-mini.json`.
 
 ## ⚡ Key Improvements Over v1
 
@@ -143,7 +159,7 @@ Categories Evaluated: 4
 ### ✅ **Objective Testing**
 - Every test file has measurable criteria
 - Intentional issues with known causes
-- Semantic answer matching vs string matching
+- Deterministic yes/no scoring (ambiguous answers count as incorrect)
 - Confidence thresholds per test
 
 ### ✅ **Easy Automation**
@@ -162,38 +178,32 @@ Categories Evaluated: 4
 
 ### Run Full Benchmark Suite:
 ```bash
-# Generate test data
-python3 benchmarks_new/generators/benchmark_runner.py
+export OPENAI_API_KEY="your-key-here"
 
-# Test all categories
-for category in layout_alignment accessibility responsive_design ui_components; do
-  echo "Testing $category..."
-  for file in benchmarks_new/test_data/$category/*.html; do
-    python3 -c "
-from layoutlens import LayoutLens
-tester = LayoutLens()
-result = tester.test_page('$file')
-print(f'$(basename $file): {result.success_rate:.1%}' if result else '$(basename $file): FAILED')
-"
-  done
-done
+# 1. Run LayoutLens over all fixtures (74 queries; --no-batch scores each
+#    fixture against its own queries).
+uv run python benchmarks/run_benchmark.py --no-batch --output benchmarks/run_out
 
-# Evaluate results
-python3 benchmarks_new/evaluation/evaluator.py
+# 2. Score deterministically against the answer keys.
+uv run python benchmarks/evaluation/evaluator.py \
+  --answer-keys benchmarks/answer_keys \
+  --results benchmarks/run_out \
+  --output benchmarks/results/$(date +%F)_gpt-4o-mini.json
 ```
 
-### Expected Benchmark Performance:
-- **Layout Alignment**: >95% accuracy (issues are measurable)
-- **Accessibility**: >90% accuracy (clear violations)
-- **Responsive Design**: >85% accuracy (obvious mobile issues)
-- **UI Components**: >80% accuracy (design quality subjective)
+### Measured Benchmark Performance (gpt-4o-mini, 2026-07-21):
+- **Overall**: 81.1% (60/74)
+- **Responsive Design**: 95.2% (20/21)
+- **Layout Alignment**: 79.2% (19/24)
+- **Accessibility**: 76.2% (16/21)
+- **UI Components**: 62.5% (5/8)
 
 ## 🔄 Migration from Old Structure
 
 The old `benchmarks/` folder can be migrated by:
 1. Moving HTML files to appropriate `test_data/` categories
 2. Converting scattered answer formats to unified JSON keys
-3. Updating evaluation logic to use semantic matching
+3. Updating evaluation logic to use deterministic yes/no scoring
 
 This new structure makes it crystal clear:
 - **What generates the data** (`generators/`)

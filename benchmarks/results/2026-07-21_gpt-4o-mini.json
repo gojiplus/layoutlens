@@ -1,0 +1,806 @@
+{
+  "evaluation_summary": {
+    "timestamp": "2026-07-21T12:43:14.569107",
+    "date": "2026-07-21",
+    "model": "gpt-4o-mini",
+    "total_queries": 74,
+    "total_correct": 60,
+    "ambiguous_answers": 7,
+    "overall_accuracy": 0.8108108108108109,
+    "categories_evaluated": 4,
+    "evaluator_version": "2.0",
+    "evaluator_method": "Deterministic structured yes/no: the model answer's leading yes/no token (word-boundary parse) is compared to the answer key's expected value. Ambiguous/unparseable answers count as incorrect (never defaulted to 'no')."
+  },
+  "category_results": {
+    "layout_alignment": {
+      "total_queries": 24,
+      "correct_predictions": 19,
+      "accuracy": 0.7916666666666666,
+      "ambiguous_answers": 4,
+      "high_confidence_correct": 19,
+      "medium_confidence_correct": 0,
+      "low_confidence_correct": 0,
+      "avg_ai_confidence": 0.75
+    },
+    "ui_components": {
+      "total_queries": 8,
+      "correct_predictions": 5,
+      "accuracy": 0.625,
+      "ambiguous_answers": 0,
+      "high_confidence_correct": 5,
+      "medium_confidence_correct": 0,
+      "low_confidence_correct": 0,
+      "avg_ai_confidence": 0.825
+    },
+    "accessibility": {
+      "total_queries": 21,
+      "correct_predictions": 16,
+      "accuracy": 0.7619047619047619,
+      "ambiguous_answers": 3,
+      "high_confidence_correct": 15,
+      "medium_confidence_correct": 1,
+      "low_confidence_correct": 0,
+      "avg_ai_confidence": 0.7714285714285716
+    },
+    "responsive_design": {
+      "total_queries": 21,
+      "correct_predictions": 20,
+      "accuracy": 0.9523809523809523,
+      "ambiguous_answers": 0,
+      "high_confidence_correct": 20,
+      "medium_confidence_correct": 0,
+      "low_confidence_correct": 0,
+      "avg_ai_confidence": 0.8857142857142858
+    }
+  },
+  "detailed_results": {
+    "layout_alignment": [
+      {
+        "html_file": "nav_centered.html",
+        "query": "Is the navigation menu properly centered?",
+        "expected": "yes",
+        "parsed_answer": "yes",
+        "ai_answer": "Yes",
+        "is_correct": true,
+        "ai_confidence": 0.9,
+        "reasoning": "Navigation uses perfect centering with transform: translateX(-50%)"
+      },
+      {
+        "html_file": "nav_centered.html",
+        "query": "Does the navigation appear professionally aligned?",
+        "expected": "yes",
+        "parsed_answer": "yes",
+        "ai_answer": "Yes",
+        "is_correct": true,
+        "ai_confidence": 0.9,
+        "reasoning": "Perfect alignment demonstrates professional design standards"
+      },
+      {
+        "html_file": "nav_centered.html",
+        "query": "Are the navigation links evenly spaced?",
+        "expected": "yes",
+        "parsed_answer": "yes",
+        "ai_answer": "Yes",
+        "is_correct": true,
+        "ai_confidence": 0.9,
+        "reasoning": "Consistent margin: 0 1rem provides even spacing"
+      },
+      {
+        "html_file": "nav_misaligned.html",
+        "query": "Is the navigation menu properly centered?",
+        "expected": "no",
+        "parsed_answer": "no",
+        "ai_answer": "No, the navigation menu is not properly centered.",
+        "is_correct": true,
+        "ai_confidence": 0.9,
+        "reasoning": "Navigation is positioned 2% off-center to the right"
+      },
+      {
+        "html_file": "nav_misaligned.html",
+        "query": "Does the navigation appear professionally aligned?",
+        "expected": "no",
+        "parsed_answer": "no",
+        "ai_answer": "No, the navigation does not appear professionally aligned.",
+        "is_correct": true,
+        "ai_confidence": 0.9,
+        "reasoning": "Subtle misalignment affects professional appearance"
+      },
+      {
+        "html_file": "nav_misaligned.html",
+        "query": "Is there a noticeable alignment issue?",
+        "expected": "yes",
+        "parsed_answer": "yes",
+        "ai_answer": "Yes, there is a noticeable alignment issue.",
+        "is_correct": true,
+        "ai_confidence": 0.9,
+        "reasoning": "2% offset is subtle but should be detectable by AI vision"
+      },
+      {
+        "html_file": "logo_correct.html",
+        "query": "Is the company logo positioned correctly?",
+        "expected": "yes",
+        "parsed_answer": "yes",
+        "ai_answer": "yes",
+        "is_correct": true,
+        "ai_confidence": 0.9,
+        "reasoning": "Logo is correctly positioned on the left side following web conventions"
+      },
+      {
+        "html_file": "logo_correct.html",
+        "query": "Does the header follow standard web layout patterns?",
+        "expected": "yes",
+        "parsed_answer": "yes",
+        "ai_answer": "Yes, the header follows standard web layout patterns.",
+        "is_correct": true,
+        "ai_confidence": 0.8,
+        "reasoning": "Logo left, navigation right follows 95% of professional websites"
+      },
+      {
+        "html_file": "logo_correct.html",
+        "query": "Is the brand identity properly positioned?",
+        "expected": "yes",
+        "parsed_answer": "no",
+        "ai_answer": "No, the brand identity is not properly positioned.",
+        "is_correct": false,
+        "ai_confidence": 0.8,
+        "reasoning": "Logo placement supports brand recognition and user expectations"
+      },
+      {
+        "html_file": "logo_wrong.html",
+        "query": "Is the company logo positioned correctly?",
+        "expected": "no",
+        "parsed_answer": "no",
+        "ai_answer": "no",
+        "is_correct": true,
+        "ai_confidence": 0.9,
+        "reasoning": "Logo is incorrectly positioned on the right side, violating web conventions"
+      },
+      {
+        "html_file": "logo_wrong.html",
+        "query": "Does the header follow standard web layout patterns?",
+        "expected": "no",
+        "parsed_answer": "no",
+        "ai_answer": "No, the header does not follow standard web layout patterns.",
+        "is_correct": true,
+        "ai_confidence": 0.9,
+        "reasoning": "Reversed layout violates user expectations and web standards"
+      },
+      {
+        "html_file": "logo_wrong.html",
+        "query": "Would users expect the logo in this position?",
+        "expected": "no",
+        "parsed_answer": "no",
+        "ai_answer": "No, users would not expect the logo in this position.",
+        "is_correct": true,
+        "ai_confidence": 0.9,
+        "reasoning": "Users expect logos on the left based on web conventions"
+      },
+      {
+        "html_file": "flexbox_center_correct.html",
+        "query": "Is the hero content properly centered vertically and horizontally?",
+        "expected": "yes",
+        "parsed_answer": "yes",
+        "ai_answer": "yes",
+        "is_correct": true,
+        "ai_confidence": 1.0,
+        "reasoning": "Uses modern flexbox centering with both align-items: center and justify-content: center"
+      },
+      {
+        "html_file": "flexbox_center_correct.html",
+        "query": "Does the layout demonstrate modern CSS centering techniques?",
+        "expected": "yes",
+        "parsed_answer": "yes",
+        "ai_answer": "Yes, the layout demonstrates modern CSS centering techniques.",
+        "is_correct": true,
+        "ai_confidence": 0.9,
+        "reasoning": "Flexbox is the modern standard for centering content"
+      },
+      {
+        "html_file": "flexbox_center_correct.html",
+        "query": "Is the centering responsive and reliable across devices?",
+        "expected": "yes",
+        "parsed_answer": "yes",
+        "ai_answer": "Yes, the centering is responsive and reliable across devices.",
+        "is_correct": true,
+        "ai_confidence": 0.9,
+        "reasoning": "Flexbox centering works consistently across all viewport sizes"
+      },
+      {
+        "html_file": "flexbox_center_broken.html",
+        "query": "Is the hero content properly centered vertically and horizontally?",
+        "expected": "no",
+        "parsed_answer": "no",
+        "ai_answer": "No, the hero content is not properly centered vertically.",
+        "is_correct": true,
+        "ai_confidence": 0.9,
+        "reasoning": "Missing align-items: center causes content to stick to top instead of vertical center"
+      },
+      {
+        "html_file": "flexbox_center_broken.html",
+        "query": "Does the layout use proper flexbox centering techniques?",
+        "expected": "no",
+        "parsed_answer": "no",
+        "ai_answer": "No, the layout does not use proper flexbox centering techniques.",
+        "is_correct": true,
+        "ai_confidence": 0.9,
+        "reasoning": "Uses manual padding-top instead of flexbox align-items property"
+      },
+      {
+        "html_file": "flexbox_center_broken.html",
+        "query": "Would this centering work reliably across different screen sizes?",
+        "expected": "no",
+        "parsed_answer": "no",
+        "ai_answer": "No, this centering would not work reliably across different screen sizes.",
+        "is_correct": true,
+        "ai_confidence": 0.9,
+        "reasoning": "Manual padding approach fails on different viewport heights"
+      },
+      {
+        "html_file": "grid_layout_correct.html",
+        "query": "Is the CSS Grid layout properly structured with semantic areas?",
+        "expected": "yes",
+        "parsed_answer": "yes",
+        "ai_answer": "Yes, the CSS Grid layout is properly structured with semantic areas.",
+        "is_correct": true,
+        "ai_confidence": 0.9,
+        "reasoning": "Uses grid-template-areas for semantic layout structure and proper element positioning"
+      },
+      {
+        "html_file": "grid_layout_correct.html",
+        "query": "Does the responsive behavior work correctly across different screen sizes?",
+        "expected": "yes",
+        "parsed_answer": null,
+        "ai_answer": "Insufficient information to determine responsive behavior.",
+        "is_correct": false,
+        "ai_confidence": 0.2,
+        "reasoning": "Grid areas adapt properly from desktop 2-column to mobile single-column layout"
+      },
+      {
+        "html_file": "grid_layout_correct.html",
+        "query": "Is the layout semantic and accessible for screen readers?",
+        "expected": "yes",
+        "parsed_answer": "yes",
+        "ai_answer": "Yes, the layout is semantic and accessible for screen readers.",
+        "is_correct": true,
+        "ai_confidence": 0.8,
+        "reasoning": "Grid areas maintain logical document structure regardless of visual positioning"
+      },
+      {
+        "html_file": "grid_layout_broken.html",
+        "query": "Is the CSS Grid layout properly structured with semantic areas?",
+        "expected": "no",
+        "parsed_answer": null,
+        "ai_answer": "I cannot analyze the UI screenshot as I cannot view images.",
+        "is_correct": false,
+        "ai_confidence": 0.0,
+        "reasoning": "Missing grid-template-areas causes unpredictable element positioning based on DOM order"
+      },
+      {
+        "html_file": "grid_layout_broken.html",
+        "query": "Does the responsive behavior work correctly across different screen sizes?",
+        "expected": "no",
+        "parsed_answer": null,
+        "ai_answer": "I cannot assess the responsive behavior of the UI screenshot.",
+        "is_correct": false,
+        "ai_confidence": 0.0,
+        "reasoning": "Without grid areas, mobile layout becomes chaotic and unpredictable"
+      },
+      {
+        "html_file": "grid_layout_broken.html",
+        "query": "Would this layout be reliable and maintainable?",
+        "expected": "no",
+        "parsed_answer": null,
+        "ai_answer": "I cannot assess the reliability and maintainability of the layout without viewing the UI screenshot.",
+        "is_correct": false,
+        "ai_confidence": 0.0,
+        "reasoning": "Layout depends on DOM order instead of semantic structure, making it fragile"
+      }
+    ],
+    "ui_components": [
+      {
+        "html_file": "form_well_designed.html",
+        "query": "Is this form well-designed and user-friendly?",
+        "expected": "yes",
+        "parsed_answer": "yes",
+        "ai_answer": "Yes, the form is well-designed and user-friendly.",
+        "is_correct": true,
+        "ai_confidence": 0.8,
+        "reasoning": "Form follows best practices for UX, accessibility, and visual design"
+      },
+      {
+        "html_file": "form_well_designed.html",
+        "query": "Are all form fields properly labeled?",
+        "expected": "yes",
+        "parsed_answer": "no",
+        "ai_answer": "No, not all form fields are properly labeled.",
+        "is_correct": false,
+        "ai_confidence": 0.8,
+        "reasoning": "Every input has an associated label with proper for/id relationships"
+      },
+      {
+        "html_file": "form_well_designed.html",
+        "query": "Is the visual hierarchy clear and logical?",
+        "expected": "yes",
+        "parsed_answer": "yes",
+        "ai_answer": "Yes, the visual hierarchy is clear and logical.",
+        "is_correct": true,
+        "ai_confidence": 0.9,
+        "reasoning": "Form uses consistent typography, spacing, and visual weight to guide users"
+      },
+      {
+        "html_file": "form_well_designed.html",
+        "query": "Are interactive elements appropriately sized?",
+        "expected": "yes",
+        "parsed_answer": "yes",
+        "ai_answer": "Yes, interactive elements are appropriately sized.",
+        "is_correct": true,
+        "ai_confidence": 0.8,
+        "reasoning": "All inputs and buttons meet minimum size requirements for usability"
+      },
+      {
+        "html_file": "form_well_designed.html",
+        "query": "Does the form provide helpful user guidance?",
+        "expected": "yes",
+        "parsed_answer": "yes",
+        "ai_answer": "Yes, the form provides helpful user guidance.",
+        "is_correct": true,
+        "ai_confidence": 0.8,
+        "reasoning": "Help text and visual cues guide users through form completion"
+      },
+      {
+        "html_file": "form_well_designed.html",
+        "query": "Is the form accessible to users with disabilities?",
+        "expected": "yes",
+        "parsed_answer": "no",
+        "ai_answer": "No, the form is not fully accessible to users with disabilities.",
+        "is_correct": false,
+        "ai_confidence": 0.8,
+        "reasoning": "Form implements accessibility best practices for screen readers and keyboard users"
+      },
+      {
+        "html_file": "form_well_designed.html",
+        "query": "Does the form have appropriate visual feedback?",
+        "expected": "yes",
+        "parsed_answer": "no",
+        "ai_answer": "No, the form does not have appropriate visual feedback.",
+        "is_correct": false,
+        "ai_confidence": 0.8,
+        "reasoning": "Clear focus states and hover effects provide visual feedback for interactions"
+      },
+      {
+        "html_file": "form_well_designed.html",
+        "query": "Is the form layout clean and organized?",
+        "expected": "yes",
+        "parsed_answer": "yes",
+        "ai_answer": "Yes, the form layout is clean and organized.",
+        "is_correct": true,
+        "ai_confidence": 0.9,
+        "reasoning": "Consistent spacing, alignment, and visual grouping create clean layout"
+      }
+    ],
+    "accessibility": [
+      {
+        "html_file": "wcag_compliant.html",
+        "query": "Does this page meet WCAG accessibility guidelines?",
+        "expected": "yes",
+        "parsed_answer": "yes",
+        "ai_answer": "Yes, this page meets WCAG accessibility guidelines.",
+        "is_correct": true,
+        "ai_confidence": 0.8,
+        "reasoning": "Page implements all major WCAG AA requirements"
+      },
+      {
+        "html_file": "wcag_compliant.html",
+        "query": "Are all form fields properly labeled?",
+        "expected": "yes",
+        "parsed_answer": "yes",
+        "ai_answer": "Yes, all form fields are properly labeled.",
+        "is_correct": true,
+        "ai_confidence": 0.9,
+        "reasoning": "All inputs have associated labels with proper for/id relationships"
+      },
+      {
+        "html_file": "wcag_compliant.html",
+        "query": "Is the color contrast sufficient for readability?",
+        "expected": "yes",
+        "parsed_answer": "yes",
+        "ai_answer": "Yes, the color contrast is sufficient for readability.",
+        "is_correct": true,
+        "ai_confidence": 0.8,
+        "reasoning": "Text colors provide high contrast ratios exceeding WCAG standards"
+      },
+      {
+        "html_file": "wcag_compliant.html",
+        "query": "Are focus indicators visible and clear?",
+        "expected": "yes",
+        "parsed_answer": "no",
+        "ai_answer": "No, focus indicators are not visible and clear.",
+        "is_correct": false,
+        "ai_confidence": 0.9,
+        "reasoning": "All interactive elements have prominent 3px focus outlines"
+      },
+      {
+        "html_file": "wcag_compliant.html",
+        "query": "Are touch targets appropriately sized?",
+        "expected": "yes",
+        "parsed_answer": "yes",
+        "ai_answer": "Yes, touch targets are appropriately sized.",
+        "is_correct": true,
+        "ai_confidence": 0.8,
+        "reasoning": "All interactive elements meet 44px minimum touch target size"
+      },
+      {
+        "html_file": "wcag_compliant.html",
+        "query": "Is keyboard navigation supported?",
+        "expected": "yes",
+        "parsed_answer": "yes",
+        "ai_answer": "Yes, keyboard navigation is supported.",
+        "is_correct": true,
+        "ai_confidence": 0.9,
+        "reasoning": "Skip link and proper focus management enable keyboard-only use"
+      },
+      {
+        "html_file": "wcag_violations.html",
+        "query": "Does this page meet WCAG accessibility guidelines?",
+        "expected": "no",
+        "parsed_answer": "no",
+        "ai_answer": "No",
+        "is_correct": true,
+        "ai_confidence": 0.7,
+        "reasoning": "Page contains multiple critical WCAG violations"
+      },
+      {
+        "html_file": "wcag_violations.html",
+        "query": "Are all form fields properly labeled?",
+        "expected": "no",
+        "parsed_answer": "no",
+        "ai_answer": "No",
+        "is_correct": true,
+        "ai_confidence": 0.8,
+        "reasoning": "Form inputs use placeholder text instead of proper labels"
+      },
+      {
+        "html_file": "wcag_violations.html",
+        "query": "Is the color contrast sufficient for readability?",
+        "expected": "no",
+        "parsed_answer": "no",
+        "ai_answer": "No, the color contrast is not sufficient for readability.",
+        "is_correct": true,
+        "ai_confidence": 0.8,
+        "reasoning": "Text colors provide poor contrast ratios below WCAG minimums"
+      },
+      {
+        "html_file": "wcag_violations.html",
+        "query": "Are focus indicators visible and clear?",
+        "expected": "no",
+        "parsed_answer": "no",
+        "ai_answer": "No, focus indicators are not visible and clear.",
+        "is_correct": true,
+        "ai_confidence": 0.8,
+        "reasoning": "No focus styles defined for any interactive elements"
+      },
+      {
+        "html_file": "wcag_violations.html",
+        "query": "Are touch targets appropriately sized?",
+        "expected": "no",
+        "parsed_answer": "no",
+        "ai_answer": "No, the touch targets are not appropriately sized.",
+        "is_correct": true,
+        "ai_confidence": 0.8,
+        "reasoning": "Interactive elements are too small for reliable touch interaction"
+      },
+      {
+        "html_file": "wcag_violations.html",
+        "query": "Is the heading hierarchy logical?",
+        "expected": "no",
+        "parsed_answer": "yes",
+        "ai_answer": "Yes",
+        "is_correct": false,
+        "ai_confidence": 0.8,
+        "reasoning": "Page starts with h3 instead of h1, violating hierarchy rules"
+      },
+      {
+        "html_file": "wcag_violations.html",
+        "query": "Does the page include alternative text for images?",
+        "expected": "no",
+        "parsed_answer": "no",
+        "ai_answer": "No",
+        "is_correct": true,
+        "ai_confidence": 0.9,
+        "reasoning": "Images present without alt attributes"
+      },
+      {
+        "html_file": "focus_management_good.html",
+        "query": "Does the modal implement proper focus management?",
+        "expected": "yes",
+        "parsed_answer": null,
+        "ai_answer": "I cannot determine if the modal implements proper focus management based on the screenshot alone.",
+        "is_correct": false,
+        "ai_confidence": 0.2,
+        "reasoning": "Modal includes focus trapping, restoration, and proper keyboard navigation"
+      },
+      {
+        "html_file": "focus_management_good.html",
+        "query": "Are all interactive elements keyboard accessible?",
+        "expected": "yes",
+        "parsed_answer": "yes",
+        "ai_answer": "Yes",
+        "is_correct": true,
+        "ai_confidence": 0.8,
+        "reasoning": "All buttons, inputs, and modal have proper focus indicators and keyboard support"
+      },
+      {
+        "html_file": "focus_management_good.html",
+        "query": "Does the modal meet ARIA standards for dialogs?",
+        "expected": "yes",
+        "parsed_answer": null,
+        "ai_answer": "Insufficient information to determine compliance with ARIA standards for dialogs.",
+        "is_correct": false,
+        "ai_confidence": 0.5,
+        "reasoning": "Modal uses role='dialog', aria-modal='true', and aria-labelledby properly"
+      },
+      {
+        "html_file": "focus_management_good.html",
+        "query": "Is focus restoration implemented correctly?",
+        "expected": "yes",
+        "parsed_answer": null,
+        "ai_answer": "Insufficient information to determine if focus restoration is implemented correctly.",
+        "is_correct": false,
+        "ai_confidence": 0.5,
+        "reasoning": "Focus returns to the trigger button when modal is closed"
+      },
+      {
+        "html_file": "focus_management_broken.html",
+        "query": "Does the modal implement proper focus management?",
+        "expected": "no",
+        "parsed_answer": "no",
+        "ai_answer": "No",
+        "is_correct": true,
+        "ai_confidence": 0.9,
+        "reasoning": "Modal lacks focus trapping, restoration, and allows focus to escape to background"
+      },
+      {
+        "html_file": "focus_management_broken.html",
+        "query": "Are all interactive elements keyboard accessible?",
+        "expected": "no",
+        "parsed_answer": "no",
+        "ai_answer": "No",
+        "is_correct": true,
+        "ai_confidence": 0.8,
+        "reasoning": "Missing focus indicators, no keyboard support for modal, tab can escape modal"
+      },
+      {
+        "html_file": "focus_management_broken.html",
+        "query": "Does the modal meet ARIA standards for dialogs?",
+        "expected": "no",
+        "parsed_answer": "no",
+        "ai_answer": "No",
+        "is_correct": true,
+        "ai_confidence": 0.9,
+        "reasoning": "Missing role='dialog', aria-modal, and aria-labelledby attributes"
+      },
+      {
+        "html_file": "focus_management_broken.html",
+        "query": "Would screen reader users be able to use this modal effectively?",
+        "expected": "no",
+        "parsed_answer": "no",
+        "ai_answer": "No, screen reader users would not be able to use this modal effectively.",
+        "is_correct": true,
+        "ai_confidence": 0.9,
+        "reasoning": "Screen readers can access background content, modal not properly announced"
+      }
+    ],
+    "responsive_design": [
+      {
+        "html_file": "mobile_friendly.html",
+        "query": "Does the layout work well on mobile devices?",
+        "expected": "yes",
+        "parsed_answer": "yes",
+        "ai_answer": "Yes, the layout works well on mobile devices.",
+        "is_correct": true,
+        "ai_confidence": 0.9,
+        "reasoning": "Layout adapts properly with mobile-first responsive design"
+      },
+      {
+        "html_file": "mobile_friendly.html",
+        "query": "Are touch targets appropriately sized for mobile?",
+        "expected": "yes",
+        "parsed_answer": "yes",
+        "ai_answer": "Yes, touch targets are appropriately sized for mobile.",
+        "is_correct": true,
+        "ai_confidence": 0.9,
+        "reasoning": "All interactive elements meet 44px minimum touch target size"
+      },
+      {
+        "html_file": "mobile_friendly.html",
+        "query": "Is the text readable without horizontal scrolling?",
+        "expected": "yes",
+        "parsed_answer": "yes",
+        "ai_answer": "Yes, the text is readable without horizontal scrolling.",
+        "is_correct": true,
+        "ai_confidence": 0.9,
+        "reasoning": "Responsive design prevents horizontal scroll on mobile viewports"
+      },
+      {
+        "html_file": "mobile_friendly.html",
+        "query": "Does the navigation adapt appropriately for mobile?",
+        "expected": "yes",
+        "parsed_answer": "yes",
+        "ai_answer": "Yes, the navigation adapts appropriately for mobile.",
+        "is_correct": true,
+        "ai_confidence": 0.9,
+        "reasoning": "Navigation stacks vertically on mobile with larger touch targets"
+      },
+      {
+        "html_file": "mobile_friendly.html",
+        "query": "Does the grid layout adjust for different screen sizes?",
+        "expected": "yes",
+        "parsed_answer": "yes",
+        "ai_answer": "Yes, the grid layout adjusts for different screen sizes.",
+        "is_correct": true,
+        "ai_confidence": 0.9,
+        "reasoning": "CSS Grid auto-adjusts from 3 columns to 1 column on mobile"
+      },
+      {
+        "html_file": "mobile_broken.html",
+        "query": "Does the layout work well on mobile devices?",
+        "expected": "no",
+        "parsed_answer": "no",
+        "ai_answer": "No, the layout does not work well on mobile devices.",
+        "is_correct": true,
+        "ai_confidence": 0.9,
+        "reasoning": "Fixed width layout causes horizontal scrolling and poor mobile experience"
+      },
+      {
+        "html_file": "mobile_broken.html",
+        "query": "Are touch targets appropriately sized for mobile?",
+        "expected": "no",
+        "parsed_answer": "no",
+        "ai_answer": "No, touch targets are not appropriately sized for mobile.",
+        "is_correct": true,
+        "ai_confidence": 0.9,
+        "reasoning": "Interactive elements are far too small for reliable touch interaction"
+      },
+      {
+        "html_file": "mobile_broken.html",
+        "query": "Is the text readable without horizontal scrolling?",
+        "expected": "no",
+        "parsed_answer": "no",
+        "ai_answer": "No, the text is not readable without horizontal scrolling.",
+        "is_correct": true,
+        "ai_confidence": 0.9,
+        "reasoning": "Fixed width container forces horizontal scrolling on mobile"
+      },
+      {
+        "html_file": "mobile_broken.html",
+        "query": "Is the font size appropriate for mobile reading?",
+        "expected": "no",
+        "parsed_answer": "no",
+        "ai_answer": "No, the font size is not appropriate for mobile reading.",
+        "is_correct": true,
+        "ai_confidence": 0.9,
+        "reasoning": "Font sizes are too small for comfortable mobile reading"
+      },
+      {
+        "html_file": "mobile_broken.html",
+        "query": "Does the content adapt to smaller screens?",
+        "expected": "no",
+        "parsed_answer": "no",
+        "ai_answer": "No, the content does not adapt to smaller screens.",
+        "is_correct": true,
+        "ai_confidence": 0.9,
+        "reasoning": "No responsive design - layout identical across all screen sizes"
+      },
+      {
+        "html_file": "mobile_broken.html",
+        "query": "Are interactive elements usable on touch devices?",
+        "expected": "no",
+        "parsed_answer": "no",
+        "ai_answer": "No, interactive elements are not usable on touch devices.",
+        "is_correct": true,
+        "ai_confidence": 0.9,
+        "reasoning": "Touch targets too small and closely spaced for accurate tapping"
+      },
+      {
+        "html_file": "container_queries_good.html",
+        "query": "Does the layout use modern container-based responsive design?",
+        "expected": "yes",
+        "parsed_answer": "yes",
+        "ai_answer": "Yes, the layout uses modern container-based responsive design.",
+        "is_correct": true,
+        "ai_confidence": 0.9,
+        "reasoning": "Uses CSS container queries to adapt components based on container width rather than viewport"
+      },
+      {
+        "html_file": "container_queries_good.html",
+        "query": "Do the card components adapt appropriately to their available space?",
+        "expected": "yes",
+        "parsed_answer": "yes",
+        "ai_answer": "Yes, the card components adapt appropriately to their available space.",
+        "is_correct": true,
+        "ai_confidence": 0.8,
+        "reasoning": "Cards change layout and styling based on their container size, not just viewport"
+      },
+      {
+        "html_file": "container_queries_good.html",
+        "query": "Is there proper fallback support for older browsers?",
+        "expected": "yes",
+        "parsed_answer": "no",
+        "ai_answer": "No, there is not proper fallback support for older browsers.",
+        "is_correct": false,
+        "ai_confidence": 0.8,
+        "reasoning": "Includes @supports feature queries with media query fallbacks"
+      },
+      {
+        "html_file": "viewport_units_broken.html",
+        "query": "Does the layout handle viewport units correctly on mobile?",
+        "expected": "no",
+        "parsed_answer": "no",
+        "ai_answer": "No, the layout does not handle viewport units correctly on mobile.",
+        "is_correct": true,
+        "ai_confidence": 0.9,
+        "reasoning": "Uses 100vh which causes issues on mobile Safari due to dynamic address bar"
+      },
+      {
+        "html_file": "viewport_units_broken.html",
+        "query": "Is the typography scaling appropriate across devices?",
+        "expected": "no",
+        "parsed_answer": "no",
+        "ai_answer": "No, the typography scaling is not appropriate across devices.",
+        "is_correct": true,
+        "ai_confidence": 0.9,
+        "reasoning": "Text sized with viewport units becomes unreadable on some screens"
+      },
+      {
+        "html_file": "viewport_units_broken.html",
+        "query": "Would the layout work reliably across different browsers and devices?",
+        "expected": "no",
+        "parsed_answer": "no",
+        "ai_answer": "No, the layout would not work reliably across different browsers and devices.",
+        "is_correct": true,
+        "ai_confidence": 0.9,
+        "reasoning": "Viewport unit issues are particularly problematic on mobile browsers"
+      },
+      {
+        "html_file": "fluid_typography_good.html",
+        "query": "Does the typography scale smoothly and appropriately across all screen sizes?",
+        "expected": "yes",
+        "parsed_answer": "yes",
+        "ai_answer": "Yes, the typography scales smoothly and appropriately across all screen sizes.",
+        "is_correct": true,
+        "ai_confidence": 0.9,
+        "reasoning": "Uses CSS clamp() functions for perfect fluid typography with min/max constraints"
+      },
+      {
+        "html_file": "fluid_typography_good.html",
+        "query": "Are viewport height issues handled properly for mobile?",
+        "expected": "yes",
+        "parsed_answer": "yes",
+        "ai_answer": "Yes, viewport height issues are handled properly for mobile.",
+        "is_correct": true,
+        "ai_confidence": 0.8,
+        "reasoning": "Includes JavaScript solution for mobile viewport height with CSS custom properties"
+      },
+      {
+        "html_file": "fluid_typography_good.html",
+        "query": "Is the text hierarchy maintained across different screen sizes?",
+        "expected": "yes",
+        "parsed_answer": "yes",
+        "ai_answer": "Yes, the text hierarchy is maintained across different screen sizes.",
+        "is_correct": true,
+        "ai_confidence": 0.9,
+        "reasoning": "Proportional scaling maintains visual hierarchy at all viewport sizes"
+      },
+      {
+        "html_file": "fluid_typography_good.html",
+        "query": "Does the spacing system scale proportionally with typography?",
+        "expected": "yes",
+        "parsed_answer": "yes",
+        "ai_answer": "Yes, the spacing system scales proportionally with typography.",
+        "is_correct": true,
+        "ai_confidence": 0.9,
+        "reasoning": "Uses fluid spacing variables that scale harmoniously with text"
+      }
+    ]
+  }
+}

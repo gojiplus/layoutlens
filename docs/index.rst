@@ -15,7 +15,7 @@ LayoutLens Documentation
 
 LayoutLens is a production-ready AI-powered UI testing framework that enables natural language visual testing. It captures screenshots using Playwright and analyzes them with OpenAI's GPT-4 Vision API to validate layouts, accessibility, responsive design, and visual consistency.
 
-**Key Achievement:** 95.2% accuracy on professional ground truth benchmark suite.
+**Measured benchmark:** 81.1% accuracy (60/74 labeled queries, ``gpt-4o-mini``, 2026-07-21) on the bundled ground-truth suite (18 fixtures / 74 queries / 4 categories). See ``benchmarks/results/2026-07-21_gpt-4o-mini.json``.
 
 🚀 Quick Start
 --------------
@@ -40,8 +40,8 @@ LayoutLens is a production-ready AI-powered UI testing framework that enables na
 
 * **Natural Language Testing**: Ask questions like "Is the button properly aligned?"
 * **Multi-Viewport Support**: Test across mobile, tablet, and desktop
-* **Comprehensive Benchmarks**: 31 test cases across 9 UI categories
-* **95.2% Accuracy**: Validated on professional ground truth suite
+* **Comprehensive Benchmarks**: 18 fixtures / 74 queries / 4 categories
+* **81.1% Accuracy**: Measured on the bundled ground-truth suite (gpt-4o-mini, 2026-07-21)
 * **CI/CD Ready**: GitHub Actions and Jenkins integration
 
 📖 Documentation
@@ -59,8 +59,8 @@ LayoutLens is a production-ready AI-powered UI testing framework that enables na
 📊 Performance Metrics
 ----------------------
 
-* ✅ **95.2% accuracy** on ground truth benchmark suite
-* ✅ **31 HTML test files** across 9 specialized categories
+* ✅ **81.1% measured accuracy** on the ground-truth benchmark suite (gpt-4o-mini, 2026-07-21)
+* ✅ **18 HTML fixtures** across 4 categories (74 labeled yes/no queries)
 * ✅ **~23 seconds** average processing time per test
 * ✅ **Multi-viewport testing** with responsive design validation
 * ✅ **Production ready** with professional documentation
