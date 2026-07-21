@@ -772,39 +772,6 @@ Focus on:
         path = Path(source)
         return path.suffix.lower() in [".html", ".htm"]
 
-    def _detect_html_complexity(self, html_file_path: Path) -> bool:
-        """Detect if HTML file has external dependencies (CSS, JS, images)."""
-        try:
-            with open(html_file_path, encoding="utf-8") as f:
-                content = f.read().lower()
-
-            # Check for external resources
-            external_indicators = [
-                "<link",
-                "<script src",
-                "<img src",
-                "url(",
-                "href=",
-                "src=",
-                "@import",
-                "background-image",
-            ]
-
-            for indicator in external_indicators:
-                # Check if indicator is present and it's a relative path (not http/https/data)
-                if (
-                    indicator in content
-                    and "http://" not in content
-                    and "https://" not in content
-                    and "data:" not in content
-                ):
-                    return True
-
-            return False
-        except Exception:
-            # If we can't read the file, assume it's complex
-            return True
-
     async def _serve_html_and_capture(
         self,
         html_file_path: str | Path,
@@ -812,7 +779,12 @@ Focus on:
         wait_for_selector: str | None = None,
         wait_time: int | None = None,
     ) -> str:
-        """Serve HTML file locally and capture screenshot."""
+        """Serve a local HTML file and capture a screenshot.
+
+        Serving is delegated to :func:`layoutlens.browser.open_page` (used by
+        the capture engine), which stands up a temporary local HTTP server so
+        relative CSS/JS/image references resolve correctly.
+        """
         html_file_path = Path(html_file_path).resolve()
         if not html_file_path.exists():
             raise LayoutFileNotFoundError(
@@ -820,91 +792,13 @@ Focus on:
                 file_path=str(html_file_path),
             )
 
-        # Try file:// URL first for simple HTML files (faster)
-        if not self._detect_html_complexity(html_file_path):
-            self.logger.debug(f"Using file:// URL for simple HTML: {html_file_path}")
-            try:
-                file_url = f"file://{html_file_path}"
-                capture_engine = Capture(output_dir=self.output_dir / "screenshots")
-                screenshot_paths = await capture_engine.screenshots(
-                    [file_url], viewport, wait_for_selector=wait_for_selector, wait_time=wait_time
-                )
-                screenshot_path = screenshot_paths[0]
-                self.logger.info(f"Successfully captured HTML file via file:// URL: {html_file_path.name}")
-                return screenshot_path
-            except Exception as e:
-                self.logger.debug(f"file:// URL failed, falling back to HTTP server: {e}")
-
-        # Fall back to HTTP server for complex HTML files
-        self.logger.debug(f"Using HTTP server for complex HTML: {html_file_path}")
-
-        import http.server
-        import socket
-        import socketserver
-        import threading
-        import time
-
-        # Find available port
-        def find_free_port():
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.bind(("", 0))
-                s.listen(1)
-                port = s.getsockname()[1]
-            return port
-
-        port = find_free_port()
-
-        # Create a handler that serves files from the HTML file's directory
-        class LocalFileHandler(http.server.SimpleHTTPRequestHandler):
-            def __init__(self, *args, **kwargs):
-                super().__init__(*args, directory=str(html_file_path.parent), **kwargs)
-
-            def do_GET(self):
-                # Route based on path
-                match self.path:
-                    case "/" | "":
-                        # Serve our HTML file
-                        self.send_response(200)
-                        self.send_header("Content-type", "text/html")
-                        self.end_headers()
-                        with open(html_file_path, "rb") as f:
-                            self.wfile.write(f.read())
-                    case _:
-                        # Serve other files normally (CSS, JS, images)
-                        super().do_GET()
-
-            def log_message(self, format, *args):
-                # Suppress server logs
-                return
-
-        # Start server in background thread
-        httpd = socketserver.TCPServer(("", port), LocalFileHandler)
-        server_thread = threading.Thread(target=httpd.serve_forever)
-        server_thread.daemon = True
-        server_thread.start()
-
-        try:
-            # Give server time to start
-            await asyncio.sleep(0.5)
-
-            # Capture the served HTML page
-            local_url = f"http://localhost:{port}/"
-            self.logger.debug(f"Serving HTML file at {local_url}")
-
-            capture_engine = Capture(output_dir=str(self.output_dir / "screenshots"))
-            screenshot_paths = await capture_engine.screenshots(
-                [local_url], viewport, wait_for_selector=wait_for_selector, wait_time=wait_time
-            )
-            screenshot_path = screenshot_paths[0]
-
-            self.logger.info(f"Successfully captured HTML file via HTTP server: {html_file_path.name}")
-            return screenshot_path
-
-        finally:
-            # Stop the server
-            httpd.shutdown()
-            httpd.server_close()
-            server_thread.join(timeout=1)
+        capture_engine = Capture(output_dir=self.output_dir / "screenshots")
+        screenshot_paths = await capture_engine.screenshots(
+            [str(html_file_path)], viewport, wait_for_selector=wait_for_selector, wait_time=wait_time
+        )
+        screenshot_path = screenshot_paths[0]
+        self.logger.info(f"Successfully captured HTML file: {html_file_path.name}")
+        return screenshot_path
 
     # Unified Capture Method
 

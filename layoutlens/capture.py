@@ -8,12 +8,9 @@ import asyncio
 import hashlib
 import time
 from pathlib import Path
-from typing import Optional
 from urllib.parse import urlparse
 
-from playwright.async_api import async_playwright
-
-from .config import ViewportConfig
+from .browser import VIEWPORTS, open_page
 from .logger import get_logger, log_performance_metric
 
 
@@ -24,14 +21,8 @@ class Capture:
     One method handles everything - single URLs are just lists of 1 item.
     """
 
-    VIEWPORTS = {
-        "desktop": ViewportConfig("desktop", 1920, 1080, 1.0, False, False),
-        "laptop": ViewportConfig("laptop", 1366, 768, 1.0, False, False),
-        "tablet": ViewportConfig("tablet", 768, 1024, 2.0, True, True),
-        "mobile": ViewportConfig("mobile", 375, 667, 2.0, True, True),
-        "mobile_landscape": ViewportConfig("mobile_landscape", 667, 375, 2.0, True, True),
-        "mobile_portrait": ViewportConfig("mobile_portrait", 375, 667, 2.0, True, True),
-    }
+    # Reuse the canonical viewport definitions owned by the browser module.
+    VIEWPORTS = VIEWPORTS
 
     def __init__(self, output_dir: str | Path = "screenshots", timeout: int = 30000):
         """Initialize capture system."""
@@ -119,29 +110,9 @@ class Capture:
         wait_time: int | None = None,
     ) -> str:
         """Capture a single URL."""
-        viewport_config = self.VIEWPORTS[viewport]
         start_time = time.time()
 
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
-
-            # Set up proper mobile context with device emulation
-            context_options = {
-                "viewport": {"width": viewport_config.width, "height": viewport_config.height},
-                "device_scale_factor": viewport_config.device_scale_factor,
-                "is_mobile": viewport_config.is_mobile,
-                "has_touch": viewport_config.has_touch,
-                "user_agent": viewport_config.user_agent or "Mozilla/5.0 (compatible; LayoutLens/1.0)",
-            }
-
-            context = await browser.new_context(**context_options)
-
-            page = await context.new_page()
-            page.set_default_timeout(self.timeout)
-
-            # Navigate to URL
-            await page.goto(url, wait_until="networkidle")
-
+        async with open_page(url, viewport, timeout=self.timeout) as page:
             # Wait for specific selector if provided
             if wait_for_selector:
                 await page.wait_for_selector(wait_for_selector, timeout=self.timeout)
@@ -154,9 +125,6 @@ class Capture:
             filename = self._generate_filename(url, viewport)
             screenshot_path = self.output_dir / filename
             await page.screenshot(path=screenshot_path, full_page=True)
-
-            await context.close()
-            await browser.close()
 
             duration = time.time() - start_time
             self.logger.debug(f"Screenshot saved: {screenshot_path} ({duration:.2f}s)")
