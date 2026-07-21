@@ -12,6 +12,46 @@ from .api.core import LayoutLens
 from .exceptions import LayoutLensError
 
 
+async def _run_a11y(sources, args) -> int:
+    """Run accessibility checks for each source and print results.
+
+    In ``axe`` mode this works with no API key configured, since the check is
+    fully deterministic.
+    """
+    try:
+        lens = LayoutLens(api_key=args.api_key or os.getenv("OPENAI_API_KEY"), model=args.model)
+    except Exception as e:
+        print(f"Error initializing LayoutLens: {e}", file=sys.stderr)
+        return 1
+
+    try:
+        results = []
+        for source in sources:
+            result = await lens.check_accessibility(source, viewport=args.viewport, mode=args.a11y)
+            results.append(result)
+    except LayoutLensError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+    except Exception as e:
+        print(f"Unexpected error: {e}", file=sys.stderr)
+        return 1
+
+    if args.output == "json":
+        for result in results:
+            print(result.to_json())
+    else:
+        print()
+        for result in results:
+            print(f"📍 {result.source}")
+            print(f"♿ Accessibility ({args.a11y}): {result.answer}")
+            print(f"📊 Confidence: {result.confidence:.0%}")
+            if result.reasoning:
+                print(f"💭 {result.reasoning}")
+            print()
+
+    return 0
+
+
 async def main():
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(
@@ -44,6 +84,13 @@ Examples:
     )
     parser.add_argument("--api-key", help="API key (or set OPENAI_API_KEY env)")
     parser.add_argument("--model", "-m", default="gpt-4o-mini", help="AI model to use")
+    parser.add_argument(
+        "--a11y",
+        choices=["hybrid", "axe", "llm"],
+        default=None,
+        help="Run a WCAG accessibility check instead of a generic query. "
+        "'axe' is deterministic and needs no API key; 'hybrid' also runs LLM vision; 'llm' is vision-only.",
+    )
 
     args = parser.parse_args()
 
@@ -69,6 +116,16 @@ Examples:
     if not sources:
         print("Error: No valid sources provided", file=sys.stderr)
         return 1
+
+    # Accessibility mode: run built-in WCAG checks instead of a generic query.
+    if args.a11y:
+        if query:
+            print(
+                "Error: --query cannot be combined with --a11y (accessibility mode uses built-in WCAG checks)",
+                file=sys.stderr,
+            )
+            return 1
+        return await _run_a11y(sources, args)
 
     # Default query
     if not query:
