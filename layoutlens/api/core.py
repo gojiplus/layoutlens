@@ -59,6 +59,16 @@ from ..types import (
     ViewportType,
 )
 
+# Maps the provider strings accepted by LayoutLens(provider=...) to the
+# environment variable that holds credentials for that provider.
+PROVIDER_API_KEY_ENV_VARS: dict[str, str] = {
+    "openai": "OPENAI_API_KEY",
+    "anthropic": "ANTHROPIC_API_KEY",
+    "google": "GEMINI_API_KEY",
+    "gemini": "GEMINI_API_KEY",
+    "litellm": "OPENAI_API_KEY",
+}
+
 
 @dataclass(slots=True)
 class AnalysisResult:
@@ -188,9 +198,10 @@ class LayoutLens:
         # Determine API key based on provider
         self.api_key = api_key or self._get_api_key_for_provider(provider)
         if not self.api_key:
+            env_var = PROVIDER_API_KEY_ENV_VARS.get(provider, "OPENAI_API_KEY")
             self.logger.error(f"No API key found for {provider} provider")
             raise AuthenticationError(
-                f"API key required for {provider} provider. Set OPENAI_API_KEY env var or pass api_key parameter."
+                f"API key required for {provider} provider. Set {env_var} env var or pass api_key parameter."
             )
 
         self.model = model
@@ -220,7 +231,8 @@ class LayoutLens:
 
     def _get_api_key_for_provider(self, provider: str) -> str | None:
         """Get appropriate API key based on provider."""
-        return os.getenv("OPENAI_API_KEY")
+        env_var = PROVIDER_API_KEY_ENV_VARS.get(provider, "OPENAI_API_KEY")
+        return os.getenv(env_var)
 
     def _encode_image(self, image_path: str | Path) -> str:
         """Encode image to base64."""
@@ -347,9 +359,9 @@ Focus on:
         try:
             self.logger.debug(f"Making API call with LiteLLM to model: {self.model}")
 
-            response = await acompletion(
-                model=self.model,
-                messages=[
+            completion_kwargs: dict[str, Any] = {
+                "model": self.model,
+                "messages": [
                     {
                         "role": "user",
                         "content": [
@@ -358,11 +370,16 @@ Focus on:
                         ],
                     }
                 ],
-                max_tokens=1000,
-                temperature=0.1,
-                api_key=self.api_key,
-                timeout=30.0,
-            )
+                "max_tokens": 1000,
+                "temperature": 0.1,
+                "timeout": 30.0,
+            }
+            # Only pass api_key when we actually resolved one; otherwise let
+            # LiteLLM fall back to its own provider-specific env resolution.
+            if self.api_key:
+                completion_kwargs["api_key"] = self.api_key
+
+            response = await acompletion(**completion_kwargs)
 
             self.logger.debug(f"API call successful")
 
