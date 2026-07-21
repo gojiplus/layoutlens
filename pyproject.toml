@@ -103,6 +103,7 @@ markers = [
     "slow: Slow running tests",
     "requires_api: Tests that require API access",
     "performance: Performance benchmark tests",
+    "browser: Tests that launch a real chromium browser",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning",
