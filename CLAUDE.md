@@ -1,4 +1,4 @@
-# CLAUDE.md - LayoutLens v1.4.0
+# CLAUDE.md - LayoutLens v1.6.0
 
 This file provides guidance to Claude Code (claude.ai/code) when working with the LayoutLens codebase.
 
@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with th
 
  LayoutLens is a production-ready AI-powered UI testing framework that enables natural language visual testing. It captures screenshots using Playwright and analyzes them with OpenAI's GPT-4o Vision API to validate layouts, accessibility, responsive design, and visual consistency.
 
-**Current Version:** v1.5.0 (includes major API simplification, architectural cleanup, and enhanced pathlib support)
+**Current Version:** v1.6.0 (includes Browser Use integration for AI agent validation)
 
 ## Quick Start Commands
 
@@ -140,7 +140,13 @@ layoutlens/
 │   └── provider.py      # Simplified LayoutLensProvider (LiteLLM unified)
 ├── integrations/
 │   ├── __init__.py
-│   └── github.py        # GitHub Actions integration
+│   ├── github.py        # GitHub Actions integration
+│   └── browser_use/     # Browser agent validation
+│       ├── __init__.py
+│       ├── types.py     # ValidationPolicy, ValidationSession, etc.
+│       ├── validator.py # AgentValidator class
+│       ├── session.py   # SessionRecorder, SessionReplayer
+│       └── reports.py   # HTML/JSON report generation
 ├── cli.py               # Main CLI entry point
 ├── cli_commands.py      # Unified async command implementations
 ├── cli_interactive.py   # Interactive mode with Rich formatting
@@ -260,16 +266,45 @@ lens = LayoutLens(provider="litellm", model="gpt-4o")  # Direct LiteLLM access
 - ✅ **Input validation** - All user inputs validated before processing
 - ⚠️ **Always use v1.4.0+** - Previous versions had security vulnerabilities
 
-## New Features in v1.4.0
+## New Features in v1.6.0
 
-### CLI Improvements
+### Browser Use Integration
+LayoutLens now serves as the "intelligent eyes" for browser automation agents:
+
+```python
+from layoutlens.integrations.browser_use import AgentValidator, ValidationPolicy
+
+# Create validator with expert personas
+validator = AgentValidator(
+    experts=["accessibility_expert", "mobile_expert"],
+    policy=ValidationPolicy(capture_on_click=True)
+)
+
+# Get hooks for Browser Use agent
+hooks = validator.get_hooks()
+await agent.run(**hooks)
+
+# Get validation results
+session = validator.get_session()
+print(f"Found {session.total_findings} issues")
+```
+
+Key components:
+- **AgentValidator** - Hooks into Browser Use's action loop for real-time validation
+- **SessionRecorder** - Record sessions for replay/regression testing
+- **SessionReplayer** - Replay recordings with validation for regression detection
+- **ValidationReportGenerator** - Generate HTML/JSON reports with embedded screenshots
+
+### v1.4.0 Features (still available)
+
+#### CLI Improvements
 - ✅ **Async-by-default processing** - All commands use concurrent execution for optimal performance
 - ✅ **Test suite support** - Full YAML-based test suite execution with async processing
 - ✅ **Interactive mode** - Real-time analysis with Rich terminal formatting
 - ✅ **Batch processing** - Efficient concurrent analysis of multiple sources
 - ✅ **Unified command structure** - Single entry point with consistent async processing
 
-### Architecture Improvements
+#### Architecture Improvements
 - ✅ **LiteLLM unified provider** - Support for OpenAI, Anthropic, and Google via LiteLLM
 - ✅ **Result caching** - Memory and file-based caching for improved performance
 - ✅ **Structured logging** - Comprehensive logging with performance metrics
@@ -285,7 +320,7 @@ lens = LayoutLens(provider="litellm", model="gpt-4o")  # Direct LiteLLM access
 
 ## Development Notes
 
-### What Works (v1.4.0)
+### What Works (v1.6.0)
 - ✅ Core analysis API (`analyze`, `compare`, `analyze_batch`, `analyze_batch_async`)
 - ✅ Built-in checks (accessibility, mobile-friendly, conversion)
 - ✅ Full CLI command suite (test, compare, batch, interactive, info, generate, validate)
@@ -300,6 +335,9 @@ lens = LayoutLens(provider="litellm", model="gpt-4o")  # Direct LiteLLM access
 - ✅ Comprehensive error handling
 - ✅ Examples and documentation
 - ✅ Structured logging and performance metrics
+- ✅ **Browser Use integration** for AI agent validation
+- ✅ Session recording and replay for regression testing
+- ✅ HTML/JSON validation reports
 
 ### Development Standards
 - ✅ **Google-style docstrings** throughout codebase
