@@ -46,19 +46,80 @@ playwright install chromium  # For screenshot capture
 ```
 
 ### Basic Usage
+LayoutLens's API is async — run it with `asyncio.run(...)`, or `await` it
+directly if you're already inside an `async def` (e.g. pytest-asyncio,
+FastAPI, a notebook cell). Every snippet below assumes one of those two
+contexts; only the first one spells out the `asyncio.run(...)` wrapper.
 ```python
+import asyncio
 from layoutlens import LayoutLens
 
-# Initialize (uses OPENAI_API_KEY env var)
-lens = LayoutLens()
+async def main():
+    # Initialize (uses OPENAI_API_KEY env var)
+    lens = LayoutLens()
 
-# Test any website or local HTML
-result = await lens.analyze("https://your-site.com", "Is the header properly aligned?")
-print(f"Answer: {result.answer}")
-print(f"Confidence: {result.confidence:.1%}")
+    # Test any website or local HTML
+    result = await lens.analyze("https://your-site.com", "Is the header properly aligned?")
+    print(f"Answer: {result.answer}")
+    print(f"Confidence: {result.confidence:.1%}")
+
+asyncio.run(main())
 ```
 
 That's it! No selectors, no complex setup, just natural language questions.
+
+## Deterministic Accessibility Checks (axe-core) — No API Key Required
+
+LayoutLens vendors [axe-core](https://github.com/dequelabs/axe-core) 4.10.3 and runs it against a real
+Playwright-rendered page to catch actual WCAG 2.1 A/AA violations — not an LLM guess. This mode is fully
+keyless: no `OPENAI_API_KEY`, no network call to an AI provider, just deterministic, reproducible results.
+
+### CLI
+```bash
+# Deterministic axe-core scan only — no API key needed
+layoutlens page.html --a11y axe
+
+# Hybrid: axe-core + LLM vision, axe overrides the verdict on violations (needs an API key)
+layoutlens https://example.com --a11y hybrid
+
+# Legacy vision-only accessibility check (needs an API key)
+layoutlens page.html --a11y llm
+```
+`--a11y` requires one of `hybrid`/`axe`/`llm` and is mutually exclusive with `--query` — accessibility mode
+always uses the built-in WCAG checks instead of a free-form question.
+
+### Python
+```python
+from layoutlens import LayoutLens, AxeAuditor
+
+# Raw axe-core report — no LayoutLens instance or API key needed at all
+report = await AxeAuditor().audit("page.html")
+print(report.summary())
+print(report.ok)          # True if there are zero violations
+print(report.violations)  # list[A11yFinding]: rule_id, impact, wcag_refs, nodes, ...
+
+# Via the LayoutLens API, restricted to WCAG A/AA tags, still keyless
+lens = LayoutLens()  # no API key required at construction
+result = await lens.check_accessibility("page.html", mode="axe")
+print(result.answer)      # "Yes — axe-core found no WCAG A/AA violations" (or lists violated rules)
+```
+
+### The three modes
+- **`mode="axe"`** — deterministic axe-core only. No API key, no LLM call. `confidence` is always `1.0`.
+- **`mode="hybrid"`** (default for `check_accessibility`/`audit_accessibility`) — runs axe-core *and* the LLM
+  vision analysis, injecting the axe findings into the LLM's prompt as grounding context. If axe finds any
+  violation, the final verdict is deterministically forced to "no" (confidence `1.0`), regardless of what the
+  LLM says — axe overrides the model, not the other way around. If axe finds nothing, the LLM's own
+  answer/confidence are kept (it can still flag issues axe's automated rules can't catch, like poor
+  color choices that pass contrast math or confusing visual hierarchy).
+- **`mode="llm"`** — legacy vision-only analysis, no axe-core involved. Requires an API key.
+
+```python
+# Hybrid: axe grounds the LLM and can force the verdict
+result = await lens.check_accessibility("page.html", mode="hybrid")
+print(result.metadata["a11y"])   # full axe report dict
+print(result.metadata["engine"])  # "axe-core 4.10.3"
+```
 
 ## Key Functions
 
@@ -87,10 +148,12 @@ result = await lens.analyze(
 ```
 
 ### 2. Compare Layouts
-Perfect for A/B testing and redesign validation:
+Perfect for A/B testing and redesign validation. `compare()` accepts URLs or
+already-captured screenshot images directly; for local HTML files, capture
+screenshots first with `lens.capture(...)`:
 ```python
 result = await lens.compare(
-    ["old-design.html", "new-design.html"],
+    ["https://old-design.example.com", "https://new-design.example.com"],
     "Which design is more accessible?"
 )
 print(f"Winner: {result.answer}")
@@ -117,21 +180,23 @@ result = await lens.check_accessibility("product-page.html")  # Backward compati
 ```
 
 ### 4. Batch Testing
-Test multiple pages efficiently:
+`analyze()` handles single or multiple sources/queries — pass lists to either
+`source` or `query` and it fans out every combination concurrently:
 ```python
 results = await lens.analyze(
-    sources=["home.html", "about.html", "contact.html"],
-    queries=["Is it accessible?", "Is it mobile-friendly?"]
+    source=["home.html", "about.html", "contact.html"],
+    query=["Is it accessible?", "Is it mobile-friendly?"]
 )
-# Processes 6 tests in parallel
+# Returns a BatchResult; processes 6 combinations concurrently
+print(f"{results.successful_queries}/{results.total_queries} succeeded")
 ```
 
-### 5. High-Performance Async (3-5x faster)
+### 5. High-Performance Async (concurrency-controlled)
 ```python
-# Async for maximum throughput
+# Cap concurrent API calls with max_concurrent
 result = await lens.analyze(
-    sources=["page1.html", "page2.html", "page3.html"],
-    queries=["Is it accessible?"],
+    source=["page1.html", "page2.html", "page3.html"],
+    query="Is it accessible?",
     max_concurrent=5
 )
 ```
@@ -183,14 +248,58 @@ result = await lens.analyze_with_expert(
     }
 )
 
-# Expert comparison analysis
+# Expert comparison analysis (compare/compare_with_expert take URLs or
+# already-captured screenshots -- see the "Compare Layouts" note above)
 result = await lens.compare_with_expert(
-    sources=["old-design.html", "new-design.html"],
+    sources=["https://old.example.com", "https://new.example.com"],
     query="Which design converts better?",
     expert_persona="conversion_expert",
     focus_areas=["cta_prominence", "trust_signals"]
 )
 ```
+
+### 8. YAML Test Suites
+
+Test suites are declared in YAML/JSON and loaded into a `UITestSuite`. **Breaking
+change (v1.7.0):** every test case must declare `expected_results` — an `answer`
+("yes"/"no", matched against the parsed leading yes/no token of the analysis
+answer) and/or a `contains` list (terms that must appear, case-insensitively, in
+the answer + reasoning). A case with no `expected_results` now raises
+`ValidationError` at load time instead of silently grading on confidence alone.
+
+```yaml
+# test_suite.yaml
+name: "Homepage Suite"
+description: "Accessibility and layout checks"
+test_cases:
+  - name: "Navigation Alignment"
+    html_path: "pages/home.html"
+    queries:
+      - "Is the navigation menu properly centered?"
+    viewports: ["desktop"]
+    expected_results:
+      answer: "yes"
+      contains: ["centered"]
+    expected_confidence: 0.7   # optional, defaults to 0.7
+```
+
+```python
+import yaml
+from layoutlens import LayoutLens, UITestSuite
+
+with open("test_suite.yaml") as f:
+    suite = UITestSuite.from_dict(yaml.safe_load(f))
+
+lens = LayoutLens()
+results = await lens.run_test_suite(suite)  # list[UITestResult], one per test case
+for r in results:
+    print(f"{r.test_case_name}: {r.passed_tests}/{r.total_tests} passed")
+    print(r.to_json())  # includes per-assertion "assertion_detail"
+```
+
+There is no CLI subcommand for suites — `run_test_suite` is a Python API only.
+See [`examples/sample_test_suite.yaml`](examples/sample_test_suite.yaml) for a
+complete, runnable example.
 
 ## CLI Usage
 
@@ -201,15 +310,27 @@ layoutlens https://example.com "Is this accessible?"
 # Analyze local files
 layoutlens page.html "Is the design professional?"
 
-# Compare two designs
-layoutlens page1.html page2.html --compare
+# Compare two designs (compare works with URLs or existing screenshot images;
+# for local HTML files, capture screenshots first — see "Compare Layouts" above)
+layoutlens https://old.example.com https://new.example.com --compare
 
 # Analyze with different viewport
 layoutlens site.com "Is it mobile-friendly?" --viewport mobile
 
 # JSON output for automation
 layoutlens page.html "Is it accessible?" --output json
+
+# Deterministic WCAG accessibility scan — no API key required
+# (see "Deterministic Accessibility Checks" above for hybrid/llm modes)
+layoutlens page.html --a11y axe
+
+# Choose model / pass an API key explicitly
+layoutlens page.html "Is it accessible?" --model gpt-4o --api-key sk-...
 ```
+
+Run `layoutlens` with no arguments (or `--help`) to see the full flag reference:
+`--query/-q`, `--compare/-c`, `--viewport/-v {desktop,mobile,tablet}`,
+`--output/-o {text,json}`, `--api-key`, `--model/-m`, `--a11y {hybrid,axe,llm}`.
 
 ## CI/CD Integration
 
@@ -348,7 +469,7 @@ lens = LayoutLens(
 - **Simple API** - One analyze method handles single pages, batches, and comparisons
 - **Structured JSON Output** - TypedDict schemas for full type safety in automation
 - **Comprehensive Benchmarking** - Built-in evaluation system (81.1% measured accuracy, gpt-4o-mini, 74 queries)
-- **Production Ready** - Used by teams for real-world applications
+- **Deterministic Accessibility** - Vendored axe-core WCAG 2.1 A/AA checks, no API key or LLM variance
 
 ---
 

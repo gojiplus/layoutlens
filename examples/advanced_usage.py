@@ -39,7 +39,12 @@ async def advanced_analysis_with_context():
 
 
 async def comprehensive_comparison_workflow():
-    """Demonstrate advanced comparison scenarios."""
+    """Demonstrate advanced comparison scenarios.
+
+    compare() accepts URLs or already-captured screenshot images directly.
+    For local HTML files, capture screenshots first with capture() -- passing
+    raw .html paths to compare() skips screenshot rendering and fails.
+    """
 
     tester = LayoutLens(output_dir="comparison_analysis")
 
@@ -49,11 +54,14 @@ async def comprehensive_comparison_workflow():
         "comparison_type": "redesign_evaluation",
     }
 
+    html_files = [
+        "benchmarks/test_data/layout_alignment/nav_misaligned.html",
+        "benchmarks/test_data/layout_alignment/nav_centered.html",
+    ]
+    screenshots = await tester.capture(html_files)
+
     result = await tester.compare(
-        sources=[
-            "benchmarks/test_data/layout_alignment/nav_misaligned.html",
-            "benchmarks/test_data/layout_alignment/nav_centered.html",
-        ],
+        sources=[screenshots[path] for path in html_files],
         query="How does the redesigned navigation improve the user experience?",
         context=before_after_context,
     )
@@ -70,14 +78,14 @@ async def batch_analysis_workflow():
     # Define pages to analyze
     pages = [
         "benchmarks/test_data/layout_alignment/nav_centered.html",
-        "benchmarks/test_data/accessibility/good_contrast.html",
-        "benchmarks/test_data/responsive_design/mobile_optimized.html",
+        "benchmarks/test_data/accessibility/wcag_compliant.html",
+        "benchmarks/test_data/responsive_design/mobile_friendly.html",
     ]
 
     # Run batch analysis
     results = await tester.analyze(
-        sources=pages,
-        queries="Does this page follow modern web design best practices?",
+        source=pages,
+        query="Does this page follow modern web design best practices?",
         context={"evaluation_focus": "ux_principles"},
     )
 
@@ -95,7 +103,7 @@ async def specialized_checks_workflow():
     # Comprehensive accessibility audit
     print("\n=== Accessibility Analysis ===")
     accessibility_result = await tester.check_accessibility(
-        source="benchmarks/test_data/accessibility/good_contrast.html"
+        source="benchmarks/test_data/accessibility/wcag_compliant.html"
     )
     print(f"Accessibility: {accessibility_result.answer}")
     print(f"Confidence: {accessibility_result.confidence:.1%}")
@@ -103,7 +111,7 @@ async def specialized_checks_workflow():
     # Mobile experience evaluation
     print("\n=== Mobile-Friendly Analysis ===")
     mobile_result = await tester.check_mobile_friendly(
-        source="benchmarks/test_data/responsive_design/mobile_optimized.html"
+        source="benchmarks/test_data/responsive_design/mobile_friendly.html"
     )
     print(f"Mobile-friendly: {mobile_result.answer}")
     print(f"Confidence: {mobile_result.confidence:.1%}")
@@ -157,8 +165,8 @@ async def performance_optimized_workflow():
     start_time = time.time()
 
     results = await tester.analyze(
-        sources=test_pages,
-        queries="Rate the overall design quality on a scale of 1-10 and explain why.",
+        source=test_pages,
+        query="Rate the overall design quality on a scale of 1-10 and explain why.",
     )
 
     elapsed_time = time.time() - start_time

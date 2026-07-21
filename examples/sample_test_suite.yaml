@@ -1,51 +1,28 @@
 name: "Sample Website Test Suite"
-description: "Comprehensive testing for clean benchmark test cases across multiple viewports"
+description: "Example test suite showing the required expected_results schema"
 
 test_cases:
   - name: "Navigation Alignment Desktop"
     html_path: "benchmarks/test_data/layout_alignment/nav_centered.html"
     queries:
       - "Is the navigation menu properly centered?"
-      - "Does the layout look professional and polished?"
-      - "Are navigation elements evenly spaced?"
-      - "Is the visual hierarchy clear?"
-    viewports: ["desktop", "desktop_large"]
+    viewports: ["desktop"]
     expected_results:
-      "navigation": "centered"
-      "professional": "yes"
-      "spacing": "even"
+      answer: "yes"
+      contains: ["centered"]
+    expected_confidence: 0.7
     metadata:
       priority: "high"
       test_type: "layout_alignment"
-
-  - name: "Navigation Alignment Mobile"
-    html_path: "benchmarks/test_data/layout_alignment/nav_centered.html"
-    queries:
-      - "Does the navigation adapt well to mobile?"
-      - "Are touch targets appropriately sized?"
-      - "Is the content readable on mobile devices?"
-      - "Is the mobile layout properly organized?"
-    viewports: ["mobile_portrait", "tablet_portrait"]
-    expected_results:
-      "mobile_nav": "adapted"
-      "touch_targets": "appropriate"
-      "readability": "good"
-    metadata:
-      priority: "high"
-      test_type: "responsive"
 
   - name: "Well-Designed Form"
     html_path: "benchmarks/test_data/ui_components/form_well_designed.html"
     queries:
       - "Are all form fields properly labeled?"
-      - "Is the form layout clean and organized?"
-      - "Are required fields clearly indicated?"
-      - "Is the submit button prominent and accessible?"
     viewports: ["desktop", "tablet_portrait"]
     expected_results:
-      "form_labels": "proper"
-      "layout": "clean"
-      "required_fields": "indicated"
+      answer: "yes"
+    expected_confidence: 0.7
     metadata:
       priority: "high"
       test_type: "ui_components"
@@ -54,14 +31,11 @@ test_cases:
     html_path: "benchmarks/test_data/accessibility/wcag_compliant.html"
     queries:
       - "Does the page meet accessibility standards?"
-      - "Is the color contrast sufficient?"
-      - "Are focus indicators visible?"
-      - "Is keyboard navigation supported?"
     viewports: ["desktop", "mobile_portrait"]
     expected_results:
-      "accessibility": "compliant"
-      "contrast": "sufficient"
-      "focus": "visible"
+      answer: "yes"
+      contains: ["contrast"]
+    expected_confidence: 0.7
     metadata:
       priority: "high"
       test_type: "accessibility"
@@ -70,21 +44,20 @@ test_cases:
     html_path: "benchmarks/test_data/responsive_design/mobile_friendly.html"
     queries:
       - "Does the layout adapt to different screen sizes?"
-      - "Are touch targets sized appropriately?"
-      - "Is the content readable without zooming?"
-      - "Does the design work well on mobile?"
-    viewports: ["mobile_portrait", "tablet_portrait", "desktop"]
+    viewports: ["mobile_portrait", "desktop"]
     expected_results:
-      "responsive": "adaptive"
-      "touch_targets": "appropriate"
-      "mobile_friendly": "yes"
+      answer: "yes"
+    expected_confidence: 0.7
     metadata:
       priority: "medium"
       test_type: "responsive_design"
 
 metadata:
-  version: "2.0"
-  created_by: "LayoutLens Framework v2"
-  test_environment: "clean_benchmark_suite"
-  browser_requirements: "Chrome, Firefox, Safari"
-  notes: "Updated test suite using clean benchmark structure with paired good/bad examples"
+  version: "1.7.0"
+  created_by: "LayoutLens"
+  notes: >
+    expected_results is required per case: declare "answer" ("yes"/"no",
+    matched against the leading yes/no token of the analysis answer) and/or
+    "contains" (terms that must appear, case-insensitively, in the answer +
+    reasoning). expected_confidence (default 0.7) is an additional minimum-
+    confidence gate.

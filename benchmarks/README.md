@@ -5,7 +5,7 @@
 ## 🏗️ Structure Overview
 
 ```
-benchmarks_new/
+benchmarks/
 ├── generators/              # Scripts that create test data
 │   └── benchmark_runner.py  # Main generator - run this to create all test files
 ├── test_data/              # Generated HTML test files (paired good/bad examples)
@@ -28,7 +28,7 @@ benchmarks_new/
 ### 1. Generate Test Data
 ```bash
 # Create all HTML test files
-python3 benchmarks_new/generators/benchmark_runner.py
+python3 benchmarks/generators/benchmark_runner.py
 ```
 
 ### 2. Run LayoutLens on Test Data
@@ -36,27 +36,39 @@ python3 benchmarks_new/generators/benchmark_runner.py
 # Set your API key
 export OPENAI_API_KEY="your-key-here"
 
-# Test a few examples
+# Test a few examples (LayoutLens's API is async)
 python3 -c "
+import asyncio
 from layoutlens import LayoutLens
-tester = LayoutLens()
 
-# Test positive example (should pass)
-result = tester.test_page('benchmarks_new/test_data/layout_alignment/nav_centered.html')
-print(f'Navigation centered: {result.success_rate:.1%}')
+async def main():
+    lens = LayoutLens()
 
-# Test negative example (should detect issues)
-result = tester.test_page('benchmarks_new/test_data/layout_alignment/nav_misaligned.html')
-print(f'Navigation misaligned: {result.success_rate:.1%}')
+    # Positive example (should be judged well-aligned)
+    result = await lens.analyze(
+        'benchmarks/test_data/layout_alignment/nav_centered.html',
+        'Is the navigation menu properly centered?',
+    )
+    print(f'Navigation centered: {result.answer} (confidence: {result.confidence:.1%})')
+
+    # Negative example (should detect the misalignment)
+    result = await lens.analyze(
+        'benchmarks/test_data/layout_alignment/nav_misaligned.html',
+        'Is the navigation menu properly centered?',
+    )
+    print(f'Navigation misaligned: {result.answer} (confidence: {result.confidence:.1%})')
+
+asyncio.run(main())
 "
 ```
 
 ### 3. Evaluate Against Ground Truth
 ```bash
-# Run benchmark evaluation
-python3 benchmarks_new/evaluation/evaluator.py \\
-  --answer-keys benchmarks_new/answer_keys \\
-  --results layoutlens_output/results \\
+# Run benchmark evaluation (see "Testing LayoutLens" below for the full,
+# verified end-to-end command)
+uv run python benchmarks/evaluation/evaluator.py \
+  --answer-keys benchmarks/answer_keys \
+  --results benchmarks/run_out \
   --output benchmark_evaluation.json
 ```
 
@@ -198,14 +210,9 @@ uv run python benchmarks/evaluation/evaluator.py \
 - **Accessibility**: 76.2% (16/21)
 - **UI Components**: 62.5% (5/8)
 
-## 🔄 Migration from Old Structure
+## 🗂️ Why This Structure
 
-The old `benchmarks/` folder can be migrated by:
-1. Moving HTML files to appropriate `test_data/` categories
-2. Converting scattered answer formats to unified JSON keys
-3. Updating evaluation logic to use deterministic yes/no scoring
-
-This new structure makes it crystal clear:
+This structure makes it crystal clear:
 - **What generates the data** (`generators/`)
 - **What the test data is** (`test_data/`)
 - **What the right answers are** (`answer_keys/`)

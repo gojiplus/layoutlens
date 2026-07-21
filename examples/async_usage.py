@@ -57,8 +57,8 @@ async def async_batch_analysis():
 
         # Use async batch processing
         result = await lens.analyze(
-            sources=sources,
-            queries=queries,
+            source=sources,
+            query=queries,
             viewport="desktop",
             max_concurrent=3,  # Limit concurrent API calls
         )
@@ -107,7 +107,7 @@ async def compare_sync_vs_async():
         # Time asynchronous batch processing
         print("Testing asynchronous batch processing...")
         start_time = time.time()
-        await lens.analyze(sources=sources, queries=queries, max_concurrent=2)
+        await lens.analyze(source=sources, query=queries, max_concurrent=2)
         async_time = time.time() - start_time
 
         print("\nPerformance Comparison:")
@@ -159,8 +159,8 @@ async def async_test_suite_simulation():
 
             start_time = time.time()
             result = await lens.analyze(
-                sources=[test_case["source"]],
-                queries=test_case["queries"],
+                source=[test_case["source"]],
+                query=test_case["queries"],
                 max_concurrent=3,
             )
             test_time = time.time() - start_time
