@@ -112,13 +112,21 @@ class TestExceptionHandlers:
 class TestLayoutLensExceptions:
     """Test exception handling in LayoutLens class."""
 
-    def test_missing_api_key(self):
-        """Test AuthenticationError when API key is missing."""
-        with (
-            patch.dict("os.environ", {}, clear=True),
-            pytest.raises(AuthenticationError, match="API key required"),
-        ):
-            LayoutLens()
+    def test_missing_api_key_constructor_tolerant(self):
+        """The constructor tolerates a missing key (deferred to first LLM use)."""
+        with patch.dict("os.environ", {}, clear=True):
+            lens = LayoutLens()
+            assert lens.api_key is None
+
+    @pytest.mark.asyncio
+    async def test_missing_api_key_raises_on_first_llm_use(self, tmp_path):
+        """AuthenticationError surfaces at the vision-API choke point, not construction."""
+        image = tmp_path / "shot.png"
+        image.write_bytes(b"not-a-real-png")
+        with patch.dict("os.environ", {}, clear=True):
+            lens = LayoutLens()
+            with pytest.raises(AuthenticationError, match="API key required"):
+                await lens._call_vision_api(str(image), "Is it accessible?")
 
     @pytest.mark.asyncio
     async def test_empty_query_validation(self):

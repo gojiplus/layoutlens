@@ -40,8 +40,10 @@ class TestProviderApiKeySelection:
         monkeypatch.setenv("OPENAI_API_KEY", "openai-key")
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
 
-        with pytest.raises(AuthenticationError, match="ANTHROPIC_API_KEY"):
-            LayoutLens(provider="anthropic", model="test-model")
+        # Constructor no longer raises for a missing key; the error is deferred
+        # to the first LLM use so deterministic-only operations stay keyless.
+        lens = LayoutLens(provider="anthropic", model="test-model")
+        assert lens.api_key is None
 
     def test_explicit_api_key_wins_over_env_var(self, monkeypatch):
         monkeypatch.setenv("ANTHROPIC_API_KEY", "env-key")
@@ -58,10 +60,49 @@ class TestProviderApiKeySelection:
             ("google", "GEMINI_API_KEY"),
         ],
     )
-    def test_missing_key_error_names_correct_env_var(self, monkeypatch, provider, env_var):
+    def test_missing_key_does_not_raise_in_constructor(self, monkeypatch, provider, env_var):
+        """The constructor must be usable with zero API keys (keyless axe mode)."""
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
         monkeypatch.delenv("GEMINI_API_KEY", raising=False)
 
+        lens = LayoutLens(provider=provider, model="test-model")
+        assert lens.api_key is None
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "provider,env_var",
+        [
+            ("openai", "OPENAI_API_KEY"),
+            ("anthropic", "ANTHROPIC_API_KEY"),
+            ("google", "GEMINI_API_KEY"),
+        ],
+    )
+    async def test_missing_key_error_surfaces_on_first_llm_use(self, monkeypatch, tmp_path, provider, env_var):
+        """The missing-key error must surface on the first LLM call, naming the right env var."""
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+
+        lens = LayoutLens(provider=provider, model="test-model")
+
+        # The vision-API call is the choke point where the key is enforced.
+        image = tmp_path / "shot.png"
+        image.write_bytes(b"not-a-real-png")
+
         with pytest.raises(AuthenticationError, match=env_var):
-            LayoutLens(provider=provider, model="test-model")
+            await lens._call_vision_api(str(image), "Is it accessible?")
+
+    @pytest.mark.asyncio
+    async def test_missing_key_error_surfaces_through_analyze(self, monkeypatch, tmp_path):
+        """analyze() must surface the deferred key error in its result (not a bare success)."""
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+        lens = LayoutLens(provider="openai", model="test-model")
+
+        image = tmp_path / "shot.png"
+        image.write_bytes(b"not-a-real-png")
+
+        result = await lens.analyze(str(image), "Is it accessible?")
+        assert result.confidence == 0.0
+        assert "OPENAI_API_KEY" in result.reasoning

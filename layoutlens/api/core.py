@@ -15,7 +15,7 @@ import re
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 from urllib.parse import urlparse
 
 # Import LiteLLM directly
@@ -24,6 +24,9 @@ try:
     from litellm import acompletion
 except ImportError as e:
     raise ImportError("litellm is required. Install with: pip install litellm") from e
+
+# Import deterministic accessibility engine
+from ..a11y import AXE_VERSION, A11yReport, AxeAuditor
 
 # Import caching
 from ..cache import create_cache
@@ -175,8 +178,13 @@ class LayoutLens:
             cache_ttl: Cache time-to-live in seconds (1 hour default).
 
         Raises:
-            AuthenticationError: If no valid API key is found.
             ConfigurationError: If invalid provider or configuration is specified.
+
+        Notes:
+            A missing API key does NOT raise here. The requirement is deferred to
+            the first LLM call (see :meth:`_ensure_api_key`) so that deterministic,
+            keyless operations such as ``check_accessibility(..., mode="axe")`` work
+            without any credentials configured.
         """
         # Initialize logger
         self.logger = get_logger("api.core")
@@ -191,14 +199,9 @@ class LayoutLens:
             cache_ttl=cache_ttl,
         )
 
-        # Determine API key based on provider
+        # Determine API key based on provider. A missing key is tolerated here and
+        # only enforced when an LLM call is actually made.
         self.api_key = api_key or self._get_api_key_for_provider(provider)
-        if not self.api_key:
-            env_var = PROVIDER_API_KEY_ENV_VARS.get(provider, "OPENAI_API_KEY")
-            self.logger.error(f"No API key found for {provider} provider")
-            raise AuthenticationError(
-                f"API key required for {provider} provider. Set {env_var} env var or pass api_key parameter."
-            )
 
         self.model = model
         self.provider = provider
@@ -229,6 +232,22 @@ class LayoutLens:
         """Get appropriate API key based on provider."""
         env_var = PROVIDER_API_KEY_ENV_VARS.get(provider, "OPENAI_API_KEY")
         return os.getenv(env_var)
+
+    def _ensure_api_key(self) -> None:
+        """Enforce that an API key is available before making an LLM call.
+
+        The key requirement is deferred from construction to first LLM use so
+        deterministic-only operations (e.g. axe-based accessibility) stay keyless.
+
+        Raises:
+            AuthenticationError: If no API key is configured for the provider.
+        """
+        if not self.api_key:
+            env_var = PROVIDER_API_KEY_ENV_VARS.get(self.provider, "OPENAI_API_KEY")
+            self.logger.error(f"No API key found for {self.provider} provider")
+            raise AuthenticationError(
+                f"API key required for {self.provider} provider. Set {env_var} env var or pass api_key parameter."
+            )
 
     def _encode_image(self, image_path: str | Path) -> str:
         """Encode image to base64."""
@@ -336,6 +355,10 @@ Focus on:
         instructions: Instructions | None = None,
     ) -> dict[str, Any]:
         """Call LiteLLM vision API directly."""
+        # Enforce the API-key requirement at the first point of LLM use. Raised
+        # (not swallowed) so it propagates through analyze as an AuthenticationError.
+        self._ensure_api_key()
+
         # Encode image
         try:
             image_b64 = self._encode_image(image_path)
@@ -955,9 +978,105 @@ Focus on:
             # Multiple sources: return the full mapping
             return results
 
+    # Deterministic accessibility helpers
+
+    @staticmethod
+    def _axe_run_only_for_level(compliance_level: str) -> list[str]:
+        """Map a WCAG compliance level to the axe tags to run.
+
+        A -> ``["wcag2a"]``, AA -> ``["wcag2a", "wcag2aa"]``,
+        AAA -> ``["wcag2a", "wcag2aa", "wcag2aaa"]``.
+        """
+        tags = ["wcag2a"]
+        if compliance_level in ("AA", "AAA"):
+            tags.append("wcag2aa")
+        if compliance_level == "AAA":
+            tags.append("wcag2aaa")
+        return tags
+
+    @staticmethod
+    def _axe_answer(report: A11yReport) -> str:
+        """Phrase a natural-language yes/no answer from an axe report."""
+        if report.violations:
+            rule_ids = ", ".join(sorted({f.rule_id for f in report.violations}))
+            return f"No — axe-core found {len(report.violations)} WCAG A/AA violation(s): {rule_ids}"
+        return "Yes — axe-core found no WCAG A/AA violations"
+
+    def _build_axe_result(
+        self,
+        source: str | Path,
+        query: str,
+        viewport_value: str,
+        report: A11yReport,
+        mode: str,
+    ) -> AnalysisResult:
+        """Build a deterministic AnalysisResult from an axe report (no LLM)."""
+        return AnalysisResult(
+            source=str(source),
+            query=query,
+            answer=self._axe_answer(report),
+            confidence=1.0,
+            reasoning=report.summary(),
+            viewport=viewport_value,
+            metadata={
+                "a11y": asdict(report),
+                "mode": mode,
+                "engine": f"axe-core {AXE_VERSION}",
+                "provider": self.provider,
+                "model": self.model,
+            },
+        )
+
+    def _apply_axe_override(self, result: AnalysisResult, report: A11yReport, mode: str) -> AnalysisResult:
+        """Apply the deterministic override to a hybrid LLM result.
+
+        If axe found violations, the final answer is forced to "no" with full
+        confidence and reasoning that combines axe findings with the LLM's
+        assessment. If axe found none, the LLM's answer/confidence are kept.
+        The axe report is always attached under ``metadata["a11y"]``.
+        """
+        if report.violations:
+            result.answer = self._axe_answer(report)
+            result.confidence = 1.0
+            result.reasoning = f"{report.summary()}\n\nLLM assessment:\n{result.reasoning}"
+        result.metadata["a11y"] = asdict(report)
+        result.metadata["mode"] = mode
+        result.metadata["engine"] = f"axe-core {AXE_VERSION}"
+        return result
+
+    @staticmethod
+    def _inject_axe_context(query: str, report: A11yReport) -> str:
+        """Append a deterministic axe-core context block to an LLM query."""
+        return (
+            f"{query}\n\n"
+            f"Deterministic axe-core scan results for this page:\n{report.summary()}\n"
+            "Assess additional visual/contextual accessibility issues that automated rules cannot catch."
+        )
+
     # Developer convenience methods
-    async def check_accessibility(self, source: str | Path, viewport: ViewportType = "desktop") -> AnalysisResult:
-        """Quick accessibility check with common WCAG queries."""
+    async def check_accessibility(
+        self,
+        source: str | Path,
+        viewport: ViewportType = "desktop",
+        mode: Literal["hybrid", "axe", "llm"] = "hybrid",
+    ) -> AnalysisResult:
+        """Accessibility check with deterministic axe-core, LLM vision, or both.
+
+        Args:
+            source: URL or file path to analyze.
+            viewport: Viewport for capture/audit.
+            mode: ``"hybrid"`` (default) runs deterministic axe-core WCAG A/AA
+                checks and LLM vision analysis, forcing a "no" verdict when axe
+                finds any violation. ``"axe"`` runs axe-core only (no API key
+                required, no LLM call). ``"llm"`` runs the legacy vision-only
+                analysis.
+
+        Returns:
+            AnalysisResult. In axe/hybrid modes ``metadata["a11y"]`` holds the
+            full axe report, ``metadata["mode"]`` the mode, and
+            ``metadata["engine"]`` the axe-core version.
+        """
+        viewport_value = viewport.value if isinstance(viewport, Viewport) else str(viewport)
         query = """
         Analyze this page for accessibility issues. Check:
         1. Color contrast and readability
@@ -968,7 +1087,20 @@ Focus on:
 
         Provide specific feedback on what works well and what needs improvement.
         """
-        return await self.analyze(source, query, viewport)
+
+        if mode == "llm":
+            result = await self.analyze(source, query, viewport_value)
+            result.metadata["mode"] = mode
+            return result
+
+        report = await AxeAuditor(run_only=["wcag2a", "wcag2aa"]).audit(source, viewport_value)
+
+        if mode == "axe":
+            return self._build_axe_result(source, query, viewport_value, report, mode)
+
+        # hybrid: run the LLM with axe context injected, then apply the override.
+        result = await self.analyze(source, self._inject_axe_context(query, report), viewport_value)
+        return self._apply_axe_override(result, report, mode)
 
     async def check_mobile_friendly(self, source: str | Path) -> AnalysisResult:
         """Quick mobile responsiveness check."""
@@ -1008,6 +1140,7 @@ Focus on:
         standards: list[str] = None,
         compliance_level: ComplianceLevelType = "AA",
         viewport: ViewportType = "desktop",
+        mode: Literal["hybrid", "axe", "llm"] = "hybrid",
     ) -> AnalysisResult:
         """Professional accessibility audit using WCAG expert knowledge.
 
@@ -1016,6 +1149,12 @@ Focus on:
             standards: Accessibility standards to apply (default: WCAG 2.1, Section 508)
             compliance_level: WCAG compliance level (ComplianceLevel.AA or string)
             viewport: Viewport for analysis (Viewport.DESKTOP or string)
+            mode: ``"hybrid"`` (default) combines deterministic axe-core checks with
+                LLM analysis (axe violations force a "no" verdict). ``"axe"`` runs
+                axe-core only (no API key required). ``"llm"`` runs the legacy
+                vision-only audit. The axe run honors ``compliance_level``:
+                A -> ``wcag2a``, AA -> ``wcag2a``+``wcag2aa``, AAA additionally
+                includes ``wcag2aaa``.
 
         Returns:
             Detailed accessibility assessment with specific WCAG guidance
@@ -1038,12 +1177,28 @@ Focus on:
                 valid_levels = [level.value for level in ComplianceLevel]
                 raise ValueError(f"compliance_level must be one of {valid_levels}, got: '{compliance_level}'") from None
 
+        viewport_value = viewport.value if isinstance(viewport, Viewport) else str(viewport)
         instructions = Instructions.for_accessibility_audit(
             standards=standards, compliance_level=compliance_level_value
         )
-
         query = f"Perform a comprehensive accessibility audit for WCAG {compliance_level_value} compliance"
-        return await self.analyze(source, query, viewport=viewport, instructions=instructions)
+
+        if mode == "llm":
+            result = await self.analyze(source, query, viewport=viewport_value, instructions=instructions)
+            result.metadata["mode"] = mode
+            return result
+
+        run_only = self._axe_run_only_for_level(compliance_level_value)
+        report = await AxeAuditor(run_only=run_only).audit(source, viewport_value)
+
+        if mode == "axe":
+            return self._build_axe_result(source, query, viewport_value, report, mode)
+
+        # hybrid: run the LLM audit with axe context injected, then apply the override.
+        result = await self.analyze(
+            source, self._inject_axe_context(query, report), viewport=viewport_value, instructions=instructions
+        )
+        return self._apply_axe_override(result, report, mode)
 
     async def optimize_conversions(
         self,
