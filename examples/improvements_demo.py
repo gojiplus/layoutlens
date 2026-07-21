@@ -63,6 +63,7 @@ async def demo_test_suite_functionality():
         ],
         viewports=["desktop", "mobile_portrait"],
         metadata={"priority": "high", "category": "accessibility"},
+        expected_results={"answer": "yes", "contains": ["accessible"]},
     )
 
     test_case2 = UITestCase(
@@ -74,6 +75,7 @@ async def demo_test_suite_functionality():
             "Does text scale properly on mobile?",
         ],
         viewports=["mobile_portrait", "tablet_landscape"],
+        expected_results={"answer": "yes"},
     )
 
     # Create test suite

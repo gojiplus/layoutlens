@@ -152,6 +152,7 @@ async def test_run_test_suite(mock_analyze):
         html_path="test.html",
         queries=["Is it good?"],
         viewports=["desktop"],
+        expected_results={"contains": ["passed"]},
     )
 
     suite = UITestSuite(name="Test Suite", description="Test description", test_cases=[test_case])
@@ -185,6 +186,7 @@ async def test_run_test_suite_with_failure(mock_analyze):
         html_path="fail.html",
         queries=["Will this fail?"],
         viewports=["desktop"],
+        expected_results={"answer": "yes"},
     )
 
     suite = UITestSuite(name="Failing Suite", description="Test with failures", test_cases=[test_case])
@@ -201,6 +203,43 @@ async def test_run_test_suite_with_failure(mock_analyze):
     assert result.success_rate == 0.0
 
 
+@patch("layoutlens.api.core.LayoutLens.analyze")
+@pytest.mark.asyncio
+async def test_run_test_suite_case_with_no_expected_results_never_passes(mock_analyze):
+    """A hand-built case with no expected_results must never pass on confidence alone.
+
+    This simulates a case bypassing from_dict/create_test_suite validation
+    (e.g. constructed directly). The defensive check in
+    _evaluate_case_assertions must turn it into a failure, not a silent pass.
+    """
+    mock_analyze.return_value = AnalysisResult(
+        source="test.html",
+        query="Is it good?",
+        answer="Yes, it is good.",
+        confidence=0.99,
+        reasoning="Looks great.",
+        metadata={},
+    )
+
+    test_case = UITestCase(
+        name="No Expectations At All",
+        html_path="test.html",
+        queries=["Is it good?"],
+        viewports=["desktop"],
+        # expected_results intentionally left at its default (None) to
+        # simulate a case slipping past construction-time validation.
+    )
+    suite = UITestSuite(name="Suite", description="d", test_cases=[test_case])
+
+    lens = LayoutLens(api_key="test_key")
+    results = await lens.run_test_suite(suite)
+
+    result = results[0]
+    assert result.passed_tests == 0
+    assert result.failed_tests == 1
+    assert "expected_results" in result.results[0].metadata["error"]
+
+
 def test_create_test_suite():
     """Test creating a test suite using LayoutLens."""
     lens = LayoutLens(api_key="test_key")
@@ -212,12 +251,15 @@ def test_create_test_suite():
             "queries": ["Is the navigation visible?"],
             "viewports": ["desktop"],
             "metadata": {"page": "home"},
+            "expected_results": {"answer": "yes"},
         },
         {
             "name": "About",
             "html_path": "about.html",
             "queries": ["Is the content readable?"],
             "viewports": ["mobile_portrait"],
+            "expected_results": {"contains": ["readable"]},
+            "expected_confidence": 0.8,
         },
     ]
 
@@ -226,7 +268,32 @@ def test_create_test_suite():
     assert suite.name == "Website Tests"
     assert len(suite.test_cases) == 2
     assert suite.test_cases[0].name == "Homepage"
+    assert suite.test_cases[0].expected_results == {"answer": "yes"}
     assert suite.test_cases[1].viewports == ["mobile_portrait"]
+    assert suite.test_cases[1].expected_confidence == 0.8
+
+
+def test_create_test_suite_requires_expected_results():
+    """A spec missing 'expected_results' raises the same ValidationError as from_dict.
+
+    create_test_suite must not offer a silent confidence-only path.
+    """
+    lens = LayoutLens(api_key="test_key")
+
+    test_cases = [
+        {
+            "name": "No Expectations",
+            "html_path": "homepage.html",
+            "queries": ["Is the navigation visible?"],
+        }
+    ]
+
+    with pytest.raises(ValidationError) as exc_info:
+        lens.create_test_suite(name="Website Tests", description="Test all pages", test_cases=test_cases)
+
+    message = str(exc_info.value)
+    assert "No Expectations" in message
+    assert "expected_results" in message
 
 
 @patch("layoutlens.api.core.LayoutLens.analyze")
@@ -264,6 +331,42 @@ async def test_run_test_suite_answer_mismatch_fails(mock_analyze):
     assert answer_check["expected"] == "no"
     assert answer_check["actual"] == "yes"
     assert answer_check["passed"] is False
+
+
+@patch("layoutlens.api.core.LayoutLens.analyze")
+@pytest.mark.asyncio
+async def test_run_test_suite_to_json_includes_assertion_detail(mock_analyze):
+    """to_json() must carry each result's assertion_detail so failures are diagnosable from output alone."""
+    mock_analyze.return_value = AnalysisResult(
+        source="test.html",
+        query="Are there accessibility violations?",
+        answer="Yes, the page has several contrast issues.",
+        confidence=0.9,
+        reasoning="Contrast ratio is below WCAG AA.",
+        metadata={},
+    )
+
+    test_case = UITestCase(
+        name="No Violations Expected",
+        html_path="test.html",
+        queries=["Are there accessibility violations?"],
+        viewports=["desktop"],
+        expected_results={"answer": "no"},
+    )
+    suite = UITestSuite(name="Suite", description="d", test_cases=[test_case])
+
+    lens = LayoutLens(api_key="test_key")
+    results = await lens.run_test_suite(suite)
+    result = results[0]
+    assert result.failed_tests == 1
+
+    serialized = json.loads(result.to_json())
+    assert len(serialized["results"]) == 1
+    entry = serialized["results"][0]
+    assert entry["passed"] is False
+    assert entry["assertion_detail"]["passed"] is False
+    failure_reasons = entry["assertion_detail"]["failure_reasons"]
+    assert any("expected answer 'no', got 'yes'" in reason for reason in failure_reasons)
 
 
 @patch("layoutlens.api.core.LayoutLens.analyze")

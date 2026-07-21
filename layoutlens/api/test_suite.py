@@ -33,6 +33,40 @@ def _parse_yes_no(text: str) -> str | None:
     return None
 
 
+def _require_expected_results(name: str, expected_results: dict[str, Any] | None) -> dict[str, Any]:
+    """Validate that a test case declares at least one assertion to grade against.
+
+    This is the single source of truth for the "expected_results is required"
+    rule — used at suite load time (``UITestSuite.from_dict``), at
+    programmatic suite construction (``LayoutLens.create_test_suite``), and
+    defensively at assertion-evaluation time (``_evaluate_case_assertions``)
+    so no path can silently fall back to confidence-only grading.
+
+    Args:
+        name: The test case name, used in the error message.
+        expected_results: The case's ``expected_results`` dict, if any.
+
+    Returns:
+        The validated ``expected_results`` dict, unchanged.
+
+    Raises:
+        ValidationError: If ``expected_results`` is missing, empty, or
+            declares neither "answer" nor "contains".
+    """
+    if not expected_results or not ({"answer", "contains"} & expected_results.keys()):
+        raise ValidationError(
+            f"Test case '{name}' is missing 'expected_results'. Every test case must "
+            "declare what to assert against — add at least one of 'answer' or "
+            "'contains', e.g.:\n"
+            "  expected_results:\n"
+            '    answer: "yes"          # or "no"\n'
+            '    contains: ["term1", "term2"]   # optional',
+            field="expected_results",
+            value=str(expected_results),
+        )
+    return expected_results
+
+
 @dataclass
 class UITestCase:
     """Represents a single test case for UI testing.
@@ -103,18 +137,7 @@ class UITestSuite:
         test_cases = []
         for tc in data["test_cases"]:
             name = tc.get("name", "<unnamed test case>")
-            expected_results = tc.get("expected_results")
-            if not expected_results or not ({"answer", "contains"} & expected_results.keys()):
-                raise ValidationError(
-                    f"Test case '{name}' is missing 'expected_results'. Every test case must "
-                    "declare what to assert against — add at least one of 'answer' or "
-                    "'contains', e.g.:\n"
-                    "  expected_results:\n"
-                    '    answer: "yes"          # or "no"\n'
-                    '    contains: ["term1", "term2"]   # optional',
-                    field="expected_results",
-                    value=str(expected_results),
-                )
+            expected_results = _require_expected_results(name, tc.get("expected_results"))
 
             test_cases.append(
                 UITestCase(
@@ -188,6 +211,8 @@ class UITestResult:
                     "answer": r.answer,
                     "confidence": r.confidence,
                     "reasoning": r.reasoning,
+                    "passed": (r.metadata.get("assertion_detail") or {}).get("passed"),
+                    "assertion_detail": r.metadata.get("assertion_detail"),
                 }
                 for r in self.results
             ],
@@ -213,9 +238,16 @@ def _evaluate_case_assertions(case: UITestCase, result: AnalysisResult) -> dict[
         A dict with "passed" (bool), "checks" (list of per-assertion detail
         dicts), and "failure_reasons" (list of human-readable strings for the
         failed checks) — enough to diagnose a failure without re-running.
+
+    Raises:
+        ValidationError: If ``case.expected_results`` is missing or empty.
+            This should already be caught at suite load / construction time
+            (``UITestSuite.from_dict``, ``LayoutLens.create_test_suite``);
+            this is a defensive backstop so a case can never silently fall
+            back to confidence-only grading.
     """
+    expected = _require_expected_results(case.name, case.expected_results)
     checks: list[dict[str, Any]] = []
-    expected = case.expected_results or {}
 
     expected_answer = expected.get("answer")
     if expected_answer is not None:
@@ -367,22 +399,35 @@ def extend_layoutlens_with_test_suite():
         """
         Create a test suite from specifications.
 
+        Each spec in ``test_cases`` follows the same shape as a YAML test
+        case, including a required ``expected_results`` (see the
+        ``UITestCase`` docstring for schema) — validated identically to, and
+        via the same helper as, ``UITestSuite.from_dict``.
+
         Args:
             name: Name of the test suite
             description: Description of the test suite
-            test_cases: List of test case specifications
+            test_cases: List of test case specifications, each requiring
+                "name", "html_path", "queries", and "expected_results".
 
         Returns:
             UITestSuite object
+
+        Raises:
+            ValidationError: If any spec is missing ``expected_results``.
         """
         cases = []
         for tc_spec in test_cases:
+            case_name = tc_spec.get("name", "<unnamed test case>")
+            expected_results = _require_expected_results(case_name, tc_spec.get("expected_results"))
             test_case = UITestCase(
                 name=tc_spec["name"],
                 html_path=tc_spec["html_path"],
                 queries=tc_spec["queries"],
                 viewports=tc_spec.get("viewports", ["desktop"]),
                 metadata=tc_spec.get("metadata", {}),
+                expected_results=expected_results,
+                expected_confidence=tc_spec.get("expected_confidence", 0.7),
             )
             cases.append(test_case)
 
