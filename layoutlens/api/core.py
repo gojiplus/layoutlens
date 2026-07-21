@@ -13,7 +13,7 @@ import json
 import os
 import re
 import time
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -70,6 +70,11 @@ PROVIDER_API_KEY_ENV_VARS: dict[str, str] = {
 }
 
 
+def _dataclass_to_json(obj: Any) -> str:
+    """Serialize a dataclass instance to an indented JSON string."""
+    return json.dumps(asdict(obj), indent=2, default=str)
+
+
 @dataclass(slots=True)
 class AnalysisResult:
     """Result from analyzing a single URL or screenshot."""
@@ -87,10 +92,7 @@ class AnalysisResult:
 
     def to_json(self) -> str:
         """Export result to JSON string."""
-        import json
-        from dataclasses import asdict
-
-        return json.dumps(asdict(self), indent=2, default=str)
+        return _dataclass_to_json(self)
 
 
 @dataclass(slots=True)
@@ -110,10 +112,7 @@ class ComparisonResult:
 
     def to_json(self) -> str:
         """Export result to JSON string."""
-        import json
-        from dataclasses import asdict
-
-        return json.dumps(asdict(self), indent=2, default=str)
+        return _dataclass_to_json(self)
 
 
 @dataclass(slots=True)
@@ -129,10 +128,7 @@ class BatchResult:
 
     def to_json(self) -> str:
         """Export result to JSON string."""
-        import json
-        from dataclasses import asdict
-
-        return json.dumps(asdict(self), indent=2, default=str)
+        return _dataclass_to_json(self)
 
 
 class LayoutLens:
