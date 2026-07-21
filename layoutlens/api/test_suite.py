@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import re
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -9,11 +10,47 @@ from pathlib import Path
 from typing import Any, Optional
 
 from ..api.core import AnalysisResult, BatchResult, LayoutLens
+from ..exceptions import ValidationError
+
+
+def _parse_yes_no(text: str) -> str | None:
+    """Parse a leading yes/no token from an analysis answer.
+
+    Structured analysis answers (see ``LayoutLens._parse_structured_response``)
+    typically begin with "Yes" or "No" followed by an explanation, e.g.
+    "Yes, the page has good contrast." or "No — there are violations...".
+
+    Args:
+        text: The answer text to parse.
+
+    Returns:
+        "yes" or "no" if the text starts with that token (case-insensitive),
+        otherwise None if no yes/no answer can be recognized.
+    """
+    match = re.match(r"\s*(yes|no)\b", text or "", re.IGNORECASE)
+    if match:
+        return match.group(1).lower()
+    return None
 
 
 @dataclass
 class UITestCase:
-    """Represents a single test case for UI testing."""
+    """Represents a single test case for UI testing.
+
+    ``expected_results`` declares what the analysis must assert against and is
+    required (see ``UITestSuite.from_dict``). Schema::
+
+        expected_results:
+          answer: "yes"                    # or "no" — compared against the
+                                            # parsed yes/no of the analysis answer
+          contains: ["nav", "contrast"]    # optional; each term must appear
+                                            # (case-insensitively) in answer + reasoning
+
+    Both keys are individually optional, but at least one of them must be
+    present — an empty or missing ``expected_results`` is a load-time error.
+    ``expected_confidence`` sets the minimum ``result.confidence`` required in
+    addition to any content assertions.
+    """
 
     name: str
     html_path: str
@@ -32,6 +69,7 @@ class UITestCase:
             "viewports": self.viewports,
             "metadata": self.metadata,
             "expected_results": self.expected_results,
+            "expected_confidence": self.expected_confidence,
         }
 
 
@@ -55,18 +93,40 @@ class UITestSuite:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "UITestSuite":
-        """Create test suite from dictionary."""
-        test_cases = [
-            UITestCase(
-                name=tc["name"],
-                html_path=tc["html_path"],
-                queries=tc["queries"],
-                viewports=tc.get("viewports", ["desktop"]),
-                metadata=tc.get("metadata", {}),
-                expected_results=tc.get("expected_results"),
+        """Create test suite from dictionary.
+
+        Raises:
+            ValidationError: If any test case is missing ``expected_results``
+                (or declares neither "answer" nor "contains"). Assertions are
+                required per case — there is no confidence-only fallback.
+        """
+        test_cases = []
+        for tc in data["test_cases"]:
+            name = tc.get("name", "<unnamed test case>")
+            expected_results = tc.get("expected_results")
+            if not expected_results or not ({"answer", "contains"} & expected_results.keys()):
+                raise ValidationError(
+                    f"Test case '{name}' is missing 'expected_results'. Every test case must "
+                    "declare what to assert against — add at least one of 'answer' or "
+                    "'contains', e.g.:\n"
+                    "  expected_results:\n"
+                    '    answer: "yes"          # or "no"\n'
+                    '    contains: ["term1", "term2"]   # optional',
+                    field="expected_results",
+                    value=str(expected_results),
+                )
+
+            test_cases.append(
+                UITestCase(
+                    name=tc["name"],
+                    html_path=tc["html_path"],
+                    queries=tc["queries"],
+                    viewports=tc.get("viewports", ["desktop"]),
+                    metadata=tc.get("metadata", {}),
+                    expected_results=expected_results,
+                    expected_confidence=tc.get("expected_confidence", 0.7),
+                )
             )
-            for tc in data["test_cases"]
-        ]
 
         return cls(
             name=data["name"],
@@ -138,6 +198,82 @@ class UITestResult:
         return json.dumps(self.to_dict(), indent=2, default=str)
 
 
+def _evaluate_case_assertions(case: UITestCase, result: AnalysisResult) -> dict[str, Any]:
+    """Evaluate a test case's expectations against an analysis result.
+
+    Checks the case's ``expected_results`` ("answer" and/or "contains") plus
+    its ``expected_confidence`` gate. A case passes iff every applicable
+    assertion passes.
+
+    Args:
+        case: The test case declaring the expectations.
+        result: The analysis result to check.
+
+    Returns:
+        A dict with "passed" (bool), "checks" (list of per-assertion detail
+        dicts), and "failure_reasons" (list of human-readable strings for the
+        failed checks) — enough to diagnose a failure without re-running.
+    """
+    checks: list[dict[str, Any]] = []
+    expected = case.expected_results or {}
+
+    expected_answer = expected.get("answer")
+    if expected_answer is not None:
+        expected_answer_norm = str(expected_answer).strip().lower()
+        actual_answer = _parse_yes_no(result.answer)
+        answer_passed = actual_answer is not None and actual_answer == expected_answer_norm
+        if actual_answer is None:
+            detail = f"expected answer '{expected_answer_norm}' but could not parse yes/no from: {result.answer!r}"
+        else:
+            detail = f"expected answer '{expected_answer_norm}', got '{actual_answer}'"
+        checks.append(
+            {
+                "type": "answer",
+                "expected": expected_answer_norm,
+                "actual": actual_answer,
+                "passed": answer_passed,
+                "detail": detail,
+            }
+        )
+
+    for term in expected.get("contains") or []:
+        haystack = f"{result.answer} {result.reasoning}".lower()
+        term_passed = term.lower() in haystack
+        checks.append(
+            {
+                "type": "contains",
+                "term": term,
+                "passed": term_passed,
+                "detail": (
+                    f"term '{term}' found in answer/reasoning"
+                    if term_passed
+                    else f"term '{term}' not found in answer/reasoning"
+                ),
+            }
+        )
+
+    confidence_passed = result.confidence >= case.expected_confidence
+    checks.append(
+        {
+            "type": "confidence",
+            "expected_min": case.expected_confidence,
+            "actual": result.confidence,
+            "passed": confidence_passed,
+            "detail": (
+                f"confidence {result.confidence} >= required {case.expected_confidence}"
+                if confidence_passed
+                else f"confidence {result.confidence} below required {case.expected_confidence}"
+            ),
+        }
+    )
+
+    return {
+        "passed": all(c["passed"] for c in checks),
+        "checks": checks,
+        "failure_reasons": [c["detail"] for c in checks if not c["passed"]],
+    }
+
+
 def extend_layoutlens_with_test_suite():
     """Extend LayoutLens class with test suite functionality."""
 
@@ -175,8 +311,12 @@ def extend_layoutlens_with_test_suite():
                             context=test_case.metadata,
                         )
 
-                        # Determine pass/fail based on confidence threshold
-                        if result.confidence >= 0.7:  # Default threshold
+                        # Assert against the case's expected_results / expected_confidence
+                        # rather than trusting the model's self-reported confidence alone.
+                        assertion_detail = _evaluate_case_assertions(test_case, result)
+                        result.metadata["assertion_detail"] = assertion_detail
+
+                        if assertion_detail["passed"]:
                             passed += 1
                         else:
                             failed += 1
@@ -194,7 +334,14 @@ def extend_layoutlens_with_test_suite():
                                 answer=f"Test failed: {str(e)}",
                                 confidence=0.0,
                                 reasoning="Test execution failed",
-                                metadata={"error": str(e)},
+                                metadata={
+                                    "error": str(e),
+                                    "assertion_detail": {
+                                        "passed": False,
+                                        "checks": [],
+                                        "failure_reasons": [f"Analysis raised an exception: {e}"],
+                                    },
+                                },
                             )
                         )
 
