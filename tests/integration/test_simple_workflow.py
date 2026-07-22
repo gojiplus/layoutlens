@@ -76,6 +76,10 @@ class TestSimpleWorkflow:
 
         with (
             patch("os.path.exists", return_value=True),
+            # compare() now routes local HTML through the capture path (real
+            # screenshots instead of raw HTML bytes), which existence-checks the
+            # file via Path.exists — mocked here alongside the mocked capture.
+            patch("pathlib.Path.exists", return_value=True),
             patch("layoutlens.api.core.LayoutLens._encode_image", return_value="fake-base64"),
         ):
             # Initialize LayoutLens

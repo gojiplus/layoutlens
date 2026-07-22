@@ -690,7 +690,7 @@ Focus on:
             Comparison analysis with overall assessment.
 
         Example:
-            >>> result = lens.compare([
+            >>> result = await lens.compare([
             ...     "https://mysite.com/before",
             ...     "https://mysite.com/after"
             ... ], "Did the redesign improve the user experience?")
@@ -720,7 +720,13 @@ Focus on:
                     capture_engine = Capture(output_dir=self.output_dir / "screenshots")
                     screenshot_paths_batch = await capture_engine.screenshots([str(source)], viewport_value)
                     screenshot_path = screenshot_paths_batch[0]  # Get first (and only) result
+                elif self._is_html_file(source):
+                    # Render local HTML to a real screenshot; otherwise the raw
+                    # HTML bytes would be base64-encoded and sent to the vision
+                    # API mislabeled as a PNG (garbage comparative analysis).
+                    screenshot_path = await self._serve_html_and_capture(source, viewport_value)
                 else:
+                    # Existing image file passes through unchanged.
                     screenshot_path = str(source)
 
                 screenshot_paths.append(screenshot_path)
