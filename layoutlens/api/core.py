@@ -1367,16 +1367,7 @@ Focus on:
             return result
 
         run_only = self._axe_run_only_for_level(compliance_level_value)
-        report = await AxeAuditor(run_only=run_only).audit(source, viewport_value)
-
-        if mode == "axe":
-            return self._build_axe_result(source, query, viewport_value, report, mode)
-
-        # hybrid: run the LLM audit with axe context injected, then apply the override.
-        result = await self.analyze(
-            source, self._inject_axe_context(query, report), viewport=viewport_value, instructions=instructions
-        )
-        return self._apply_axe_override(result, report, mode)
+        return await self._run_a11y_check(source, query, viewport_value, run_only, mode, instructions=instructions)
 
     async def optimize_conversions(
         self,
