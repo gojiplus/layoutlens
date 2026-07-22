@@ -8,8 +8,8 @@ engine-agnostic so future deterministic engines can reuse the same shapes.
 from __future__ import annotations
 
 import json
-import time
 from dataclasses import asdict, dataclass, field
+from datetime import UTC, datetime
 from typing import Any
 
 
@@ -60,7 +60,7 @@ class A11yReport:
     violations: list[A11yFinding]
     incomplete: list[A11yFinding]
     passes_count: int
-    timestamp: str = field(default_factory=lambda: time.strftime("%Y-%m-%dT%H:%M:%S"))
+    timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
     @property
     def ok(self) -> bool:

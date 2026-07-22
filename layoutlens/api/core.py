@@ -28,6 +28,9 @@ except ImportError as e:
 # Import deterministic accessibility engine
 from ..a11y import AXE_VERSION, A11yReport, AxeAuditor
 
+# Import shared browser lifecycle (single-session hybrid audits)
+from ..browser import open_page
+
 # Import caching
 from ..cache import create_cache
 
@@ -510,6 +513,9 @@ Focus on:
                 cache_key = self.cache.get_analysis_key(
                     source=str(source), query=query, viewport=viewport_value, context=context
                 )
+                # ``AnalysisCache.get`` returns a defensive deep copy, so mutating
+                # the result here (and by downstream callers such as the hybrid
+                # axe override) can never corrupt the shared cached entry.
                 cached_result = self.cache.get(cache_key)
                 if cached_result and isinstance(cached_result, AnalysisResult):
                     cached_result.execution_time = time.time() - combination_start_time
@@ -795,6 +801,21 @@ Focus on:
         path = Path(source)
         return path.suffix.lower() in [".html", ".htm"]
 
+    # Recognized raster/vector image extensions treated as pre-rendered screenshots.
+    _IMAGE_SUFFIXES = frozenset({".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tiff", ".svg"})
+
+    def _is_image_file(self, source: str | Path) -> bool:
+        """Check if source is an image file (a pre-rendered screenshot).
+
+        Image sources have no DOM, so the deterministic axe engine cannot audit
+        them — accessibility modes must reject or skip them rather than audit a
+        garbage document served as HTML.
+        """
+        if self._is_url(source):
+            return False
+
+        return Path(source).suffix.lower() in self._IMAGE_SUFFIXES
+
     async def _serve_html_and_capture(
         self,
         html_file_path: str | Path,
@@ -995,12 +1016,30 @@ Focus on:
         return tags
 
     @staticmethod
-    def _axe_answer(report: A11yReport) -> str:
-        """Phrase a natural-language yes/no answer from an axe report."""
+    def _wcag_level_label(run_only: list[str] | None) -> str:
+        """Return the WCAG level label covered by an axe ``run_only`` tag list.
+
+        ``["wcag2a"]`` -> "WCAG A", ``["wcag2a", "wcag2aa"]`` -> "WCAG A/AA",
+        adding ``"wcag2aaa"`` -> "WCAG A/AA/AAA".
+        """
+        tags = set(run_only or [])
+        if "wcag2aaa" in tags:
+            return "WCAG A/AA/AAA"
+        if "wcag2aa" in tags:
+            return "WCAG A/AA"
+        return "WCAG A"
+
+    @staticmethod
+    def _axe_answer(report: A11yReport, level_label: str = "WCAG A/AA") -> str:
+        """Phrase a natural-language yes/no answer from an axe report.
+
+        ``level_label`` names the WCAG level(s) actually audited (see
+        :meth:`_wcag_level_label`) so the answer never overstates coverage.
+        """
         if report.violations:
             rule_ids = ", ".join(sorted({f.rule_id for f in report.violations}))
-            return f"No — axe-core found {len(report.violations)} WCAG A/AA violation(s): {rule_ids}"
-        return "Yes — axe-core found no WCAG A/AA violations"
+            return f"No — axe-core found {len(report.violations)} {level_label} violation(s): {rule_ids}"
+        return f"Yes — axe-core found no {level_label} violations"
 
     def _build_axe_result(
         self,
@@ -1009,12 +1048,13 @@ Focus on:
         viewport_value: str,
         report: A11yReport,
         mode: str,
+        run_only: list[str] | None = None,
     ) -> AnalysisResult:
         """Build a deterministic AnalysisResult from an axe report (no LLM)."""
         return AnalysisResult(
             source=str(source),
             query=query,
-            answer=self._axe_answer(report),
+            answer=self._axe_answer(report, self._wcag_level_label(run_only)),
             confidence=1.0,
             reasoning=report.summary(),
             viewport=viewport_value,
@@ -1027,7 +1067,13 @@ Focus on:
             },
         )
 
-    def _apply_axe_override(self, result: AnalysisResult, report: A11yReport, mode: str) -> AnalysisResult:
+    def _apply_axe_override(
+        self,
+        result: AnalysisResult,
+        report: A11yReport,
+        mode: str,
+        run_only: list[str] | None = None,
+    ) -> AnalysisResult:
         """Apply the deterministic override to a hybrid LLM result.
 
         If axe found violations, the final answer is forced to "no" with full
@@ -1036,7 +1082,7 @@ Focus on:
         The axe report is always attached under ``metadata["a11y"]``.
         """
         if report.violations:
-            result.answer = self._axe_answer(report)
+            result.answer = self._axe_answer(report, self._wcag_level_label(run_only))
             result.confidence = 1.0
             result.reasoning = f"{report.summary()}\n\nLLM assessment:\n{result.reasoning}"
         result.metadata["a11y"] = asdict(report)
@@ -1052,6 +1098,124 @@ Focus on:
             f"Deterministic axe-core scan results for this page:\n{report.summary()}\n"
             "Assess additional visual/contextual accessibility issues that automated rules cannot catch."
         )
+
+    async def _run_a11y_check(
+        self,
+        source: str | Path,
+        query: str,
+        viewport_value: str,
+        run_only: list[str],
+        mode: str,
+        instructions: Instructions | None = None,
+    ) -> AnalysisResult:
+        """Shared axe/hybrid execution for the accessibility entry points.
+
+        Handles the image-source guard, the deterministic ``axe`` path, and the
+        single-session ``hybrid`` path. ``llm`` mode is handled entirely by the
+        callers and never reaches here.
+
+        Raises:
+            ValidationError: In ``axe`` mode when ``source`` is an image, which
+                has no DOM for axe to audit.
+        """
+        # Image sources are pre-rendered screenshots with no DOM; axe would
+        # otherwise be handed a garbage document served as HTML and report a
+        # false "compliant" at full confidence.
+        if self._is_image_file(source):
+            if mode == "axe":
+                raise ValidationError(
+                    f"axe mode cannot audit an image source ({source}) — it has no DOM. "
+                    "Provide a URL or HTML file, or use mode='llm' for vision-only analysis.",
+                    field="source",
+                    value=str(source),
+                )
+            # hybrid: fall back to vision-only and record why axe was skipped.
+            self.logger.warning(
+                f"Image source {source} has no DOM; falling back to llm-only for hybrid accessibility check."
+            )
+            result = await self.analyze(source, query, viewport=viewport_value, instructions=instructions)
+            result.metadata["mode"] = "llm"
+            result.metadata["a11y_skipped"] = "image source"
+            return result
+
+        if mode == "axe":
+            report = await AxeAuditor(run_only=run_only).audit(source, viewport_value)
+            return self._build_axe_result(source, query, viewport_value, report, mode, run_only)
+
+        return await self._hybrid_a11y(source, query, viewport_value, run_only, mode, instructions)
+
+    async def _hybrid_a11y(
+        self,
+        source: str | Path,
+        query: str,
+        viewport_value: str,
+        run_only: list[str],
+        mode: str,
+        instructions: Instructions | None = None,
+    ) -> AnalysisResult:
+        """Run one browser session for the screenshot + axe audit, then the LLM.
+
+        A single :func:`open_page` session yields the exact page the screenshot
+        is taken from AND the DOM axe audits, so the pixels the LLM sees and the
+        DOM axe scores can never diverge (and only one browser is launched).
+        Results are cached under a key that includes the a11y mode so llm-mode
+        and hybrid-mode results for the same source never collide. If axe fails,
+        the check degrades gracefully to LLM-only with an ``a11y_error`` note.
+        """
+        cache_key = self.cache.get_analysis_key(
+            source=str(source), query=query, viewport=viewport_value, context={"a11y_mode": mode}
+        )
+        # ``AnalysisCache.get`` already hands back a defensive deep copy.
+        cached = self.cache.get(cache_key)
+        if cached and isinstance(cached, AnalysisResult):
+            cached.metadata["cache_hit"] = True
+            return cached
+
+        start_time = time.time()
+        capture_engine = Capture(output_dir=self.output_dir / "screenshots")
+        screenshot_path = capture_engine.output_dir / capture_engine._generate_filename(str(source), viewport_value)
+
+        report: A11yReport | None = None
+        axe_error: str | None = None
+        async with open_page(source, viewport_value) as page:
+            await page.screenshot(path=str(screenshot_path), full_page=True)
+            try:
+                report = await AxeAuditor(run_only=run_only).audit_page(
+                    page, source=str(source), viewport=viewport_value
+                )
+            except Exception as e:  # noqa: BLE001 - degrade to LLM-only on axe failure
+                axe_error = str(e)
+                self.logger.warning(f"axe audit failed in hybrid mode; proceeding LLM-only: {e}")
+
+        llm_query = self._inject_axe_context(query, report) if report is not None else query
+        vision_response = await self._call_vision_api(
+            image_path=str(screenshot_path), query=llm_query, instructions=instructions
+        )
+
+        result = AnalysisResult(
+            source=str(source),
+            query=query,
+            answer=str(vision_response["answer"]),
+            confidence=float(vision_response["confidence"]),
+            reasoning=str(vision_response["reasoning"]),
+            screenshot_path=str(screenshot_path),
+            viewport=viewport_value,
+            execution_time=time.time() - start_time,
+            metadata={
+                **vision_response["metadata"],
+                "provider": self.provider,
+                "model": self.model,
+            },
+        )
+
+        if report is not None:
+            result = self._apply_axe_override(result, report, mode, run_only)
+        else:
+            result.metadata["mode"] = mode
+            result.metadata["a11y_error"] = axe_error
+
+        self.cache.set(cache_key, result)
+        return result
 
     # Developer convenience methods
     async def check_accessibility(
@@ -1093,14 +1257,7 @@ Focus on:
             result.metadata["mode"] = mode
             return result
 
-        report = await AxeAuditor(run_only=["wcag2a", "wcag2aa"]).audit(source, viewport_value)
-
-        if mode == "axe":
-            return self._build_axe_result(source, query, viewport_value, report, mode)
-
-        # hybrid: run the LLM with axe context injected, then apply the override.
-        result = await self.analyze(source, self._inject_axe_context(query, report), viewport_value)
-        return self._apply_axe_override(result, report, mode)
+        return await self._run_a11y_check(source, query, viewport_value, ["wcag2a", "wcag2aa"], mode)
 
     async def check_mobile_friendly(self, source: str | Path) -> AnalysisResult:
         """Quick mobile responsiveness check."""

@@ -1,5 +1,6 @@
 """Caching mechanism for LayoutLens to reduce API calls and improve performance."""
 
+import copy
 import hashlib
 import json
 import pickle  # nosec B403 - Used only for internal caching, not user input
@@ -289,14 +290,19 @@ class AnalysisCache:
         return hashlib.sha256(content_str.encode()).hexdigest()[:16]
 
     def get(self, key: str) -> "AnalysisResult | ComparisonResult | None":
-        """Get a cached result."""
+        """Get a cached result.
+
+        Returns a deep copy so callers can freely mutate the result (e.g. the
+        hybrid axe override rewriting ``reasoning``/``metadata``) without
+        corrupting the cached entry that later calls will read.
+        """
         if not self.enabled:
             return None
 
         entry = self.backend.get(key)
         if entry:
             self.hits += 1
-            return entry.result
+            return copy.deepcopy(entry.result)
 
         self.misses += 1
         return None
@@ -307,13 +313,17 @@ class AnalysisCache:
         result: "AnalysisResult | ComparisonResult",
         ttl: int = None,
     ) -> None:
-        """Cache a result."""
+        """Cache a result.
+
+        Stores a deep copy so a caller mutating the object it just passed in
+        (and got back) cannot reach into and corrupt the cached entry.
+        """
         if not self.enabled:
             return
 
         entry = CacheEntry(
             key=key,
-            result=result,
+            result=copy.deepcopy(result),
             timestamp=time.time(),
             ttl_seconds=ttl or self.default_ttl,
             metadata={

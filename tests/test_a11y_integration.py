@@ -8,6 +8,7 @@ vendored axe-core bundle and require no API key at all.
 from __future__ import annotations
 
 import asyncio
+from contextlib import asynccontextmanager
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
@@ -16,6 +17,7 @@ import pytest
 from layoutlens import AXE_VERSION, LayoutLens
 from layoutlens.a11y import A11yFinding, A11yReport
 from layoutlens.api.core import AnalysisResult
+from layoutlens.exceptions import ValidationError
 from layoutlens.integrations.browser_use import AgentValidator, ValidationPolicy
 from layoutlens.integrations.browser_use.validator import normalize_wcag_reference
 
@@ -42,6 +44,33 @@ def _report(violations: list[A11yFinding]) -> A11yReport:
         violations=violations,
         incomplete=[],
         passes_count=5,
+    )
+
+
+def _fake_open_page(page, sessions: list):
+    """Build a patched ``open_page`` that records each session opened.
+
+    Yields ``page`` and appends to ``sessions`` so a test can assert exactly one
+    browser session was used for the hybrid screenshot + axe audit.
+    """
+
+    @asynccontextmanager
+    async def _cm(*args, **kwargs):
+        sessions.append((args, kwargs))
+        yield page
+
+    return _cm
+
+
+def _fake_vision(answer: str, confidence: float, reasoning: str):
+    """An AsyncMock standing in for ``_call_vision_api``."""
+    return AsyncMock(
+        return_value={
+            "answer": answer,
+            "confidence": confidence,
+            "reasoning": reasoning,
+            "metadata": {"model_used": "mock", "provider": "litellm"},
+        }
     )
 
 
@@ -97,27 +126,38 @@ class TestCheckAccessibilityModes:
         assert result.confidence == 1.0
         assert result.metadata["mode"] == "axe"
 
-    async def test_hybrid_override_forces_no_when_violations(self):
+    async def test_hybrid_uses_single_session_and_overrides_on_violations(self):
+        # Plan-mandated: hybrid opens ONE browser session shared by the
+        # screenshot and the axe audit, then forces "no" on violations.
         lens = LayoutLens()
         report = _report([_finding("color-contrast", ["wcag2aa", "wcag143"])])
 
-        llm_result = AnalysisResult(
-            source="page.html",
-            query="q",
-            answer="Yes, this page looks accessible",
-            confidence=0.6,
-            reasoning="The layout appears clean and usable.",
+        page = Mock()
+        page.screenshot = AsyncMock()
+        sessions: list = []
+        lens._call_vision_api = _fake_vision(
+            "Yes, this page looks accessible", 0.6, "The layout appears clean and usable."
         )
-        lens.analyze = AsyncMock(return_value=llm_result)
 
-        with patch("layoutlens.api.core.AxeAuditor") as mock_auditor_cls:
-            mock_auditor_cls.return_value.audit = AsyncMock(return_value=report)
+        with (
+            patch("layoutlens.api.core.open_page", _fake_open_page(page, sessions)),
+            patch("layoutlens.api.core.AxeAuditor") as mock_auditor_cls,
+        ):
+            mock_auditor_cls.return_value.audit_page = AsyncMock(return_value=report)
+            # The single-session path must never fall back to the two-session audit().
+            mock_auditor_cls.return_value.audit = AsyncMock(side_effect=AssertionError("audit() must not be used"))
             result = await lens.check_accessibility("page.html", mode="hybrid")
 
-        # LLM was consulted, and its query carried the axe context block.
-        lens.analyze.assert_awaited_once()
-        injected_query = lens.analyze.call_args.args[1]
-        assert "Deterministic axe-core scan results" in injected_query
+        # Exactly one browser session was opened.
+        assert len(sessions) == 1
+        # The screenshot was taken and axe audited the SAME page object.
+        page.screenshot.assert_awaited_once()
+        mock_auditor_cls.return_value.audit_page.assert_awaited_once()
+        assert mock_auditor_cls.return_value.audit_page.call_args.args[0] is page
+        # The LLM analyzed exactly the screenshot that was captured, with axe context injected.
+        shot_path = page.screenshot.call_args.kwargs["path"]
+        assert lens._call_vision_api.call_args.kwargs["image_path"] == shot_path
+        assert "Deterministic axe-core scan results" in lens._call_vision_api.call_args.kwargs["query"]
 
         # Deterministic override wins.
         assert result.answer.lower().startswith("no")
@@ -132,23 +172,118 @@ class TestCheckAccessibilityModes:
         lens = LayoutLens()
         report = _report([])
 
-        llm_result = AnalysisResult(
-            source="page.html",
-            query="q",
-            answer="Yes, fully accessible",
-            confidence=0.72,
-            reasoning="Good contrast and structure.",
-        )
-        lens.analyze = AsyncMock(return_value=llm_result)
+        page = Mock()
+        page.screenshot = AsyncMock()
+        sessions: list = []
+        lens._call_vision_api = _fake_vision("Yes, fully accessible", 0.72, "Good contrast and structure.")
 
-        with patch("layoutlens.api.core.AxeAuditor") as mock_auditor_cls:
-            mock_auditor_cls.return_value.audit = AsyncMock(return_value=report)
+        with (
+            patch("layoutlens.api.core.open_page", _fake_open_page(page, sessions)),
+            patch("layoutlens.api.core.AxeAuditor") as mock_auditor_cls,
+        ):
+            mock_auditor_cls.return_value.audit_page = AsyncMock(return_value=report)
             result = await lens.check_accessibility("page.html", mode="hybrid")
 
+        assert len(sessions) == 1
         assert result.answer == "Yes, fully accessible"
         assert result.confidence == 0.72
         assert result.metadata["mode"] == "hybrid"
         assert "a11y" in result.metadata
+
+    async def test_hybrid_axe_failure_falls_back_to_llm_only(self):
+        # Item 7a: an axe error in hybrid degrades to LLM-only with a note,
+        # rather than failing loud (axe mode still fails loud, tested elsewhere).
+        lens = LayoutLens()
+
+        page = Mock()
+        page.screenshot = AsyncMock()
+        sessions: list = []
+        lens._call_vision_api = _fake_vision("Mostly accessible", 0.8, "Some minor issues.")
+
+        with (
+            patch("layoutlens.api.core.open_page", _fake_open_page(page, sessions)),
+            patch("layoutlens.api.core.AxeAuditor") as mock_auditor_cls,
+        ):
+            mock_auditor_cls.return_value.audit_page = AsyncMock(side_effect=RuntimeError("axe boom"))
+            result = await lens.check_accessibility("page.html", mode="hybrid")
+
+        # LLM result is returned, with the axe error recorded and no override applied.
+        assert result.answer == "Mostly accessible"
+        assert result.confidence == 0.8
+        assert result.metadata["mode"] == "hybrid"
+        assert result.metadata["a11y_error"] == "axe boom"
+        assert "a11y" not in result.metadata
+        # The LLM query carried NO injected axe context (there was no report).
+        assert "Deterministic axe-core scan results" not in lens._call_vision_api.call_args.kwargs["query"]
+
+    async def test_hybrid_cache_hit_returns_copy_without_re_wrapping(self):
+        # CRITICAL regression: a memory-cache hit must return a defensive copy so
+        # the hybrid override never re-wraps the cached reasoning across calls.
+        lens = LayoutLens()  # real in-memory cache
+        report = _report([_finding("color-contrast", ["wcag2aa", "wcag143"])])
+
+        page = Mock()
+        page.screenshot = AsyncMock()
+        sessions: list = []
+        lens._call_vision_api = _fake_vision("Yes, looks fine", 0.6, "Clean and usable layout.")
+
+        with (
+            patch("layoutlens.api.core.open_page", _fake_open_page(page, sessions)),
+            patch("layoutlens.api.core.AxeAuditor") as mock_auditor_cls,
+        ):
+            mock_auditor_cls.return_value.audit_page = AsyncMock(return_value=report)
+            first = await lens.check_accessibility("page.html", mode="hybrid")
+            # Mutating the first result must not corrupt the cached entry.
+            first.reasoning += " MUTATED"
+            second = await lens.check_accessibility("page.html", mode="hybrid")
+
+        # Second call is a pure cache hit: one session, one LLM call total.
+        assert len(sessions) == 1
+        lens._call_vision_api.assert_awaited_once()
+        # Reasoning is wrapped exactly once, both times.
+        assert second.reasoning.count("LLM assessment") == 1
+        assert "MUTATED" not in second.reasoning
+        assert second.metadata["cache_hit"] is True
+
+    async def test_axe_mode_rejects_image_source(self):
+        # Item 2: axe cannot audit a pre-rendered screenshot (no DOM).
+        lens = LayoutLens()
+        with (
+            patch("layoutlens.api.core.AxeAuditor") as mock_auditor_cls,
+            pytest.raises(ValidationError, match="image source"),
+        ):
+            await lens.check_accessibility("shot.png", mode="axe")
+        mock_auditor_cls.assert_not_called()
+
+    async def test_hybrid_mode_image_source_falls_back_to_llm(self):
+        # Item 2: hybrid on an image falls back to vision-only, no auditor built.
+        lens = LayoutLens()
+        lens.analyze = AsyncMock(
+            return_value=AnalysisResult(
+                source="shot.png", query="q", answer="Looks ok", confidence=0.7, reasoning="fine"
+            )
+        )
+        with patch("layoutlens.api.core.AxeAuditor", new=MagicMock()) as mock_auditor_cls:
+            result = await lens.check_accessibility("shot.png", mode="hybrid")
+
+        lens.analyze.assert_awaited_once()
+        mock_auditor_cls.assert_not_called()
+        assert result.metadata["mode"] == "llm"
+        assert result.metadata["a11y_skipped"] == "image source"
+
+    async def test_axe_answer_is_level_aware(self):
+        # Item 7b: the deterministic answer names the level(s) actually audited.
+        lens = LayoutLens()
+        report = _report([_finding("image-alt", ["wcag2a", "wcag111"])])
+
+        with patch("layoutlens.api.core.AxeAuditor") as mock_auditor_cls:
+            mock_auditor_cls.return_value.audit = AsyncMock(return_value=report)
+            a_only = await lens.audit_accessibility("page.html", compliance_level="A", mode="axe")
+            aaa = await lens.audit_accessibility("page.html", compliance_level="AAA", mode="axe")
+
+        assert "WCAG A violation" in a_only.answer
+        assert "A/AA" not in a_only.answer
+        assert "WCAG A/AA/AAA violation" in aaa.answer
 
     async def test_llm_mode_never_constructs_auditor(self):
         lens = LayoutLens()
