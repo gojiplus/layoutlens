@@ -22,7 +22,6 @@ class TestProviderApiKeySelection:
             ("anthropic", "ANTHROPIC_API_KEY"),
             ("google", "GEMINI_API_KEY"),
             ("gemini", "GEMINI_API_KEY"),
-            ("litellm", "OPENAI_API_KEY"),
         ],
     )
     def test_selects_env_var_for_provider(self, monkeypatch, provider, env_var):
@@ -34,6 +33,19 @@ class TestProviderApiKeySelection:
         lens = LayoutLens(provider=provider, model="test-model")
 
         assert lens.api_key == "provider-specific-key"
+
+    def test_litellm_provider_never_grabs_openai_key(self, monkeypatch):
+        """``litellm`` is a passthrough: it must not adopt OPENAI_API_KEY.
+
+        LiteLLM resolves credentials from its own per-model env conventions, so
+        ``api_key`` stays ``None`` even when OPENAI_API_KEY happens to be set —
+        preventing an OpenAI key being forwarded to, say, an Anthropic model.
+        """
+        monkeypatch.setenv("OPENAI_API_KEY", "openai-key")
+
+        lens = LayoutLens(provider="litellm", model="anthropic/claude-3-5-sonnet")
+
+        assert lens.api_key is None
 
     def test_anthropic_does_not_pick_up_openai_key(self, monkeypatch):
         """An OPENAI_API_KEY in the environment must not leak into anthropic."""

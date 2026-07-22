@@ -66,13 +66,15 @@ from ..types import (
 )
 
 # Maps the provider strings accepted by LayoutLens(provider=...) to the
-# environment variable that holds credentials for that provider.
-PROVIDER_API_KEY_ENV_VARS: dict[str, str] = {
+# environment variable that holds credentials for that provider. ``litellm`` maps
+# to ``None``: it is a passthrough provider with no single canonical key, so
+# LiteLLM resolves credentials from its own per-model env conventions at call time.
+PROVIDER_API_KEY_ENV_VARS: dict[str, str | None] = {
     "openai": "OPENAI_API_KEY",
     "anthropic": "ANTHROPIC_API_KEY",
     "google": "GEMINI_API_KEY",
     "gemini": "GEMINI_API_KEY",
-    "litellm": "OPENAI_API_KEY",
+    "litellm": None,
 }
 
 
@@ -232,8 +234,16 @@ class LayoutLens:
             raise
 
     def _get_api_key_for_provider(self, provider: str) -> str | None:
-        """Get appropriate API key based on provider."""
+        """Get appropriate API key based on provider.
+
+        For the ``litellm`` passthrough provider this returns ``None`` even when
+        ``OPENAI_API_KEY`` happens to be set, so an OpenAI key is never silently
+        forwarded to, say, an Anthropic model. LiteLLM resolves credentials from
+        its own env conventions in that case.
+        """
         env_var = PROVIDER_API_KEY_ENV_VARS.get(provider, "OPENAI_API_KEY")
+        if env_var is None:
+            return None
         return os.getenv(env_var)
 
     def _ensure_api_key(self) -> None:
@@ -241,10 +251,15 @@ class LayoutLens:
 
         The key requirement is deferred from construction to first LLM use so
         deterministic-only operations (e.g. axe-based accessibility) stay keyless.
+        The ``litellm`` passthrough provider is exempt: it has no single
+        canonical key, so LiteLLM is left to resolve credentials from its own
+        per-model env conventions (its auth errors are already surfaced).
 
         Raises:
-            AuthenticationError: If no API key is configured for the provider.
+            AuthenticationError: If no API key is configured for a mapped provider.
         """
+        if self.provider == "litellm":
+            return
         if not self.api_key:
             env_var = PROVIDER_API_KEY_ENV_VARS.get(self.provider, "OPENAI_API_KEY")
             self.logger.error(f"No API key found for {self.provider} provider")
