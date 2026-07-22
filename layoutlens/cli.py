@@ -125,6 +125,12 @@ Examples:
                 file=sys.stderr,
             )
             return 1
+        if args.compare:
+            print(
+                "Error: --compare cannot be combined with --a11y (accessibility checks run per source, not comparatively)",
+                file=sys.stderr,
+            )
+            return 1
         return await _run_a11y(sources, args)
 
     # Default query

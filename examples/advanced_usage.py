@@ -128,7 +128,7 @@ async def multi_viewport_analysis():
 
     tester = LayoutLens(output_dir="viewport_analysis")
 
-    viewports = ["desktop", "mobile_portrait", "tablet_landscape"]
+    viewports = ["desktop", "mobile_portrait", "tablet"]
     source_page = "https://example.com"
 
     print(f"\n=== Multi-Viewport Analysis ===")

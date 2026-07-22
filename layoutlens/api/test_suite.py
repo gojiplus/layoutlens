@@ -141,7 +141,7 @@ class UITestSuite:
 
             test_cases.append(
                 UITestCase(
-                    name=tc["name"],
+                    name=name,
                     html_path=tc["html_path"],
                     queries=tc["queries"],
                     viewports=tc.get("viewports", ["desktop"]),
@@ -421,7 +421,7 @@ def extend_layoutlens_with_test_suite():
             case_name = tc_spec.get("name", "<unnamed test case>")
             expected_results = _require_expected_results(case_name, tc_spec.get("expected_results"))
             test_case = UITestCase(
-                name=tc_spec["name"],
+                name=case_name,
                 html_path=tc_spec["html_path"],
                 queries=tc_spec["queries"],
                 viewports=tc_spec.get("viewports", ["desktop"]),

@@ -19,7 +19,7 @@ test_cases:
     html_path: "benchmarks/test_data/ui_components/form_well_designed.html"
     queries:
       - "Are all form fields properly labeled?"
-    viewports: ["desktop", "tablet_portrait"]
+    viewports: ["desktop", "tablet"]
     expected_results:
       answer: "yes"
     expected_confidence: 0.7

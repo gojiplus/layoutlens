@@ -551,6 +551,64 @@ def test_from_dict_requires_expected_results_nonempty():
     assert "Empty Expectations" in str(exc_info.value)
 
 
+def test_from_dict_handles_missing_name_without_keyerror():
+    """A test case dict without 'name' loads (using a placeholder), never KeyError.
+
+    Regression: from_dict computed a fallback ``name`` but then indexed
+    ``tc["name"]``, raising KeyError instead of using the fallback.
+    """
+    data = {
+        "name": "Suite",
+        "description": "d",
+        "test_cases": [
+            {
+                "html_path": "test.html",
+                "queries": ["Is this good?"],
+                "expected_results": {"answer": "yes"},
+            }
+        ],
+    }
+
+    suite = UITestSuite.from_dict(data)
+    assert suite.test_cases[0].name == "<unnamed test case>"
+
+
+def test_create_test_suite_handles_missing_name_without_keyerror():
+    """create_test_suite mirrors from_dict: a spec without 'name' loads cleanly."""
+    lens = LayoutLens(api_key="sk-test")
+    suite = lens.create_test_suite(
+        name="Suite",
+        description="d",
+        test_cases=[
+            {
+                "html_path": "test.html",
+                "queries": ["Is this good?"],
+                "expected_results": {"answer": "yes"},
+            }
+        ],
+    )
+    assert suite.test_cases[0].name == "<unnamed test case>"
+
+
+def test_shipped_sample_suite_uses_valid_viewports():
+    """The shipped example YAML must reference only real viewport names.
+
+    Invalid viewport strings only fail at capture time, so parse the example
+    suite and assert every viewport is one the browser engine can resolve.
+    """
+    import yaml
+
+    from layoutlens.browser import VIEWPORTS
+
+    suite_path = Path(__file__).parent.parent / "examples" / "sample_test_suite.yaml"
+    data = yaml.safe_load(suite_path.read_text())
+    suite = UITestSuite.from_dict(data)
+
+    for case in suite.test_cases:
+        for viewport in case.viewports:
+            assert viewport in VIEWPORTS, f"case '{case.name}' uses unknown viewport '{viewport}'"
+
+
 def test_from_dict_to_dict_round_trip_preserves_expected_fields():
     """expected_confidence and expected_results survive a from_dict -> to_dict round trip."""
     data = {

@@ -74,7 +74,7 @@ async def demo_test_suite_functionality():
             "Are touch targets appropriately sized?",
             "Does text scale properly on mobile?",
         ],
-        viewports=["mobile_portrait", "tablet_landscape"],
+        viewports=["mobile_portrait", "tablet"],
         expected_results={"answer": "yes"},
     )
 
