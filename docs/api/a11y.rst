@@ -1,0 +1,36 @@
+Accessibility (axe-core) API
+=============================
+
+Deterministic WCAG 2.1 A/AA accessibility checks via a vendored
+`axe-core <https://github.com/dequelabs/axe-core>`_ bundle, injected into a
+Playwright-rendered page. This engine requires no API key or LLM call.
+
+AxeAuditor
+----------
+
+.. autoclass:: layoutlens.AxeAuditor
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Report Types
+------------
+
+Field documentation for these dataclasses lives in the class docstrings below
+(``:members:`` is scoped to methods only, to avoid duplicating the
+dataclass-field docs that Napoleon already renders from the docstring).
+
+.. autoclass:: layoutlens.A11yReport
+   :members: ok, to_json, summary
+   :no-undoc-members:
+   :show-inheritance:
+
+.. autoclass:: layoutlens.A11yFinding
+   :no-undoc-members:
+   :no-members:
+   :show-inheritance:
+
+Engine Version
+--------------
+
+.. autodata:: layoutlens.AXE_VERSION

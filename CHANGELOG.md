@@ -2,6 +2,73 @@
 
 All notable changes to LayoutLens are documented in this file.
 
+## [1.7.0] - 2026-07-21
+
+### 🚀 Major Features
+
+- **Deterministic accessibility engine**: vendored [axe-core](https://github.com/dequelabs/axe-core)
+  4.10.3 (`layoutlens/a11y/`, assets under `layoutlens/a11y/assets/`) runs real
+  WCAG 2.1 A/AA checks against a live Playwright-rendered page — no LLM, no
+  API key, fully reproducible. New public exports: `AxeAuditor`, `A11yReport`,
+  `A11yFinding`, `AXE_VERSION`.
+- **Three accessibility modes** on `check_accessibility` / `audit_accessibility`:
+  `"axe"` (deterministic only, keyless), `"hybrid"` (default — axe grounds the
+  LLM's prompt and deterministically forces a "no" verdict on any violation),
+  `"llm"` (legacy vision-only).
+- **`--a11y {hybrid,axe,llm}` CLI flag** — `layoutlens page.html --a11y axe`
+  runs a full WCAG scan with no API key configured. Mutually exclusive with
+  `--query`.
+- **Keyless construction**: `LayoutLens()` no longer requires an API key at
+  construction time. The requirement is deferred to the first LLM call
+  (`AuthenticationError`, provider-aware message), so deterministic-only
+  workflows never need credentials.
+- **browser_use findings verified against axe-core**: `AgentValidator`
+  findings now carry a `verified` flag (`True`/`False`/`None`) cross-checked
+  against a deterministic axe-core scan of the same page.
+
+### 💥 Breaking Changes
+
+- **YAML/JSON test suites now require `expected_results` per test case.** A
+  case must declare `answer` ("yes"/"no") and/or `contains` (a list of
+  required terms); a case with neither raises `ValidationError` at load time
+  (`UITestSuite.from_dict`, `LayoutLens.create_test_suite`). There is no
+  confidence-only fallback anymore — `run_test_suite` actually asserts
+  against these expectations instead of trusting self-reported confidence.
+  Per-case `expected_confidence` (default `0.7`) is honored as an additional
+  gate, and `assertion_detail` (per-assertion pass/fail) is attached to each
+  result's metadata and included in `UITestResult.to_json()`.
+
+### 🔧 Fixes
+
+- Fixed `_get_api_key_for_provider` selecting the wrong provider's API key
+  environment variable in some configurations.
+
+### 📊 Benchmarks
+
+- Rewrote the benchmark evaluator to score structured yes/no answers
+  deterministically; ambiguous/unparseable answers now count as **incorrect**
+  instead of being silently treated as "no".
+- Replaced fabricated accuracy claims (previously "95.2%", "31 test cases
+  across 9 categories") with a real measured run: **81.1% (60/74)** on
+  `gpt-4o-mini`, 18 fixtures / 74 queries / 4 categories, committed as
+  `benchmarks/results/2026-07-21_gpt-4o-mini.json`.
+- Accessibility fixtures are now grounded in real axe-core output
+  (`axe_ground_truth` blocks per fixture, generated/verified by
+  `benchmarks/generators/generate_a11y_ground_truth.py`).
+
+### 📚 Documentation
+
+- Rewrote `README.md`, `docs/`, and `CLAUDE.md` to describe the real flat CLI
+  (`layoutlens SOURCES... [--query] [--compare] [--viewport] [--a11y] ...`)
+  and package layout. Removed references to a prior architecture that no
+  longer exists in this codebase (`vision/`, `providers/`, `cli_commands.py`,
+  `cli_interactive.py`, `integrations/github.py`, and the `test`/`batch`/
+  `interactive`/`generate`/`validate` subcommands).
+- Added a Sphinx API page for the accessibility engine (`docs/api/a11y.rst`).
+- Fixed several broken example snippets (wrong keyword argument names on
+  `analyze()`, `compare()` called with local HTML paths instead of
+  screenshots, benchmark fixture paths that no longer exist).
+
 ## [1.4.0] - 2024-12-21
 
 ### 🚀 Major Changes

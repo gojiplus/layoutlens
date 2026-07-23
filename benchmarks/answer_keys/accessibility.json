@@ -61,6 +61,18 @@
           "touch_targets",
           "keyboard_navigation"
         ]
+      },
+      "axe_ground_truth": {
+        "engine": "axe-core",
+        "engine_version": "4.10.3",
+        "run_only": [
+          "wcag2a",
+          "wcag2aa"
+        ],
+        "violations": [],
+        "incomplete_rule_ids": [],
+        "passes_count": 18,
+        "ok": true
       }
     },
     "wcag_violations.html": {
@@ -115,24 +127,60 @@
         "example_type": "negative",
         "difficulty": "easy",
         "wcag_level": "fails_AA",
-        "violations": [
-          "poor_color_contrast",
-          "missing_form_labels",
+        "violations_axe_confirmed": [
+          "color-contrast",
+          "image-alt"
+        ],
+        "violations_visual_only": [
           "no_focus_indicators",
           "small_touch_targets",
           "improper_heading_hierarchy",
-          "missing_alt_text",
-          "no_skip_link"
+          "no_skip_link",
+          "form_fields_labeled_by_placeholder_only"
         ],
+        "violations_note": "axe-core (wcag2a+wcag2aa) confirms color-contrast and image-alt (see axe_ground_truth). The remaining items are real but not flagged by axe's automated rules under this ruleset: touch-target size and skip-link presence are not automatable axe checks, heading hierarchy here (starting at h3) does not trip axe's heading rules, and the inputs carry a `placeholder` which axe 4.10.3 accepts as an accessible name so the `label` rule does not fire. The 'Are all form fields properly labeled?' query stays expected='no' because placeholder-only labeling is poor practice an LLM judge should catch, but it is not an axe-detectable violation.",
         "fixes_required": [
           "increase color contrast to 4.5:1 minimum",
           "replace placeholders with proper label elements",
           "add focus styles with 3px outlines",
           "increase touch targets to 44px minimum",
-          "fix heading hierarchy (h1 → h2 → h3)",
+          "fix heading hierarchy (h1 \u2192 h2 \u2192 h3)",
           "add alt text to all images",
           "add skip link for keyboard users"
         ]
+      },
+      "axe_ground_truth": {
+        "engine": "axe-core",
+        "engine_version": "4.10.3",
+        "run_only": [
+          "wcag2a",
+          "wcag2aa"
+        ],
+        "violations": [
+          {
+            "rule_id": "color-contrast",
+            "impact": "serious",
+            "wcag_refs": [
+              "wcag2aa",
+              "wcag143"
+            ],
+            "node_count": 2
+          },
+          {
+            "rule_id": "image-alt",
+            "impact": "critical",
+            "wcag_refs": [
+              "wcag2a",
+              "wcag111",
+              "section508",
+              "section508.22.a"
+            ],
+            "node_count": 1
+          }
+        ],
+        "incomplete_rule_ids": [],
+        "passes_count": 10,
+        "ok": false
       }
     },
     "focus_management_good.html": {
@@ -176,6 +224,28 @@
           "skip_links",
           "proper_focus_indicators"
         ]
+      },
+      "axe_ground_truth": {
+        "engine": "axe-core",
+        "engine_version": "4.10.3",
+        "run_only": [
+          "wcag2a",
+          "wcag2aa"
+        ],
+        "violations": [
+          {
+            "rule_id": "color-contrast",
+            "impact": "serious",
+            "wcag_refs": [
+              "wcag2aa",
+              "wcag143"
+            ],
+            "node_count": 1
+          }
+        ],
+        "incomplete_rule_ids": [],
+        "passes_count": 9,
+        "ok": false
       }
     },
     "focus_management_broken.html": {
@@ -228,6 +298,28 @@
           "prevent background interaction",
           "add proper focus indicators"
         ]
+      },
+      "axe_ground_truth": {
+        "engine": "axe-core",
+        "engine_version": "4.10.3",
+        "run_only": [
+          "wcag2a",
+          "wcag2aa"
+        ],
+        "violations": [
+          {
+            "rule_id": "color-contrast",
+            "impact": "serious",
+            "wcag_refs": [
+              "wcag2aa",
+              "wcag143"
+            ],
+            "node_count": 1
+          }
+        ],
+        "incomplete_rule_ids": [],
+        "passes_count": 8,
+        "ok": false
       }
     }
   },

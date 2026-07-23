@@ -47,9 +47,9 @@ repos:
       # Fast tests (mirrors CI fast test subset) - skip integration tests
       - id: pytest-fast
         name: pytest-fast
-        entry: pytest
+        entry: uv
         language: system
-        args: [tests/unit/, tests/test_comprehensive.py, tests/test_caching.py, tests/test_exceptions.py, tests/test_suite_functionality.py, -v, -x, --tb=short, -m, "not slow"]
+        args: [run, pytest, tests/unit/, tests/test_comprehensive.py, tests/test_caching.py, tests/test_exceptions.py, tests/test_suite_functionality.py, -v, -x, --tb=short, -m, "not slow"]
         types: [python]
         pass_filenames: false
         stages: [pre-commit]

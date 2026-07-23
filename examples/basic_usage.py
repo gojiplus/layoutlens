@@ -43,16 +43,24 @@ async def website_analysis():
 
 # Example 3: Compare two designs
 async def compare_designs():
-    """Compare two versions of a page."""
+    """Compare two versions of a page.
+
+    compare() accepts URLs or already-captured screenshot images directly.
+    For local HTML files, capture screenshots first with capture() -- passing
+    raw .html paths to compare() skips screenshot rendering and fails.
+    """
 
     tester = LayoutLens()
 
-    # Compare two different layouts
+    html_files = [
+        "benchmarks/test_data/layout_alignment/nav_centered.html",
+        "benchmarks/test_data/layout_alignment/nav_misaligned.html",
+    ]
+    screenshots = await tester.capture(html_files)
+
+    # Compare the rendered screenshots
     result = await tester.compare(
-        sources=[
-            "benchmarks/test_data/layout_alignment/nav_centered.html",
-            "benchmarks/test_data/layout_alignment/nav_misaligned.html",
-        ],
+        sources=[screenshots[path] for path in html_files],
         query="Which layout has better navigation alignment?",
     )
 
@@ -72,7 +80,7 @@ async def batch_analysis():
         "benchmarks/test_data/ui_components/form_well_designed.html",
     ]
 
-    results = await tester.analyze(sources=pages, query="Is this page well-designed and user-friendly?")
+    results = await tester.analyze(source=pages, query="Is this page well-designed and user-friendly?")
 
     for i, result in enumerate(results.results):
         print(f"Page {i + 1}: {result.answer} (confidence: {result.confidence:.1%})")
@@ -85,7 +93,7 @@ async def accessibility_check():
     tester = LayoutLens()
 
     # Check accessibility of a page
-    result = await tester.check_accessibility(source="benchmarks/test_data/accessibility/good_contrast.html")
+    result = await tester.check_accessibility(source="benchmarks/test_data/accessibility/wcag_compliant.html")
 
     print(f"Accessibility assessment: {result.answer}")
     print(f"Confidence: {result.confidence:.1%}")
@@ -98,7 +106,7 @@ async def mobile_check():
     tester = LayoutLens()
 
     # Check if page is mobile-friendly
-    result = await tester.check_mobile_friendly(source="benchmarks/test_data/responsive_design/mobile_optimized.html")
+    result = await tester.check_mobile_friendly(source="benchmarks/test_data/responsive_design/mobile_friendly.html")
 
     print(f"Mobile-friendly assessment: {result.answer}")
     print(f"Confidence: {result.confidence:.1%}")

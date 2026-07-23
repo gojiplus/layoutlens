@@ -81,12 +81,15 @@ lens = LayoutLens(output_dir="custom_output")
 
 ## 📊 API Methods Demonstrated
 
-All examples use the actual LayoutLens API methods:
+All examples use the actual LayoutLens API methods (all async):
 
 ### Core Analysis
-- `analyze(source, query, viewport="desktop", context=None)` - Analyze a page or screenshot
-- `compare(sources, query, context=None)` - Compare multiple pages
-- `analyze_batch(sources, queries, viewport="desktop", context=None)` - Batch analysis
+- `await analyze(source, query, viewport="desktop", context=None, max_concurrent=5)` - Analyze one
+  or more pages/screenshots; pass a list to `source` and/or `query` to fan out concurrently (returns
+  a `BatchResult` when there's more than one combination)
+- `await compare(sources, query, context=None)` - Compare multiple pages (URLs or already-captured
+  screenshots; local HTML paths need `capture()` first — see below)
+- `await capture(source, viewport="desktop")` - Render a URL/HTML file to a screenshot PNG
 
 ### Built-in Checks
 - `check_accessibility(source)` - Accessibility compliance
@@ -121,19 +124,22 @@ python examples/advanced_usage.py
 
 ### Example Analysis
 ```python
+import asyncio
 from layoutlens import LayoutLens
 
-# Initialize
-lens = LayoutLens()
+async def main():
+    lens = LayoutLens()
 
-# Analyze a page
-result = lens.analyze(
-    source="https://example.com",
-    query="Is this page user-friendly and accessible?"
-)
+    # Analyze a page
+    result = await lens.analyze(
+        source="https://example.com",
+        query="Is this page user-friendly and accessible?"
+    )
 
-print(f"Answer: {result.answer}")
-print(f"Confidence: {result.confidence:.1%}")
+    print(f"Answer: {result.answer}")
+    print(f"Confidence: {result.confidence:.1%}")
+
+asyncio.run(main())
 ```
 
 ## 🛠️ Customization
@@ -154,7 +160,7 @@ context = {
     "business_context": "healthcare_website"
 }
 
-result = lens.analyze(
+result = await lens.analyze(
     source="https://example.com",
     query="Is this suitable for elderly users?",
     context=context

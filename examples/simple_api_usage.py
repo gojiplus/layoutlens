@@ -108,7 +108,7 @@ async def batch_analysis():
 
         queries = ["Is the navigation clear and user-friendly?"]
 
-        results = await lens.analyze(sources=sources, queries=queries)
+        results = await lens.analyze(source=sources, query=queries)
 
         print(f"Analyzed {len(sources)} sources with {len(queries)} queries")
         for i, result in enumerate(results.results):

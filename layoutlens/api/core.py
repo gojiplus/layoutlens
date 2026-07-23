@@ -13,9 +13,9 @@ import json
 import os
 import re
 import time
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 from urllib.parse import urlparse
 
 # Import LiteLLM directly
@@ -24,6 +24,12 @@ try:
     from litellm import acompletion
 except ImportError as e:
     raise ImportError("litellm is required. Install with: pip install litellm") from e
+
+# Import deterministic accessibility engine
+from ..a11y import AXE_VERSION, A11yReport, AxeAuditor
+
+# Import shared browser lifecycle (single-session hybrid audits)
+from ..browser import open_page
 
 # Import caching
 from ..cache import create_cache
@@ -59,6 +65,23 @@ from ..types import (
     ViewportType,
 )
 
+# Maps the provider strings accepted by LayoutLens(provider=...) to the
+# environment variable that holds credentials for that provider. ``litellm`` maps
+# to ``None``: it is a passthrough provider with no single canonical key, so
+# LiteLLM resolves credentials from its own per-model env conventions at call time.
+PROVIDER_API_KEY_ENV_VARS: dict[str, str | None] = {
+    "openai": "OPENAI_API_KEY",
+    "anthropic": "ANTHROPIC_API_KEY",
+    "google": "GEMINI_API_KEY",
+    "gemini": "GEMINI_API_KEY",
+    "litellm": None,
+}
+
+
+def _dataclass_to_json(obj: Any) -> str:
+    """Serialize a dataclass instance to an indented JSON string."""
+    return json.dumps(asdict(obj), indent=2, default=str)
+
 
 @dataclass(slots=True)
 class AnalysisResult:
@@ -77,10 +100,7 @@ class AnalysisResult:
 
     def to_json(self) -> str:
         """Export result to JSON string."""
-        import json
-        from dataclasses import asdict
-
-        return json.dumps(asdict(self), indent=2, default=str)
+        return _dataclass_to_json(self)
 
 
 @dataclass(slots=True)
@@ -100,10 +120,7 @@ class ComparisonResult:
 
     def to_json(self) -> str:
         """Export result to JSON string."""
-        import json
-        from dataclasses import asdict
-
-        return json.dumps(asdict(self), indent=2, default=str)
+        return _dataclass_to_json(self)
 
 
 @dataclass(slots=True)
@@ -119,10 +136,7 @@ class BatchResult:
 
     def to_json(self) -> str:
         """Export result to JSON string."""
-        import json
-        from dataclasses import asdict
-
-        return json.dumps(asdict(self), indent=2, default=str)
+        return _dataclass_to_json(self)
 
 
 class LayoutLens:
@@ -169,8 +183,13 @@ class LayoutLens:
             cache_ttl: Cache time-to-live in seconds (1 hour default).
 
         Raises:
-            AuthenticationError: If no valid API key is found.
             ConfigurationError: If invalid provider or configuration is specified.
+
+        Notes:
+            A missing API key does NOT raise here. The requirement is deferred to
+            the first LLM call (see :meth:`_ensure_api_key`) so that deterministic,
+            keyless operations such as ``check_accessibility(..., mode="axe")`` work
+            without any credentials configured.
         """
         # Initialize logger
         self.logger = get_logger("api.core")
@@ -185,13 +204,9 @@ class LayoutLens:
             cache_ttl=cache_ttl,
         )
 
-        # Determine API key based on provider
+        # Determine API key based on provider. A missing key is tolerated here and
+        # only enforced when an LLM call is actually made.
         self.api_key = api_key or self._get_api_key_for_provider(provider)
-        if not self.api_key:
-            self.logger.error(f"No API key found for {provider} provider")
-            raise AuthenticationError(
-                f"API key required for {provider} provider. Set OPENAI_API_KEY env var or pass api_key parameter."
-            )
 
         self.model = model
         self.provider = provider
@@ -219,8 +234,38 @@ class LayoutLens:
             raise
 
     def _get_api_key_for_provider(self, provider: str) -> str | None:
-        """Get appropriate API key based on provider."""
-        return os.getenv("OPENAI_API_KEY")
+        """Get appropriate API key based on provider.
+
+        For the ``litellm`` passthrough provider this returns ``None`` even when
+        ``OPENAI_API_KEY`` happens to be set, so an OpenAI key is never silently
+        forwarded to, say, an Anthropic model. LiteLLM resolves credentials from
+        its own env conventions in that case.
+        """
+        env_var = PROVIDER_API_KEY_ENV_VARS.get(provider, "OPENAI_API_KEY")
+        if env_var is None:
+            return None
+        return os.getenv(env_var)
+
+    def _ensure_api_key(self) -> None:
+        """Enforce that an API key is available before making an LLM call.
+
+        The key requirement is deferred from construction to first LLM use so
+        deterministic-only operations (e.g. axe-based accessibility) stay keyless.
+        The ``litellm`` passthrough provider is exempt: it has no single
+        canonical key, so LiteLLM is left to resolve credentials from its own
+        per-model env conventions (its auth errors are already surfaced).
+
+        Raises:
+            AuthenticationError: If no API key is configured for a mapped provider.
+        """
+        if self.provider == "litellm":
+            return
+        if not self.api_key:
+            env_var = PROVIDER_API_KEY_ENV_VARS.get(self.provider, "OPENAI_API_KEY")
+            self.logger.error(f"No API key found for {self.provider} provider")
+            raise AuthenticationError(
+                f"API key required for {self.provider} provider. Set {env_var} env var or pass api_key parameter."
+            )
 
     def _encode_image(self, image_path: str | Path) -> str:
         """Encode image to base64."""
@@ -328,6 +373,10 @@ Focus on:
         instructions: Instructions | None = None,
     ) -> dict[str, Any]:
         """Call LiteLLM vision API directly."""
+        # Enforce the API-key requirement at the first point of LLM use. Raised
+        # (not swallowed) so it propagates through analyze as an AuthenticationError.
+        self._ensure_api_key()
+
         # Encode image
         try:
             image_b64 = self._encode_image(image_path)
@@ -347,9 +396,9 @@ Focus on:
         try:
             self.logger.debug(f"Making API call with LiteLLM to model: {self.model}")
 
-            response = await acompletion(
-                model=self.model,
-                messages=[
+            completion_kwargs: dict[str, Any] = {
+                "model": self.model,
+                "messages": [
                     {
                         "role": "user",
                         "content": [
@@ -358,11 +407,16 @@ Focus on:
                         ],
                     }
                 ],
-                max_tokens=1000,
-                temperature=0.1,
-                api_key=self.api_key,
-                timeout=30.0,
-            )
+                "max_tokens": 1000,
+                "temperature": 0.1,
+                "timeout": 30.0,
+            }
+            # Only pass api_key when we actually resolved one; otherwise let
+            # LiteLLM fall back to its own provider-specific env resolution.
+            if self.api_key:
+                completion_kwargs["api_key"] = self.api_key
+
+            response = await acompletion(**completion_kwargs)
 
             self.logger.debug(f"API call successful")
 
@@ -474,6 +528,9 @@ Focus on:
                 cache_key = self.cache.get_analysis_key(
                     source=str(source), query=query, viewport=viewport_value, context=context
                 )
+                # ``AnalysisCache.get`` returns a defensive deep copy, so mutating
+                # the result here (and by downstream callers such as the hybrid
+                # axe override) can never corrupt the shared cached entry.
                 cached_result = self.cache.get(cache_key)
                 if cached_result and isinstance(cached_result, AnalysisResult):
                     cached_result.execution_time = time.time() - combination_start_time
@@ -633,7 +690,7 @@ Focus on:
             Comparison analysis with overall assessment.
 
         Example:
-            >>> result = lens.compare([
+            >>> result = await lens.compare([
             ...     "https://mysite.com/before",
             ...     "https://mysite.com/after"
             ... ], "Did the redesign improve the user experience?")
@@ -663,7 +720,13 @@ Focus on:
                     capture_engine = Capture(output_dir=self.output_dir / "screenshots")
                     screenshot_paths_batch = await capture_engine.screenshots([str(source)], viewport_value)
                     screenshot_path = screenshot_paths_batch[0]  # Get first (and only) result
+                elif self._is_html_file(source):
+                    # Render local HTML to a real screenshot; otherwise the raw
+                    # HTML bytes would be base64-encoded and sent to the vision
+                    # API mislabeled as a PNG (garbage comparative analysis).
+                    screenshot_path = await self._serve_html_and_capture(source, viewport_value)
                 else:
+                    # Existing image file passes through unchanged.
                     screenshot_path = str(source)
 
                 screenshot_paths.append(screenshot_path)
@@ -759,38 +822,20 @@ Focus on:
         path = Path(source)
         return path.suffix.lower() in [".html", ".htm"]
 
-    def _detect_html_complexity(self, html_file_path: Path) -> bool:
-        """Detect if HTML file has external dependencies (CSS, JS, images)."""
-        try:
-            with open(html_file_path, encoding="utf-8") as f:
-                content = f.read().lower()
+    # Recognized raster/vector image extensions treated as pre-rendered screenshots.
+    _IMAGE_SUFFIXES = frozenset({".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tiff", ".svg"})
 
-            # Check for external resources
-            external_indicators = [
-                "<link",
-                "<script src",
-                "<img src",
-                "url(",
-                "href=",
-                "src=",
-                "@import",
-                "background-image",
-            ]
+    def _is_image_file(self, source: str | Path) -> bool:
+        """Check if source is an image file (a pre-rendered screenshot).
 
-            for indicator in external_indicators:
-                # Check if indicator is present and it's a relative path (not http/https/data)
-                if (
-                    indicator in content
-                    and "http://" not in content
-                    and "https://" not in content
-                    and "data:" not in content
-                ):
-                    return True
-
+        Image sources have no DOM, so the deterministic axe engine cannot audit
+        them — accessibility modes must reject or skip them rather than audit a
+        garbage document served as HTML.
+        """
+        if self._is_url(source):
             return False
-        except Exception:
-            # If we can't read the file, assume it's complex
-            return True
+
+        return Path(source).suffix.lower() in self._IMAGE_SUFFIXES
 
     async def _serve_html_and_capture(
         self,
@@ -799,7 +844,12 @@ Focus on:
         wait_for_selector: str | None = None,
         wait_time: int | None = None,
     ) -> str:
-        """Serve HTML file locally and capture screenshot."""
+        """Serve a local HTML file and capture a screenshot.
+
+        Serving is delegated to :func:`layoutlens.browser.open_page` (used by
+        the capture engine), which stands up a temporary local HTTP server so
+        relative CSS/JS/image references resolve correctly.
+        """
         html_file_path = Path(html_file_path).resolve()
         if not html_file_path.exists():
             raise LayoutFileNotFoundError(
@@ -807,91 +857,13 @@ Focus on:
                 file_path=str(html_file_path),
             )
 
-        # Try file:// URL first for simple HTML files (faster)
-        if not self._detect_html_complexity(html_file_path):
-            self.logger.debug(f"Using file:// URL for simple HTML: {html_file_path}")
-            try:
-                file_url = f"file://{html_file_path}"
-                capture_engine = Capture(output_dir=self.output_dir / "screenshots")
-                screenshot_paths = await capture_engine.screenshots(
-                    [file_url], viewport, wait_for_selector=wait_for_selector, wait_time=wait_time
-                )
-                screenshot_path = screenshot_paths[0]
-                self.logger.info(f"Successfully captured HTML file via file:// URL: {html_file_path.name}")
-                return screenshot_path
-            except Exception as e:
-                self.logger.debug(f"file:// URL failed, falling back to HTTP server: {e}")
-
-        # Fall back to HTTP server for complex HTML files
-        self.logger.debug(f"Using HTTP server for complex HTML: {html_file_path}")
-
-        import http.server
-        import socket
-        import socketserver
-        import threading
-        import time
-
-        # Find available port
-        def find_free_port():
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.bind(("", 0))
-                s.listen(1)
-                port = s.getsockname()[1]
-            return port
-
-        port = find_free_port()
-
-        # Create a handler that serves files from the HTML file's directory
-        class LocalFileHandler(http.server.SimpleHTTPRequestHandler):
-            def __init__(self, *args, **kwargs):
-                super().__init__(*args, directory=str(html_file_path.parent), **kwargs)
-
-            def do_GET(self):
-                # Route based on path
-                match self.path:
-                    case "/" | "":
-                        # Serve our HTML file
-                        self.send_response(200)
-                        self.send_header("Content-type", "text/html")
-                        self.end_headers()
-                        with open(html_file_path, "rb") as f:
-                            self.wfile.write(f.read())
-                    case _:
-                        # Serve other files normally (CSS, JS, images)
-                        super().do_GET()
-
-            def log_message(self, format, *args):
-                # Suppress server logs
-                return
-
-        # Start server in background thread
-        httpd = socketserver.TCPServer(("", port), LocalFileHandler)
-        server_thread = threading.Thread(target=httpd.serve_forever)
-        server_thread.daemon = True
-        server_thread.start()
-
-        try:
-            # Give server time to start
-            await asyncio.sleep(0.5)
-
-            # Capture the served HTML page
-            local_url = f"http://localhost:{port}/"
-            self.logger.debug(f"Serving HTML file at {local_url}")
-
-            capture_engine = Capture(output_dir=str(self.output_dir / "screenshots"))
-            screenshot_paths = await capture_engine.screenshots(
-                [local_url], viewport, wait_for_selector=wait_for_selector, wait_time=wait_time
-            )
-            screenshot_path = screenshot_paths[0]
-
-            self.logger.info(f"Successfully captured HTML file via HTTP server: {html_file_path.name}")
-            return screenshot_path
-
-        finally:
-            # Stop the server
-            httpd.shutdown()
-            httpd.server_close()
-            server_thread.join(timeout=1)
+        capture_engine = Capture(output_dir=self.output_dir / "screenshots")
+        screenshot_paths = await capture_engine.screenshots(
+            [str(html_file_path)], viewport, wait_for_selector=wait_for_selector, wait_time=wait_time
+        )
+        screenshot_path = screenshot_paths[0]
+        self.logger.info(f"Successfully captured HTML file: {html_file_path.name}")
+        return screenshot_path
 
     # Unified Capture Method
 
@@ -1048,9 +1020,248 @@ Focus on:
             # Multiple sources: return the full mapping
             return results
 
+    # Deterministic accessibility helpers
+
+    @staticmethod
+    def _axe_run_only_for_level(compliance_level: str) -> list[str]:
+        """Map a WCAG compliance level to the axe tags to run.
+
+        A -> ``["wcag2a"]``, AA -> ``["wcag2a", "wcag2aa"]``,
+        AAA -> ``["wcag2a", "wcag2aa", "wcag2aaa"]``.
+        """
+        tags = ["wcag2a"]
+        if compliance_level in ("AA", "AAA"):
+            tags.append("wcag2aa")
+        if compliance_level == "AAA":
+            tags.append("wcag2aaa")
+        return tags
+
+    @staticmethod
+    def _wcag_level_label(run_only: list[str] | None) -> str:
+        """Return the WCAG level label covered by an axe ``run_only`` tag list.
+
+        ``["wcag2a"]`` -> "WCAG A", ``["wcag2a", "wcag2aa"]`` -> "WCAG A/AA",
+        adding ``"wcag2aaa"`` -> "WCAG A/AA/AAA".
+        """
+        tags = set(run_only or [])
+        if "wcag2aaa" in tags:
+            return "WCAG A/AA/AAA"
+        if "wcag2aa" in tags:
+            return "WCAG A/AA"
+        return "WCAG A"
+
+    @staticmethod
+    def _axe_answer(report: A11yReport, level_label: str = "WCAG A/AA") -> str:
+        """Phrase a natural-language yes/no answer from an axe report.
+
+        ``level_label`` names the WCAG level(s) actually audited (see
+        :meth:`_wcag_level_label`) so the answer never overstates coverage.
+        """
+        if report.violations:
+            rule_ids = ", ".join(sorted({f.rule_id for f in report.violations}))
+            return f"No — axe-core found {len(report.violations)} {level_label} violation(s): {rule_ids}"
+        return f"Yes — axe-core found no {level_label} violations"
+
+    def _build_axe_result(
+        self,
+        source: str | Path,
+        query: str,
+        viewport_value: str,
+        report: A11yReport,
+        mode: str,
+        run_only: list[str] | None = None,
+    ) -> AnalysisResult:
+        """Build a deterministic AnalysisResult from an axe report (no LLM)."""
+        return AnalysisResult(
+            source=str(source),
+            query=query,
+            answer=self._axe_answer(report, self._wcag_level_label(run_only)),
+            confidence=1.0,
+            reasoning=report.summary(),
+            viewport=viewport_value,
+            metadata={
+                "a11y": asdict(report),
+                "mode": mode,
+                "engine": f"axe-core {AXE_VERSION}",
+                "provider": self.provider,
+                "model": self.model,
+            },
+        )
+
+    def _apply_axe_override(
+        self,
+        result: AnalysisResult,
+        report: A11yReport,
+        mode: str,
+        run_only: list[str] | None = None,
+    ) -> AnalysisResult:
+        """Apply the deterministic override to a hybrid LLM result.
+
+        If axe found violations, the final answer is forced to "no" with full
+        confidence and reasoning that combines axe findings with the LLM's
+        assessment. If axe found none, the LLM's answer/confidence are kept.
+        The axe report is always attached under ``metadata["a11y"]``.
+        """
+        if report.violations:
+            result.answer = self._axe_answer(report, self._wcag_level_label(run_only))
+            result.confidence = 1.0
+            result.reasoning = f"{report.summary()}\n\nLLM assessment:\n{result.reasoning}"
+        result.metadata["a11y"] = asdict(report)
+        result.metadata["mode"] = mode
+        result.metadata["engine"] = f"axe-core {AXE_VERSION}"
+        return result
+
+    @staticmethod
+    def _inject_axe_context(query: str, report: A11yReport) -> str:
+        """Append a deterministic axe-core context block to an LLM query."""
+        return (
+            f"{query}\n\n"
+            f"Deterministic axe-core scan results for this page:\n{report.summary()}\n"
+            "Assess additional visual/contextual accessibility issues that automated rules cannot catch."
+        )
+
+    async def _run_a11y_check(
+        self,
+        source: str | Path,
+        query: str,
+        viewport_value: str,
+        run_only: list[str],
+        mode: str,
+        instructions: Instructions | None = None,
+    ) -> AnalysisResult:
+        """Shared axe/hybrid execution for the accessibility entry points.
+
+        Handles the image-source guard, the deterministic ``axe`` path, and the
+        single-session ``hybrid`` path. ``llm`` mode is handled entirely by the
+        callers and never reaches here.
+
+        Raises:
+            ValidationError: In ``axe`` mode when ``source`` is an image, which
+                has no DOM for axe to audit.
+        """
+        # Image sources are pre-rendered screenshots with no DOM; axe would
+        # otherwise be handed a garbage document served as HTML and report a
+        # false "compliant" at full confidence.
+        if self._is_image_file(source):
+            if mode == "axe":
+                raise ValidationError(
+                    f"axe mode cannot audit an image source ({source}) — it has no DOM. "
+                    "Provide a URL or HTML file, or use mode='llm' for vision-only analysis.",
+                    field="source",
+                    value=str(source),
+                )
+            # hybrid: fall back to vision-only and record why axe was skipped.
+            self.logger.warning(
+                f"Image source {source} has no DOM; falling back to llm-only for hybrid accessibility check."
+            )
+            result = await self.analyze(source, query, viewport=viewport_value, instructions=instructions)
+            result.metadata["mode"] = "llm"
+            result.metadata["a11y_skipped"] = "image source"
+            return result
+
+        if mode == "axe":
+            report = await AxeAuditor(run_only=run_only).audit(source, viewport_value)
+            return self._build_axe_result(source, query, viewport_value, report, mode, run_only)
+
+        return await self._hybrid_a11y(source, query, viewport_value, run_only, mode, instructions)
+
+    async def _hybrid_a11y(
+        self,
+        source: str | Path,
+        query: str,
+        viewport_value: str,
+        run_only: list[str],
+        mode: str,
+        instructions: Instructions | None = None,
+    ) -> AnalysisResult:
+        """Run one browser session for the screenshot + axe audit, then the LLM.
+
+        A single :func:`open_page` session yields the exact page the screenshot
+        is taken from AND the DOM axe audits, so the pixels the LLM sees and the
+        DOM axe scores can never diverge (and only one browser is launched).
+        Results are cached under a key that includes the a11y mode so llm-mode
+        and hybrid-mode results for the same source never collide. If axe fails,
+        the check degrades gracefully to LLM-only with an ``a11y_error`` note.
+        """
+        cache_key = self.cache.get_analysis_key(
+            source=str(source), query=query, viewport=viewport_value, context={"a11y_mode": mode}
+        )
+        # ``AnalysisCache.get`` already hands back a defensive deep copy.
+        cached = self.cache.get(cache_key)
+        if cached and isinstance(cached, AnalysisResult):
+            cached.metadata["cache_hit"] = True
+            return cached
+
+        start_time = time.time()
+        capture_engine = Capture(output_dir=self.output_dir / "screenshots")
+        screenshot_path = capture_engine.output_dir / capture_engine._generate_filename(str(source), viewport_value)
+
+        report: A11yReport | None = None
+        axe_error: str | None = None
+        async with open_page(source, viewport_value) as page:
+            await page.screenshot(path=str(screenshot_path), full_page=True)
+            try:
+                report = await AxeAuditor(run_only=run_only).audit_page(
+                    page, source=str(source), viewport=viewport_value
+                )
+            except Exception as e:  # noqa: BLE001 - degrade to LLM-only on axe failure
+                axe_error = str(e)
+                self.logger.warning(f"axe audit failed in hybrid mode; proceeding LLM-only: {e}")
+
+        llm_query = self._inject_axe_context(query, report) if report is not None else query
+        vision_response = await self._call_vision_api(
+            image_path=str(screenshot_path), query=llm_query, instructions=instructions
+        )
+
+        result = AnalysisResult(
+            source=str(source),
+            query=query,
+            answer=str(vision_response["answer"]),
+            confidence=float(vision_response["confidence"]),
+            reasoning=str(vision_response["reasoning"]),
+            screenshot_path=str(screenshot_path),
+            viewport=viewport_value,
+            execution_time=time.time() - start_time,
+            metadata={
+                **vision_response["metadata"],
+                "provider": self.provider,
+                "model": self.model,
+            },
+        )
+
+        if report is not None:
+            result = self._apply_axe_override(result, report, mode, run_only)
+        else:
+            result.metadata["mode"] = mode
+            result.metadata["a11y_error"] = axe_error
+
+        self.cache.set(cache_key, result)
+        return result
+
     # Developer convenience methods
-    async def check_accessibility(self, source: str | Path, viewport: ViewportType = "desktop") -> AnalysisResult:
-        """Quick accessibility check with common WCAG queries."""
+    async def check_accessibility(
+        self,
+        source: str | Path,
+        viewport: ViewportType = "desktop",
+        mode: Literal["hybrid", "axe", "llm"] = "hybrid",
+    ) -> AnalysisResult:
+        """Accessibility check with deterministic axe-core, LLM vision, or both.
+
+        Args:
+            source: URL or file path to analyze.
+            viewport: Viewport for capture/audit.
+            mode: ``"hybrid"`` (default) runs deterministic axe-core WCAG A/AA
+                checks and LLM vision analysis, forcing a "no" verdict when axe
+                finds any violation. ``"axe"`` runs axe-core only (no API key
+                required, no LLM call). ``"llm"`` runs the legacy vision-only
+                analysis.
+
+        Returns:
+            AnalysisResult. In axe/hybrid modes ``metadata["a11y"]`` holds the
+            full axe report, ``metadata["mode"]`` the mode, and
+            ``metadata["engine"]`` the axe-core version.
+        """
+        viewport_value = viewport.value if isinstance(viewport, Viewport) else str(viewport)
         query = """
         Analyze this page for accessibility issues. Check:
         1. Color contrast and readability
@@ -1061,7 +1272,13 @@ Focus on:
 
         Provide specific feedback on what works well and what needs improvement.
         """
-        return await self.analyze(source, query, viewport)
+
+        if mode == "llm":
+            result = await self.analyze(source, query, viewport_value)
+            result.metadata["mode"] = mode
+            return result
+
+        return await self._run_a11y_check(source, query, viewport_value, ["wcag2a", "wcag2aa"], mode)
 
     async def check_mobile_friendly(self, source: str | Path) -> AnalysisResult:
         """Quick mobile responsiveness check."""
@@ -1101,6 +1318,7 @@ Focus on:
         standards: list[str] = None,
         compliance_level: ComplianceLevelType = "AA",
         viewport: ViewportType = "desktop",
+        mode: Literal["hybrid", "axe", "llm"] = "hybrid",
     ) -> AnalysisResult:
         """Professional accessibility audit using WCAG expert knowledge.
 
@@ -1109,6 +1327,12 @@ Focus on:
             standards: Accessibility standards to apply (default: WCAG 2.1, Section 508)
             compliance_level: WCAG compliance level (ComplianceLevel.AA or string)
             viewport: Viewport for analysis (Viewport.DESKTOP or string)
+            mode: ``"hybrid"`` (default) combines deterministic axe-core checks with
+                LLM analysis (axe violations force a "no" verdict). ``"axe"`` runs
+                axe-core only (no API key required). ``"llm"`` runs the legacy
+                vision-only audit. The axe run honors ``compliance_level``:
+                A -> ``wcag2a``, AA -> ``wcag2a``+``wcag2aa``, AAA additionally
+                includes ``wcag2aaa``.
 
         Returns:
             Detailed accessibility assessment with specific WCAG guidance
@@ -1131,12 +1355,19 @@ Focus on:
                 valid_levels = [level.value for level in ComplianceLevel]
                 raise ValueError(f"compliance_level must be one of {valid_levels}, got: '{compliance_level}'") from None
 
+        viewport_value = viewport.value if isinstance(viewport, Viewport) else str(viewport)
         instructions = Instructions.for_accessibility_audit(
             standards=standards, compliance_level=compliance_level_value
         )
-
         query = f"Perform a comprehensive accessibility audit for WCAG {compliance_level_value} compliance"
-        return await self.analyze(source, query, viewport=viewport, instructions=instructions)
+
+        if mode == "llm":
+            result = await self.analyze(source, query, viewport=viewport_value, instructions=instructions)
+            result.metadata["mode"] = mode
+            return result
+
+        run_only = self._axe_run_only_for_level(compliance_level_value)
+        return await self._run_a11y_check(source, query, viewport_value, run_only, mode, instructions=instructions)
 
     async def optimize_conversions(
         self,

@@ -79,23 +79,6 @@ def sample_config_file(temp_dir):
 
 
 @pytest.fixture
-def mock_openai_response():
-    """Mock OpenAI API response."""
-    mock_response = Mock()
-    mock_response.output_text = "Yes, the layout appears correct and well-structured."
-    return mock_response
-
-
-@pytest.fixture
-def mock_layout_lens(mock_openai_response):
-    """Mock LayoutLens instance."""
-    mock_lens = Mock()
-    mock_lens.ask.return_value = mock_openai_response.output_text
-    mock_lens.compare_layouts.return_value = "Yes, the layouts look the same."
-    return mock_lens
-
-
-@pytest.fixture
 def mock_playwright_browser():
     """Mock Playwright browser for screenshot testing."""
     mock_browser = Mock()

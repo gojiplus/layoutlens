@@ -81,9 +81,11 @@ class TestAPIFunctionality(unittest.TestCase):
         """Test LayoutLens initialization."""
         from layoutlens.api.core import LayoutLens
 
-        # Test without API key (should fail) - patch env var to ensure it's not set
-        with patch.dict("os.environ", {}, clear=True), self.assertRaises(AuthenticationError):
-            LayoutLens()
+        # Without an API key the constructor no longer raises: the requirement is
+        # deferred to first LLM use so deterministic (axe) operations stay keyless.
+        with patch.dict("os.environ", {}, clear=True):
+            keyless = LayoutLens()
+            self.assertIsNone(keyless.api_key)
 
         # Test with API key (should succeed)
         lens = LayoutLens(api_key=self.mock_api_key)

@@ -141,6 +141,62 @@ class TestSimpleCLI:
             source=["page1.html", "page2.html"], query="Is it good?", viewport="desktop"
         )
 
+    @patch("layoutlens.cli.LayoutLens")
+    async def test_a11y_axe_mode(self, mock_lens_class):
+        """--a11y axe runs check_accessibility with the axe mode."""
+        mock_lens = Mock()
+        mock_lens_class.return_value = mock_lens
+
+        mock_result = AnalysisResult(
+            source="test.html",
+            query="",
+            answer="No — axe-core found 2 WCAG A/AA violation(s): color-contrast, image-alt",
+            confidence=1.0,
+            reasoning="Accessibility report ...",
+        )
+        mock_lens.check_accessibility = AsyncMock(return_value=mock_result)
+
+        test_args = ["layoutlens", "test.html", "--a11y", "axe"]
+        with patch("sys.argv", test_args), patch("pathlib.Path.exists", return_value=True):
+            result = await main()
+
+        assert result == 0
+        mock_lens.check_accessibility.assert_called_once_with("test.html", viewport="desktop", mode="axe")
+
+    @patch("layoutlens.cli.LayoutLens")
+    async def test_a11y_query_conflict_errors(self, mock_lens_class, capsys):
+        """Combining --a11y with a query is an error."""
+        mock_lens = Mock()
+        mock_lens_class.return_value = mock_lens
+        mock_lens.check_accessibility = AsyncMock()
+
+        test_args = ["layoutlens", "test.html", "--a11y", "axe", "--query", "Is it good?"]
+        with patch("sys.argv", test_args), patch("pathlib.Path.exists", return_value=True):
+            result = await main()
+
+        assert result == 1
+        captured = capsys.readouterr()
+        assert "--query cannot be combined with --a11y" in captured.err
+        mock_lens.check_accessibility.assert_not_called()
+
+    @patch("layoutlens.cli.LayoutLens")
+    async def test_a11y_compare_conflict_errors(self, mock_lens_class, capsys):
+        """Combining --a11y with --compare is an error (accessibility runs per source)."""
+        mock_lens = Mock()
+        mock_lens_class.return_value = mock_lens
+        mock_lens.check_accessibility = AsyncMock()
+        mock_lens.compare = AsyncMock()
+
+        test_args = ["layoutlens", "a.html", "b.html", "--a11y", "axe", "--compare"]
+        with patch("sys.argv", test_args), patch("pathlib.Path.exists", return_value=True):
+            result = await main()
+
+        assert result == 1
+        captured = capsys.readouterr()
+        assert "--compare cannot be combined with --a11y" in captured.err
+        mock_lens.check_accessibility.assert_not_called()
+        mock_lens.compare.assert_not_called()
+
     async def test_no_args_shows_help(self, capsys):
         """Test that no arguments shows help."""
         test_args = ["layoutlens"]

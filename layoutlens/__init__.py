@@ -4,6 +4,9 @@ A production-ready AI-powered UI testing framework that enables
 natural language visual testing.
 """
 
+# Import deterministic accessibility engine
+from .a11y import AXE_VERSION, A11yFinding, A11yReport, AxeAuditor
+
 # Import the main API
 from .api.core import AnalysisResult, BatchResult, ComparisonResult, LayoutLens
 from .api.test_suite import UITestCase, UITestResult, UITestSuite
@@ -53,6 +56,11 @@ __all__ = [
     "UITestResult",
     "Capture",
     "Config",
+    # Deterministic accessibility engine
+    "AxeAuditor",
+    "A11yReport",
+    "A11yFinding",
+    "AXE_VERSION",
     # Types and Enums
     "ComplianceLevel",
     "Expert",

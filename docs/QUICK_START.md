@@ -6,7 +6,7 @@ Get started with AI-powered UI testing in 5 minutes.
 
 ```bash
 pip install layoutlens
-playwright install  # For URL capture
+playwright install chromium  # For screenshot capture
 ```
 
 ## 🔑 Setup
@@ -17,30 +17,69 @@ export OPENAI_API_KEY="sk-your-openai-key"
 
 *Get your API key from [OpenAI Platform](https://platform.openai.com/api-keys)*
 
+Only needed for LLM-backed analysis. The deterministic axe-core accessibility
+mode (below) needs no API key at all — `LayoutLens()` itself never requires
+one at construction either; a missing key only raises when an LLM call is
+actually made.
+
+## ♿ Deterministic Accessibility Checks (No API Key Required)
+
+LayoutLens vendors [axe-core](https://github.com/dequelabs/axe-core) and runs it
+against a real rendered page for actual WCAG 2.1 A/AA violations:
+
+```bash
+layoutlens page.html --a11y axe
+```
+
+```python
+import asyncio
+from layoutlens import AxeAuditor
+
+async def main():
+    report = await AxeAuditor().audit("page.html")
+    print(report.summary())
+    print(report.ok)  # True if zero violations
+
+asyncio.run(main())
+```
+
+`check_accessibility(source, mode="hybrid")` (the default) combines this with
+LLM vision analysis: axe grounds the LLM's assessment and deterministically
+forces a "no" verdict if it finds any violation. Pass `mode="axe"` for the
+keyless deterministic-only check, or `mode="llm"` for the legacy vision-only
+check.
+
 ## 💡 Basic Usage
+
+LayoutLens's API is async — call it with `await` from an `async def`, or wrap
+top-level calls in `asyncio.run(...)`.
 
 ### Analyze a Website
 
 ```python
+import asyncio
 from layoutlens import LayoutLens
 
-lens = LayoutLens()
+async def main():
+    lens = LayoutLens()
 
-# Test any live website
-result = lens.analyze(
-    "https://your-website.com",
-    "Is the navigation easy to use?"
-)
+    # Test any live website
+    result = await lens.analyze(
+        "https://your-website.com",
+        "Is the navigation easy to use?"
+    )
 
-print(f"Answer: {result.answer}")
-print(f"Confidence: {result.confidence:.1%}")
+    print(f"Answer: {result.answer}")
+    print(f"Confidence: {result.confidence:.1%}")
+
+asyncio.run(main())
 ```
 
 ### Analyze Screenshots
 
 ```python
-# Test uploaded images
-result = lens.analyze(
+# Test an existing screenshot image
+result = await lens.analyze(
     "screenshot.png",
     "Are the buttons large enough for mobile users?"
 )
@@ -49,8 +88,9 @@ result = lens.analyze(
 ### Compare Designs
 
 ```python
-# Compare before/after
-result = lens.compare([
+# Compare two live pages (compare() takes URLs or already-captured
+# screenshots directly; for local HTML files, call capture() first)
+result = await lens.compare([
     "https://old-design.com",
     "https://new-design.com"
 ], "Which design is more user-friendly?")
@@ -60,24 +100,23 @@ result = lens.compare([
 
 ### Mobile-Friendly Check
 ```python
-result = lens.check_mobile_friendly("https://your-site.com")
+result = await lens.check_mobile_friendly("https://your-site.com")
 ```
 
 ### Accessibility Check
 ```python
-result = lens.check_accessibility("https://your-site.com")
+result = await lens.check_accessibility("https://your-site.com")  # mode="hybrid" by default
 ```
 
 ### Conversion Optimization
 ```python
-result = lens.check_conversion_optimization("https://your-site.com")
+result = await lens.check_conversion_optimization("https://your-site.com")
 ```
 
-## 🤖 GitHub Actions Integration
+## 🤖 CI Integration
 
-### 1. Add to Your Workflow
-
-Create `.github/workflows/ui-quality.yml`:
+There is no bundled GitHub composite action — call the CLI directly in your
+workflow:
 
 ```yaml
 name: UI Quality Check
@@ -89,30 +128,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Test UI Quality
-        uses: your-org/layoutlens/.github/actions/layoutlens@v1
+      - uses: actions/setup-python@v5
         with:
-          url: ${{ env.PREVIEW_URL }}
-          openai_api_key: ${{ secrets.OPENAI_API_KEY }}
-          queries: |
-            - "Is the layout professional and trustworthy?"
-            - "Are there any obvious usability issues?"
-            - "Does this work well on mobile?"
+          python-version: "3.11"
+
+      - name: Install LayoutLens
+        run: |
+          pip install layoutlens
+          playwright install chromium
+
+      - name: Deterministic accessibility check (no API key needed)
+        run: layoutlens ${{ env.PREVIEW_URL }} --a11y axe
+
+      - name: AI quality check
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          layoutlens ${{ env.PREVIEW_URL }} "Is the layout professional and trustworthy?"
 ```
-
-### 2. Add API Key to Secrets
-
-1. Go to your repository Settings → Secrets
-2. Add `OPENAI_API_KEY` with your OpenAI API key
-
-### 3. Test with a Pull Request
-
-The action will automatically:
-- ✅ Capture screenshots from your preview URL
-- 🤖 Analyze with AI using your queries
-- 💬 Comment on the PR with results
-- ❌ Fail the check if quality is below threshold
 
 ## 🎯 Common Use Cases
 
@@ -146,19 +179,20 @@ queries = [
 ## ⚡ Advanced Usage
 
 ### Batch Analysis
+`analyze()` handles single or multiple sources/queries directly — pass lists
+to fan out concurrently:
 ```python
-# Test multiple pages with multiple questions
-urls = ["page1.com", "page2.com", "page3.com"]
+urls = ["https://page1.com", "https://page2.com", "https://page3.com"]
 queries = ["Is navigation consistent?", "Is mobile experience good?"]
 
-result = lens.analyze_batch(urls, queries)
-print(f"Average score: {result.average_confidence:.1%}")
+result = await lens.analyze(source=urls, query=queries)  # returns a BatchResult
+print(f"Average confidence: {result.average_confidence:.1%}")
 ```
 
 ### Cross-Browser Testing
 ```python
-# Compare screenshots from different browsers
-result = lens.compare(
+# Compare pre-captured screenshots from different browsers
+result = await lens.compare(
     sources=["chrome.png", "firefox.png", "safari.png"],
     query="Are these layouts consistent across browsers?"
 )
@@ -166,15 +200,29 @@ result = lens.compare(
 
 ### Custom Context
 ```python
-result = lens.analyze(
+result = await lens.analyze(
     "https://app.com/dashboard",
     "Is this suitable for elderly users?",
     context={
         "user_type": "elderly",
         "accessibility": True,
-        "viewport": "desktop"
     }
 )
+```
+
+### YAML Test Suites
+Every test case requires `expected_results` (breaking change in v1.7.0 — see
+the main [README](https://github.com/gojiplus/layoutlens#8-yaml-test-suites)
+for the full schema):
+```python
+import yaml
+from layoutlens import LayoutLens, UITestSuite
+
+with open("test_suite.yaml") as f:
+    suite = UITestSuite.from_dict(yaml.safe_load(f))
+
+lens = LayoutLens()
+results = await lens.run_test_suite(suite)
 ```
 
 ## 🎨 Customization
@@ -200,11 +248,13 @@ result = lens.analyze(
 
 ### Common Issues
 
-**"No API key" error:**
+**"API key required" error:**
 ```bash
 export OPENAI_API_KEY="sk-your-key"
 # Or pass directly: LayoutLens(api_key="sk-your-key")
 ```
+This only happens when an LLM call is actually made — `LayoutLens()`
+construction and `mode="axe"` accessibility checks never require a key.
 
 **Playwright install error:**
 ```bash
@@ -212,19 +262,24 @@ playwright install chromium
 ```
 
 **Screenshot capture fails:**
-- Check URL is accessible
-- Try with `wait_time` parameter for slow loading pages
+- Check the URL is accessible
+- Try with `wait_time` parameter for slow-loading pages
+
+**"You uploaded an unsupported image" error from `compare()`:**
+`compare()` expects URLs or already-captured screenshot paths. Passing a raw
+local `.html` path skips screenshot rendering — call `await lens.capture(...)`
+first and pass the resulting screenshot paths to `compare()`.
 
 ### Getting Help
 
-- 📖 [Full Documentation](./README.md)
-- 🐛 [Report Issues](https://github.com/your-org/layoutlens/issues)
-- 💬 [Discussions](https://github.com/your-org/layoutlens/discussions)
+- 📖 [Full Documentation](https://gojiplus.github.io/layoutlens/)
+- 🐛 [Report Issues](https://github.com/gojiplus/layoutlens/issues)
+- 💬 [Discussions](https://github.com/gojiplus/layoutlens/discussions)
 
 ## 🎯 Next Steps
 
-1. **Try the examples** in `examples/simple_api_usage.py`
-2. **Set up GitHub Actions** for your repository
+1. **Try the examples** in `examples/` (e.g. `python examples/simple_api_usage.py`)
+2. **Set up CI** for your repository
 3. **Customize queries** for your specific use case
 4. **Integrate with your deployment pipeline**
 
