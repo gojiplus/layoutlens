@@ -99,27 +99,80 @@ def _clamp_confidence(value: Any) -> float:
     return max(0.0, min(1.0, conf))
 
 
-def _extract_json_object(text: str) -> dict[str, Any] | None:
-    """Extract the first JSON object from ``text`` (tolerating fences/prose).
+def _iter_balanced_objects(text: str) -> list[dict[str, Any]]:
+    """Yield every parseable top-level balanced JSON object found in ``text``.
 
-    Tries, in order: the whole (fence-stripped) text, then the first balanced
-    ``{...}`` span found by regex. Returns the parsed dict, or None if no JSON
-    object can be recovered.
+    Scans character-by-character tracking brace depth while string-aware (braces
+    inside JSON string values and escaped quotes are ignored), so it never mixes
+    a stray ``{...}`` in surrounding prose with the real object. Each balanced
+    ``{...}`` span is parsed; non-object or unparseable spans are skipped.
+    """
+    objects: list[dict[str, Any]] = []
+    depth = 0
+    start = -1
+    in_string = False
+    escaped = False
+
+    for i, ch in enumerate(text):
+        if in_string:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_string = False
+            continue
+
+        if ch == '"':
+            in_string = True
+        elif ch == "{":
+            if depth == 0:
+                start = i
+            depth += 1
+        elif ch == "}" and depth > 0:
+            depth -= 1
+            if depth == 0 and start != -1:
+                try:
+                    parsed = json.loads(text[start : i + 1])
+                except (json.JSONDecodeError, ValueError):
+                    parsed = None
+                if isinstance(parsed, dict):
+                    objects.append(parsed)
+                start = -1
+
+    return objects
+
+
+def _extract_json_object(text: str) -> dict[str, Any] | None:
+    """Extract the best JSON object from ``text`` (tolerating fences/prose).
+
+    Prefers the first balanced object containing an ``answer`` key (the real
+    verdict), so a stray leading object such as ``{"x": 1}`` in surrounding
+    prose can never shadow it. Falls back to the first balanced object, then to
+    parsing the whole (fence-stripped) text. Returns None if nothing parses.
     """
     stripped = text.strip()
 
-    # Strip a ```json ... ``` (or plain ``` ... ```) fence if present.
+    # Strip a ```json ... ``` (or plain ``` ... ```) fence if present, so the
+    # scanner works on the fence body too.
     fence = re.search(r"```(?:json)?\s*(.*?)\s*```", stripped, re.DOTALL | re.IGNORECASE)
-    candidates = []
+    scan_targets = []
     if fence:
-        candidates.append(fence.group(1).strip())
-    candidates.append(stripped)
-    # Greedy brace span to capture a JSON object embedded in surrounding prose.
-    brace = re.search(r"\{.*\}", stripped, re.DOTALL)
-    if brace:
-        candidates.append(brace.group(0))
+        scan_targets.append(fence.group(1).strip())
+    scan_targets.append(stripped)
 
-    for candidate in candidates:
+    fallback: dict[str, Any] | None = None
+    for target in scan_targets:
+        for obj in _iter_balanced_objects(target):
+            if "answer" in obj:
+                return obj
+            if fallback is None:
+                fallback = obj
+    if fallback is not None:
+        return fallback
+
+    # Last resort: the whole text as a single JSON document.
+    for candidate in scan_targets:
         try:
             parsed = json.loads(candidate)
         except (json.JSONDecodeError, ValueError):
@@ -184,10 +237,11 @@ async def judge(lens: LayoutLens, image_path: str | Path, prompt: str, *, max_to
         ValidationError: If ``image_path`` does not exist. No result is
             fabricated — the caller must supply a real image.
     """
-    lens._ensure_api_key()
-
-    # Build the data URL first: a missing image must raise before any API call.
+    # Validate the image FIRST: a missing image must raise ValidationError
+    # regardless of whether an API key is configured (and before any API call).
     data_url = _image_data_url(lens, image_path)
+
+    lens._ensure_api_key()
 
     completion_kwargs: dict[str, Any] = {
         "model": lens.model,

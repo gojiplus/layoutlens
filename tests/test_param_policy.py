@@ -22,6 +22,15 @@ _REGISTRY_CASES = [
     ("claude-opus-4-8", False),
     ("anthropic/claude-opus-4-8-20250101", False),
     ("claude-3-5-sonnet-4-6", False),
+    # Bedrock / cross-region dotted forms of the sampling-locked Claude models.
+    ("bedrock/anthropic.claude-sonnet-5", False),
+    ("bedrock/anthropic.claude-sonnet-5-20250101-v1:0", False),
+    ("us.anthropic.claude-sonnet-5", False),
+    ("us.anthropic.claude-sonnet-5-20250101-v1:0", False),
+    ("bedrock/anthropic.claude-opus-4-6", False),
+    ("bedrock/anthropic.claude-opus-4-7", False),
+    ("us.anthropic.claude-opus-4-8", False),
+    ("eu.anthropic.claude-opus-4-8-20250101-v1:0", False),
     # Models that accept temperature → include it.
     ("gpt-4o", True),
     ("gpt-4o-mini", True),
@@ -30,6 +39,9 @@ _REGISTRY_CASES = [
     ("anthropic/claude-3-5-sonnet", True),
     ("ollama/qwen2.5vl", True),
     ("gemini-1.5-pro", True),
+    # Bedrock dotted forms that are NOT sampling-locked must still include it.
+    ("bedrock/anthropic.claude-3-5-sonnet-20241022-v2:0", True),
+    ("us.anthropic.claude-opus-4-5", True),
 ]
 
 

@@ -26,8 +26,10 @@ from typing import Any
 
 # Ordered glob patterns (matched against the normalized model name) whose models
 # reject non-default sampling params and must therefore OMIT temperature.
-# First match wins. Patterns are matched case-insensitively with the provider
-# prefix (e.g. "anthropic/") stripped.
+# First match wins. Patterns are matched case-insensitively against the model
+# name with any provider prefix (e.g. "anthropic/", "bedrock/") and Bedrock /
+# cross-region dotted namespace (e.g. "anthropic.", "us.anthropic.") stripped —
+# so "bedrock/anthropic.claude-sonnet-5-...v1:0" normalizes to "claude-sonnet-5-...".
 _OMIT_TEMPERATURE_PATTERNS: tuple[str, ...] = (
     "claude-sonnet-5*",
     "claude-opus-4-6*",
@@ -38,10 +40,24 @@ _OMIT_TEMPERATURE_PATTERNS: tuple[str, ...] = (
 
 
 def _normalize_model(model: str) -> str:
-    """Lowercase and strip any provider prefix (``anthropic/claude-...``)."""
+    """Reduce a model id to its bare Claude-style name for pattern matching.
+
+    Strips any ``/``-delimited provider prefix (``anthropic/``, ``bedrock/``),
+    then any leading dot-delimited namespace segments that precede the model
+    family (Bedrock / cross-region forms such as ``anthropic.claude-...`` or
+    ``us.anthropic.claude-...``). Everything is lowercased.
+    """
     normalized = (model or "").lower()
     if "/" in normalized:
         normalized = normalized.rsplit("/", 1)[-1]
+    # Drop dotted namespace prefixes (e.g. "us.anthropic.claude-..." -> "claude-...").
+    # The model family always starts at the first segment beginning with "claude".
+    if "." in normalized and "claude" in normalized:
+        segments = normalized.split(".")
+        for idx, segment in enumerate(segments):
+            if segment.startswith("claude"):
+                normalized = ".".join(segments[idx:])
+                break
     return normalized
 
 

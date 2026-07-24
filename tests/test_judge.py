@@ -211,6 +211,18 @@ async def test_missing_image_raises_validation_error(lens, tmp_path):
     mock_llm.assert_not_awaited()
 
 
+@pytest.mark.asyncio
+async def test_missing_image_raises_validation_error_even_without_api_key(tmp_path, monkeypatch):
+    """Image existence is validated BEFORE the API-key check (per brief)."""
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    lens = LayoutLens(api_key=None, model="gpt-4o-mini", output_dir=str(tmp_path / "out"))
+    assert lens.api_key is None
+    missing = str(tmp_path / "nope.png")
+    with patch("layoutlens.api.judge.acompletion", new=AsyncMock()) as mock_llm, pytest.raises(ValidationError):
+        await lens.judge(missing, "prompt")
+    mock_llm.assert_not_awaited()
+
+
 # --- Result plumbing ------------------------------------------------------
 
 
@@ -250,6 +262,31 @@ def test_parse_json_with_surrounding_prose():
     answer, conf, rationale, mode = parse_judge_response(raw)
     assert answer == "A"
     assert conf == 0.6
+    assert mode == "json"
+
+
+def test_parse_picks_answer_object_among_multiple():
+    # Reviewer repro: a stray leading object must not swallow the real verdict.
+    raw = 'prefix {"x":1} more {"answer":"A"} end'
+    answer, conf, rationale, mode = parse_judge_response(raw)
+    assert answer == "A"
+    assert mode == "json"
+
+
+def test_parse_nested_brace_prose():
+    raw = 'Notes {a set {1,2}} then {"answer":"B","confidence":0.4} done'
+    answer, conf, rationale, mode = parse_judge_response(raw)
+    assert answer == "B"
+    assert conf == 0.4
+    assert mode == "json"
+
+
+def test_parse_json_value_containing_braces():
+    # Braces inside a JSON string value must not confuse brace counting.
+    raw = '{"answer": "A", "rationale": "use {curly} braces { unbalanced"}'
+    answer, conf, rationale, mode = parse_judge_response(raw)
+    assert answer == "A"
+    assert rationale == "use {curly} braces { unbalanced"
     assert mode == "json"
 
 
