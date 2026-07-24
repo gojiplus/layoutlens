@@ -34,6 +34,7 @@ class LLMConfig:
     max_retries: int = 3
     timeout: int = 60
     temperature: float = 0.1
+    api_base: str | None = None  # OpenAI-compatible endpoint (Ollama/vLLM/etc.)
     custom_params: dict[str, Any] = field(default_factory=dict)
 
 
@@ -148,6 +149,7 @@ class Config:
             self.llm.max_retries = llm_data.get("max_retries", self.llm.max_retries)
             self.llm.timeout = llm_data.get("timeout", self.llm.timeout)
             self.llm.temperature = llm_data.get("temperature", self.llm.temperature)
+            self.llm.api_base = llm_data.get("api_base", self.llm.api_base)
             self.llm.custom_params = llm_data.get("custom_params", self.llm.custom_params)
 
         # Load screenshot configuration
@@ -242,6 +244,7 @@ class Config:
                 "max_retries": self.llm.max_retries,
                 "timeout": self.llm.timeout,
                 "temperature": self.llm.temperature,
+                "api_base": self.llm.api_base,
                 "custom_params": self.llm.custom_params,
             },
             "screenshot": {

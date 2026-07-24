@@ -301,6 +301,54 @@ There is no CLI subcommand for suites — `run_test_suite` is a Python API only.
 See [`examples/sample_test_suite.yaml`](examples/sample_test_suite.yaml) for a
 complete, runnable example.
 
+## Using LayoutLens as an LLM Judge
+
+For external evaluation harnesses (e.g. UIJudgeBench), `judge()` sends your
+prompt **verbatim** — no persona, no scaffolding, no appended JSON contract —
+alongside a single image, and returns a parsed, structured verdict. Your harness
+owns the entire prompt, including its own response contract and prompt versioning.
+
+```python
+from layoutlens import LayoutLens
+
+lens = LayoutLens(model="gpt-4o")  # or any vision model via provider/api_base
+
+prompt = (
+    "You are a UI evaluation judge. Compare the layout in the image against the "
+    "criteria below and respond ONLY as JSON: "
+    '{"answer": "A" | "B", "confidence": 0.0-1.0, "rationale": "..."}.\n'
+    "Criteria: which layout has clearer visual hierarchy?"
+)
+
+result = await lens.judge("candidate.png", prompt, max_tokens=300)
+
+result.answer      # parsed "answer" field, or "unknown" if unparseable
+result.confidence  # parsed 0-1, else 0.0
+result.rationale   # parsed "rationale"/"reasoning", else ""
+result.raw         # full raw model text
+result.refused     # True if the model declined
+result.usage       # {"prompt_tokens": ..., "completion_tokens": ..., "total_tokens": ...}
+result.parse_mode  # "json" | "fallback" | "none"
+```
+
+Key guarantees:
+
+- **Verbatim prompt** — LayoutLens adds nothing to the text you provide.
+- **No caching** — every judge call hits the model, so a benchmark controls its
+  own determinism.
+- **Per-model parameter policy** — models that reject non-default sampling params
+  (Claude Sonnet 5, Opus 4.6+) omit `temperature` automatically; others send
+  `temperature=0.0`.
+- **Self-hosted endpoints** — point at Ollama/vLLM via `api_base`:
+
+  ```python
+  lens = LayoutLens(
+      provider="litellm",
+      model="ollama/qwen2.5vl",
+      api_base="http://localhost:11434",
+  )
+  ```
+
 ## CLI Usage
 
 ```bash

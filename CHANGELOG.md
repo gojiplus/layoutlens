@@ -2,6 +2,39 @@
 
 All notable changes to LayoutLens are documented in this file.
 
+## [1.8.0] - Unreleased
+
+### 🚀 Major Features
+
+- **Faithful judge interface** (`LayoutLens.judge`, `JudgeResult`): LayoutLens
+  can now serve as a reference judge for external evaluation harnesses (e.g.
+  [UIJudgeBench](https://github.com/soodoku/UIJudgeBench)). The caller-supplied
+  prompt is sent **verbatim** — no system persona, no query scaffolding, no
+  appended JSON-format instruction — alongside a single image. The response is
+  parsed (strict JSON, then a yes/no fallback, then `"unknown"`), refusals are
+  detected, and a real token-usage split is returned. Judge calls always hit the
+  model (no caching) so a harness controls its own prompt versioning.
+  New module: `layoutlens/api/judge.py`.
+- **Per-model parameter policy** (`layoutlens/param_policy.py`): a data-driven,
+  ordered registry decides which sampling parameters are safe per model. Claude
+  Sonnet 5 and Opus 4.6/4.7/4.8 reject non-default sampling params with a 400, so
+  those patterns omit `temperature` entirely; every other model includes it.
+  Wired into both the analyze path and `judge()`.
+- **`api_base` support**: `LayoutLens(..., api_base=...)` (and `LLMConfig.api_base`)
+  forwards `api_base` to every model call, enabling self-hosted / OpenAI-compatible
+  endpoints such as Ollama and vLLM
+  (`LayoutLens(provider="litellm", model="ollama/qwen2.5vl", api_base="http://localhost:11434")`).
+
+### 🔧 Improvements
+
+- **Token-usage split**: analysis metadata and `JudgeResult.usage` now record
+  `prompt_tokens` and `completion_tokens` in addition to `total_tokens` (each
+  defaults to 0 when the provider does not report it).
+- **Analyze temperature is now configurable**: `_call_vision_api` no longer
+  hardcodes `temperature=0.1`. It honors the new constructor `temperature`
+  override (defaulting to 0.1 to preserve prior behavior), subject to the
+  per-model parameter policy.
+
 ## [1.7.0] - 2026-07-21
 
 ### 🚀 Major Features
