@@ -145,7 +145,9 @@ metadata and included in `UITestResult.to_json()`).
 ## Benchmarks
 
 `benchmarks/` holds 18 HTML fixtures / 74 labeled yes/no queries across 4
-categories, with answer keys in `benchmarks/answer_keys/`.
+categories, with answer keys in `benchmarks/answer_keys/`. The full-scale
+sibling benchmark is https://github.com/gojiplus/uijudge-bench (vendors this
+repo's browser/axe modules; LayoutLens is a planned baseline there).
 
 ```bash
 # 1. Run LayoutLens over all fixtures

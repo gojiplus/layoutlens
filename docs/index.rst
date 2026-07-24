@@ -15,7 +15,7 @@ LayoutLens Documentation
 
 LayoutLens is an AI-powered UI testing framework that enables natural language visual testing. It captures screenshots using Playwright and analyzes them with a vision-capable LLM (via LiteLLM; OpenAI's ``gpt-4o-mini`` by default) to validate layouts, responsive design, and visual consistency — plus a deterministic, keyless axe-core engine for real WCAG 2.1 A/AA accessibility checks.
 
-**Measured benchmark:** 81.1% accuracy (60/74 labeled queries, ``gpt-4o-mini``, 2026-07-21) on the bundled ground-truth suite (18 fixtures / 74 queries / 4 categories). See ``benchmarks/results/2026-07-21_gpt-4o-mini.json``.
+**Measured benchmark:** 81.1% accuracy (60/74 labeled queries, ``gpt-4o-mini``, 2026-07-21) on the bundled ground-truth suite (18 fixtures / 74 queries / 4 categories). See ``benchmarks/results/2026-07-21_gpt-4o-mini.json``. For the full-scale external benchmark of AI UI judges, see `UIJudgeBench <https://github.com/gojiplus/uijudge-bench>`_.
 
 🚀 Quick Start
 --------------

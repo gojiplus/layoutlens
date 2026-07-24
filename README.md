@@ -358,7 +358,12 @@ async def test_homepage_quality():
 
 ## Benchmark & Evaluation Workflow
 
-LayoutLens includes a comprehensive benchmarking system to validate AI performance:
+LayoutLens bundles a compact benchmark suite (18 fixtures / 74 labeled queries) for smoke-testing
+AI performance. For a larger, paper-rigor benchmark of AI judges of web UI quality — 4,000+
+machine-verified items across accessibility, layout, and referring tasks, built on LayoutLens's
+own axe/browser machinery — see **[UIJudgeBench](https://github.com/gojiplus/uijudge-bench)**
+([dataset on Hugging Face](https://huggingface.co/datasets/gojiberries/uijudge-bench)).
+LayoutLens is a planned judge baseline there.
 
 ### 1. Generate Benchmark Results
 ```bash
@@ -468,7 +473,7 @@ lens = LayoutLens(
 - **Async-by-Default** - Concurrent processing for optimal performance
 - **Simple API** - One analyze method handles single pages, batches, and comparisons
 - **Structured JSON Output** - TypedDict schemas for full type safety in automation
-- **Comprehensive Benchmarking** - Built-in evaluation system (81.1% measured accuracy, gpt-4o-mini, 74 queries)
+- **Honest Benchmarking** - Compact built-in suite (81.1% measured accuracy, gpt-4o-mini, 74 queries); see [UIJudgeBench](https://github.com/gojiplus/uijudge-bench) for the full-scale external benchmark
 - **Deterministic Accessibility** - Vendored axe-core WCAG 2.1 A/AA checks, no API key or LLM variance
 
 ---

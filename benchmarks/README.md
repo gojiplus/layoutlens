@@ -217,3 +217,13 @@ This structure makes it crystal clear:
 - **What the test data is** (`test_data/`)
 - **What the right answers are** (`answer_keys/`)
 - **How to check if we're right** (`evaluation/`)
+
+## Relationship to UIJudgeBench
+
+This bundled suite (18 fixtures / 74 queries) is a compact smoke-test for LayoutLens itself.
+The full-scale, paper-rigor benchmark for AI judges of web UI quality is
+**[UIJudgeBench](https://github.com/gojiplus/uijudge-bench)**
+([HF dataset](https://huggingface.co/datasets/gojiberries/uijudge-bench)) — 4,000+
+machine-verified items with receipted ground truth, built on LayoutLens's vendored axe/browser
+machinery, with LayoutLens as a planned judge baseline. Prefer it for any serious evaluation
+claims.
