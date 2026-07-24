@@ -6,5 +6,6 @@ designed for developer workflows and CI/CD integration.
 """
 
 from .core import AnalysisResult, BatchResult, ComparisonResult, LayoutLens
+from .judge import JudgeResult
 
-__all__ = ["LayoutLens", "AnalysisResult", "ComparisonResult", "BatchResult"]
+__all__ = ["LayoutLens", "AnalysisResult", "ComparisonResult", "BatchResult", "JudgeResult"]

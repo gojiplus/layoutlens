@@ -1,0 +1,225 @@
+"""Faithful judge interface for LayoutLens.
+
+This module turns LayoutLens into a faithful *instrument* for external
+evaluation harnesses (UIJudgeBench first). Unlike :meth:`LayoutLens.analyze`,
+which wraps queries in its own persona/JSON scaffolding, :func:`judge` sends the
+caller-supplied prompt VERBATIM as the only text block alongside one image. The
+caller owns the entire prompt, including any response contract; LayoutLens adds
+nothing to it.
+
+Design contract:
+    * No system persona, no ``_format_query_prompt`` scaffolding, no appended
+      JSON-format instruction. One user message: ``[text=prompt, image]``.
+    * Structured parsing: strict JSON first (tolerating fenced blocks and
+      surrounding prose), then a leading yes/no fallback, then "unknown".
+    * Conservative refusal detection (still returns the raw text).
+    * Per-model parameter policy (see :mod:`layoutlens.param_policy`) so Claude
+      4.6+/5 judges omit temperature.
+    * No caching: a judge call must always hit the model.
+    * Real token accounting: prompt/completion/total recorded separately.
+
+``acompletion`` is imported here so tests patch it at
+``layoutlens.api.judge.acompletion`` (mirroring the analyze path, which is
+patched at ``layoutlens.api.core.acompletion``).
+"""
+
+from __future__ import annotations
+
+import json
+import re
+from dataclasses import dataclass
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
+
+from litellm import acompletion
+
+from ..exceptions import ValidationError
+from ..param_policy import completion_params
+
+# ``.test_suite`` fully imports ``.core`` at its top, so ``.core`` is guaranteed
+# loaded by the time this line runs — importing ``_read_usage`` from it here is
+# cycle-safe and avoids duplicating the token-accounting helper.
+from .core import _read_usage
+from .test_suite import _parse_yes_no
+
+if TYPE_CHECKING:
+    from .core import LayoutLens
+
+# Conservative refusal markers. Kept small and specific to avoid false positives
+# on legitimate answers (e.g. "the nav could not be simpler").
+_REFUSAL_PATTERNS: tuple[str, ...] = (
+    "i can't",
+    "i cannot assist",
+    "i'm unable to",
+    "i am unable to",
+    "as an ai",
+)
+
+# Image extensions that map to a JPEG mime type; everything else is sent as PNG.
+_JPEG_SUFFIXES = frozenset({".jpg", ".jpeg"})
+
+
+@dataclass(slots=True)
+class JudgeResult:
+    """Structured outcome of a single :func:`judge` call.
+
+    Attributes:
+        answer: Parsed answer field, or "unknown" if unparseable.
+        confidence: Parsed confidence in [0, 1], else 0.0.
+        rationale: Parsed rationale/reasoning field, else "".
+        raw: Full raw model text (always populated, even on refusal).
+        refused: True if the response matched a refusal pattern.
+        usage: Token counts with keys prompt_tokens/completion_tokens/total_tokens.
+        model: The model that produced the response.
+        parse_mode: "json", "fallback", or "none".
+    """
+
+    answer: str
+    confidence: float
+    rationale: str
+    raw: str
+    refused: bool
+    usage: dict[str, int]
+    model: str
+    parse_mode: str
+
+
+def detect_refusal(text: str) -> bool:
+    """Return True if ``text`` matches a conservative refusal pattern."""
+    lowered = (text or "").lower()
+    return any(pattern in lowered for pattern in _REFUSAL_PATTERNS)
+
+
+def _clamp_confidence(value: Any) -> float:
+    """Coerce a parsed confidence to a float in [0, 1]; 0.0 on failure."""
+    try:
+        conf = float(value)
+    except (TypeError, ValueError):
+        return 0.0
+    return max(0.0, min(1.0, conf))
+
+
+def _extract_json_object(text: str) -> dict[str, Any] | None:
+    """Extract the first JSON object from ``text`` (tolerating fences/prose).
+
+    Tries, in order: the whole (fence-stripped) text, then the first balanced
+    ``{...}`` span found by regex. Returns the parsed dict, or None if no JSON
+    object can be recovered.
+    """
+    stripped = text.strip()
+
+    # Strip a ```json ... ``` (or plain ``` ... ```) fence if present.
+    fence = re.search(r"```(?:json)?\s*(.*?)\s*```", stripped, re.DOTALL | re.IGNORECASE)
+    candidates = []
+    if fence:
+        candidates.append(fence.group(1).strip())
+    candidates.append(stripped)
+    # Greedy brace span to capture a JSON object embedded in surrounding prose.
+    brace = re.search(r"\{.*\}", stripped, re.DOTALL)
+    if brace:
+        candidates.append(brace.group(0))
+
+    for candidate in candidates:
+        try:
+            parsed = json.loads(candidate)
+        except (json.JSONDecodeError, ValueError):
+            continue
+        if isinstance(parsed, dict):
+            return parsed
+    return None
+
+
+def parse_judge_response(raw: str) -> tuple[str, float, str, str]:
+    """Parse a raw judge response into (answer, confidence, rationale, mode).
+
+    Parsing strategy:
+        1. Strict JSON object (fences and surrounding prose tolerated). Requires
+           an ``answer`` field. ``rationale`` accepts ``reasoning`` as an alias.
+        2. Leading yes/no fallback (reusing test-suite ``_parse_yes_no``).
+        3. Otherwise ("none"): answer="unknown", confidence=0.0, rationale="".
+
+    Returns:
+        A 4-tuple ``(answer, confidence, rationale, parse_mode)`` where
+        ``parse_mode`` is one of "json", "fallback", "none".
+    """
+    text = raw or ""
+
+    parsed = _extract_json_object(text)
+    if parsed is not None and "answer" in parsed:
+        answer = str(parsed.get("answer", "unknown"))
+        confidence = _clamp_confidence(parsed.get("confidence", 0.0))
+        rationale = parsed.get("rationale")
+        if rationale is None:
+            rationale = parsed.get("reasoning", "")
+        return answer, confidence, str(rationale or ""), "json"
+
+    yes_no = _parse_yes_no(text)
+    if yes_no is not None:
+        return yes_no, 0.0, "", "fallback"
+
+    return "unknown", 0.0, "", "none"
+
+
+def _image_data_url(lens: LayoutLens, image_path: str | Path) -> str:
+    """Encode ``image_path`` as a base64 data URL with mime by extension."""
+    path = Path(image_path)
+    if not path.exists():
+        raise ValidationError(
+            f"Image not found for judge call: {path}",
+            field="image_path",
+            value=str(path),
+        )
+    mime = "image/jpeg" if path.suffix.lower() in _JPEG_SUFFIXES else "image/png"
+    image_b64 = lens._encode_image(path)
+    return f"data:{mime};base64,{image_b64}"
+
+
+async def judge(lens: LayoutLens, image_path: str | Path, prompt: str, *, max_tokens: int = 300) -> JudgeResult:
+    """Send ``prompt`` verbatim with ``image_path`` and parse the response.
+
+    See :meth:`LayoutLens.judge` for the public contract. This is the module
+    implementation so ``acompletion`` is patchable at ``layoutlens.api.judge``.
+
+    Raises:
+        ValidationError: If ``image_path`` does not exist. No result is
+            fabricated — the caller must supply a real image.
+    """
+    lens._ensure_api_key()
+
+    # Build the data URL first: a missing image must raise before any API call.
+    data_url = _image_data_url(lens, image_path)
+
+    completion_kwargs: dict[str, Any] = {
+        "model": lens.model,
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {"type": "image_url", "image_url": {"url": data_url}},
+                ],
+            }
+        ],
+        "timeout": 30.0,
+        **completion_params(lens.model, temperature=0.0, max_tokens=max_tokens),
+    }
+    if lens.api_key:
+        completion_kwargs["api_key"] = lens.api_key
+    if lens.api_base:
+        completion_kwargs["api_base"] = lens.api_base
+
+    response = await acompletion(**completion_kwargs)
+
+    raw = response.choices[0].message.content or ""
+    answer, confidence, rationale, parse_mode = parse_judge_response(raw)
+
+    return JudgeResult(
+        answer=answer,
+        confidence=confidence,
+        rationale=rationale,
+        raw=raw,
+        refused=detect_refusal(raw),
+        usage=_read_usage(response),
+        model=lens.model,
+        parse_mode=parse_mode,
+    )

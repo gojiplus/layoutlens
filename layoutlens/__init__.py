@@ -9,6 +9,7 @@ from .a11y import AXE_VERSION, A11yFinding, A11yReport, AxeAuditor
 
 # Import the main API
 from .api.core import AnalysisResult, BatchResult, ComparisonResult, LayoutLens
+from .api.judge import JudgeResult
 from .api.test_suite import UITestCase, UITestResult, UITestSuite
 from .cache import AnalysisCache, create_cache
 from .capture import Capture
@@ -51,6 +52,7 @@ __all__ = [
     "AnalysisResult",
     "ComparisonResult",
     "BatchResult",
+    "JudgeResult",
     "UITestCase",
     "UITestSuite",
     "UITestResult",
