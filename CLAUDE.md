@@ -101,6 +101,30 @@ result = await lens.analyze(source, query, viewport="desktop", max_concurrent=5)
   `_call_vision_api` when an LLM call actually happens. This keeps
   `check_accessibility(..., mode="axe")` and `AxeAuditor` fully keyless.
 
+## Faithful Judge Interface (v1.8.0)
+
+`LayoutLens.judge(image_path, prompt, *, max_tokens=300) -> JudgeResult` is the
+reference-judge surface for external eval harnesses (UIJudgeBench). Unlike
+`analyze`, it sends the prompt **verbatim**: no system persona, no
+`_format_query_prompt` scaffolding, no appended JSON contract. One user message
+(`[text=prompt, image]`). It bypasses the cache (every call hits the model) and
+is persona/instructions-free. A missing image raises `ValidationError`.
+
+- **`layoutlens/api/judge.py`** — `JudgeResult` (answer/confidence/rationale/raw/
+  refused/usage/model/parse_mode), `judge()`, `parse_judge_response()`
+  (strict JSON → yes/no fallback → `"unknown"`; `reasoning` aliases `rationale`),
+  `detect_refusal()`. In tests, `acompletion` is patched at
+  `layoutlens.api.judge.acompletion` (mirroring `layoutlens.api.core.acompletion`).
+- **`layoutlens/param_policy.py`** — `completion_params(model, *, temperature,
+  max_tokens)` + `model_omits_temperature(model)`. Ordered `fnmatch` registry;
+  first match wins. **Claude Sonnet 5 / Opus 4.6-4.8 return HTTP 400 on any
+  non-default sampling param, so those patterns omit `temperature`.** Wired into
+  both `_call_vision_api` and `judge()`.
+- **`api_base`** — `LayoutLens(..., api_base=...)` and `LLMConfig.api_base`
+  forward `api_base` to every `acompletion` call (Ollama/vLLM/OpenAI-compatible).
+- **Usage split** — `_read_usage` records prompt/completion/total tokens in
+  analysis metadata and `JudgeResult.usage` (0 when the provider omits them).
+
 ## Deterministic Accessibility (axe-core)
 
 `layoutlens/a11y/` wraps a vendored axe-core bundle

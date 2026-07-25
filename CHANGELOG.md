@@ -2,6 +2,62 @@
 
 All notable changes to LayoutLens are documented in this file.
 
+## [1.8.0] - 2026-07-25
+
+### 🚀 Major Features
+
+- **Multi-provider batch judging** (`LayoutLens.judge_batch`, `BatchRequest`):
+  the batched counterpart to `judge()` for bulk offline evaluation (e.g.
+  UIJudgeBench) — provider batch APIs are ~50% cheaper and the correct transport
+  for thousands of independent judgments. Each request sends its prompt
+  **verbatim** with one image, **byte-identical** to `judge()` (a parity test
+  enforces this by reusing the same message/result builders). Two backends,
+  dispatched by model: `gemini/*` (AI Studio) uses a **google-genai inline
+  batch** (optional extra `layoutlens[gemini]`, imported lazily); every other
+  model (`gpt-*`/`openai/*`/`anthropic/*`/`vertex_ai/*`/`bedrock/*`) uses the
+  **litellm file-based batch** (`acreate_file` → `acreate_batch` →
+  `aretrieve_batch` → `afile_content`). Both are **resumable** via a manifest
+  that persists submitted job ids before polling, so a killed run collects prior
+  work and re-submits only uncovered ids (never re-billing). Missing images
+  yield an `"unknown"` result instead of aborting the batch. New module:
+  `layoutlens/api/batch.py`.
+- **Reasoning-aware `max_tokens` defaults**: `judge()`/`judge_batch()` now
+  default `max_tokens` to `AUTO`, which resolves to **8000 for reasoning/thinking
+  models** (Gemini 3, Gemini 2.5, GPT-5, o1/o3/o4 — they spend thinking tokens
+  inside the completion budget) and **300 otherwise**. An explicit integer still
+  passes through unchanged. Detection lives in a data-driven registry
+  (`param_policy.is_reasoning_model`), mirroring the temperature registry.
+  `JudgeResult` gains **`truncated`**, set when the model stopped on the token
+  budget (`finish_reason == "length"`), with a logged warning.
+- **Faithful judge interface** (`LayoutLens.judge`, `JudgeResult`): LayoutLens
+  can now serve as a reference judge for external evaluation harnesses (e.g.
+  [UIJudgeBench](https://github.com/gojiplus/uijudge-bench)). The caller-supplied
+  prompt is sent **verbatim** — no system persona, no query scaffolding, no
+  appended JSON-format instruction — alongside a single image. The response is
+  parsed (strict JSON, then a yes/no fallback, then `"unknown"`), refusals are
+  detected, and a real token-usage split is returned. Judge calls always hit the
+  model (no caching) so a harness controls its own prompt versioning.
+  New module: `layoutlens/api/judge.py`.
+- **Per-model parameter policy** (`layoutlens/param_policy.py`): a data-driven,
+  ordered registry decides which sampling parameters are safe per model. Claude
+  Sonnet 5 and Opus 4.6/4.7/4.8 reject non-default sampling params with a 400, so
+  those patterns omit `temperature` entirely; every other model includes it.
+  Wired into both the analyze path and `judge()`.
+- **`api_base` support**: `LayoutLens(..., api_base=...)` (and `LLMConfig.api_base`)
+  forwards `api_base` to every model call, enabling self-hosted / OpenAI-compatible
+  endpoints such as Ollama and vLLM
+  (`LayoutLens(provider="litellm", model="ollama/qwen2.5vl", api_base="http://localhost:11434")`).
+
+### 🔧 Improvements
+
+- **Token-usage split**: analysis metadata and `JudgeResult.usage` now record
+  `prompt_tokens` and `completion_tokens` in addition to `total_tokens` (each
+  defaults to 0 when the provider does not report it).
+- **Analyze temperature is now configurable**: `_call_vision_api` no longer
+  hardcodes `temperature=0.1`. It honors the new constructor `temperature`
+  override (defaulting to 0.1 to preserve prior behavior), subject to the
+  per-model parameter policy.
+
 ## [1.7.0] - 2026-07-21
 
 ### 🚀 Major Features

@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "layoutlens"
-version = "1.7.0"
+version = "1.8.0"
 description = "AI-powered UI testing framework with natural language visual validation"
 readme = "README.md"
 license = "MIT"
@@ -39,6 +39,12 @@ dependencies = [
     "rich>=13.0.0",
     "pydantic>=2.0.0",
 ]
+
+[project.optional-dependencies]
+# Optional extra for the google-genai inline batch backend (AI-Studio Gemini,
+# ``gemini/*`` models) used by ``LayoutLens.judge_batch``. Imported lazily, so
+# the base install and all other backends never require it.
+gemini = ["google-genai>=1.0"]
 
 [dependency-groups]
 dev = [

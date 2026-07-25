@@ -1518,7 +1518,7 @@ wheels = [
 
 [[package]]
 name = "layoutlens"
-version = "1.7.0"
+version = "1.8.0"
 source = { editable = "." }
 dependencies = [
     { name = "beautifulsoup4" },
@@ -1529,6 +1529,11 @@ dependencies = [
     { name = "pydantic" },
     { name = "pyyaml" },
     { name = "rich" },
+]
+
+[package.optional-dependencies]
+gemini = [
+    { name = "google-genai" },
 ]
 
 [package.dev-dependencies]
@@ -1563,6 +1568,7 @@ test = [
 [package.metadata]
 requires-dist = [
     { name = "beautifulsoup4", specifier = ">=4.12.0" },
+    { name = "google-genai", marker = "extra == 'gemini'", specifier = ">=1.0" },
     { name = "litellm", specifier = ">=1.80.10" },
     { name = "openai", specifier = ">=1.0.0" },
     { name = "pillow", specifier = ">=10.0.0" },
@@ -1571,6 +1577,7 @@ requires-dist = [
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "rich", specifier = ">=13.0.0" },
 ]
+provides-extras = ["gemini"]
 
 [package.metadata.requires-dev]
 browser-use = [{ name = "browser-use", specifier = ">=0.1.0" }]

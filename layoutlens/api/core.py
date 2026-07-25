@@ -15,8 +15,12 @@ import re
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 from urllib.parse import urlparse
+
+if TYPE_CHECKING:
+    from .batch import BatchRequest
+    from .judge import JudgeResult
 
 # Import LiteLLM directly
 try:
@@ -51,6 +55,9 @@ from ..exceptions import (
 # Import logging
 from ..logger import get_logger, log_function_call, log_performance_metric
 
+# Import per-model parameter policy
+from ..param_policy import AUTO, _Auto, completion_params
+
 # Import enhanced prompt system
 from ..prompts import Instructions, get_expert
 
@@ -81,6 +88,35 @@ PROVIDER_API_KEY_ENV_VARS: dict[str, str | None] = {
 def _dataclass_to_json(obj: Any) -> str:
     """Serialize a dataclass instance to an indented JSON string."""
     return json.dumps(asdict(obj), indent=2, default=str)
+
+
+def _coerce_int(value: Any) -> int:
+    """Coerce a token-count value to int, returning 0 if it is not numeric.
+
+    Guards against providers (or test mocks) that leave an attribute as a
+    non-numeric placeholder rather than a real count.
+    """
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _read_usage(response: Any) -> dict[str, int]:
+    """Read prompt/completion/total token counts from a response, 0 when absent.
+
+    LiteLLM exposes ``prompt_tokens``/``completion_tokens``/``total_tokens`` on
+    ``response.usage`` when the provider reports them; each defaults to 0 so
+    downstream accounting always has all three keys.
+    """
+    usage = getattr(response, "usage", None)
+    if not usage:
+        return {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+    return {
+        "prompt_tokens": _coerce_int(getattr(usage, "prompt_tokens", 0)),
+        "completion_tokens": _coerce_int(getattr(usage, "completion_tokens", 0)),
+        "total_tokens": _coerce_int(getattr(usage, "total_tokens", 0)),
+    }
 
 
 @dataclass(slots=True)
@@ -169,6 +205,8 @@ class LayoutLens:
         cache_enabled: bool = True,
         cache_type: str = "memory",
         cache_ttl: int = 3600,
+        api_base: str | None = None,
+        temperature: float | None = None,
     ):
         """Initialize LayoutLens with AI provider credentials.
 
@@ -181,6 +219,20 @@ class LayoutLens:
             cache_enabled: Whether to enable result caching for performance.
             cache_type: Type of cache backend: "memory" or "file".
             cache_ttl: Cache time-to-live in seconds (1 hour default).
+            api_base: Optional base URL for an OpenAI-compatible endpoint. When
+                set, it is passed as ``api_base`` to every model call, enabling
+                self-hosted backends such as Ollama or vLLM. Example::
+
+                    LayoutLens(
+                        provider="litellm",
+                        model="ollama/qwen2.5vl",
+                        api_base="http://localhost:11434",
+                    )
+            temperature: Optional sampling temperature for the analyze path. When
+                None (default) the analyze path uses 0.1 to preserve historical
+                behavior. Subject to the per-model parameter policy — models that
+                reject non-default sampling params (e.g. Claude Sonnet 5) omit it
+                regardless.
 
         Raises:
             ConfigurationError: If invalid provider or configuration is specified.
@@ -210,6 +262,8 @@ class LayoutLens:
 
         self.model = model
         self.provider = provider
+        self.api_base = api_base
+        self.temperature = temperature
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(exist_ok=True)
 
@@ -396,6 +450,10 @@ Focus on:
         try:
             self.logger.debug(f"Making API call with LiteLLM to model: {self.model}")
 
+            # Resolve temperature: honor the constructor override when set,
+            # otherwise keep the historical analyze default of 0.1. The policy
+            # then drops it for models that reject non-default sampling params.
+            temperature = self.temperature if self.temperature is not None else 0.1
             completion_kwargs: dict[str, Any] = {
                 "model": self.model,
                 "messages": [
@@ -407,14 +465,15 @@ Focus on:
                         ],
                     }
                 ],
-                "max_tokens": 1000,
-                "temperature": 0.1,
                 "timeout": 30.0,
+                **completion_params(self.model, temperature=temperature, max_tokens=1000),
             }
             # Only pass api_key when we actually resolved one; otherwise let
             # LiteLLM fall back to its own provider-specific env resolution.
             if self.api_key:
                 completion_kwargs["api_key"] = self.api_key
+            if self.api_base:
+                completion_kwargs["api_base"] = self.api_base
 
             response = await acompletion(**completion_kwargs)
 
@@ -422,9 +481,7 @@ Focus on:
 
             # Extract content
             content = response.choices[0].message.content or ""
-            tokens_used = (
-                getattr(response.usage, "total_tokens", 0) if hasattr(response, "usage") and response.usage else 0
-            )
+            usage = _read_usage(response)
 
             # Parse structured response
             answer, confidence, reasoning = self._parse_structured_response(content)
@@ -437,7 +494,9 @@ Focus on:
                 "reasoning": reasoning,
                 "metadata": {
                     "raw_response": content,
-                    "tokens_used": tokens_used,
+                    "tokens_used": usage["total_tokens"],
+                    "prompt_tokens": usage["prompt_tokens"],
+                    "completion_tokens": usage["completion_tokens"],
                     "model_used": self.model,
                     "provider": "litellm",
                 },
@@ -1237,6 +1296,105 @@ Focus on:
 
         self.cache.set(cache_key, result)
         return result
+
+    # Faithful judge interface (for external eval harnesses)
+
+    async def judge(
+        self,
+        image_path: str | Path,
+        prompt: str,
+        *,
+        max_tokens: int | _Auto = AUTO,
+        timeout: float = 120.0,
+    ) -> JudgeResult:
+        """Send ``prompt`` VERBATIM with an image and return a parsed verdict.
+
+        This is the faithful judge interface for external evaluation harnesses
+        (e.g. UIJudgeBench). Unlike :meth:`analyze`, LayoutLens adds NOTHING to
+        the prompt: no system persona, no scaffolding, no appended JSON-format
+        instruction. The caller owns the entire prompt, including any response
+        contract. The call always hits the model (no caching) and honors the
+        per-model parameter policy (Claude 4.6+/5 omit temperature).
+
+        Args:
+            image_path: Path to an existing image file (mime inferred from the
+                extension: ``.jpg``/``.jpeg`` -> JPEG, otherwise PNG).
+            prompt: The exact text to send as the sole text block.
+            max_tokens: Maximum tokens to generate. Defaults to ``AUTO``, which
+                resolves to 8000 for reasoning/thinking models (they spend
+                thinking tokens inside this budget) and 300 otherwise. Pass an
+                explicit integer to override.
+            timeout: Per-call timeout in seconds (default 120 — reasoning
+                models can take well over 30s on a single judgment).
+
+        Returns:
+            JudgeResult with the parsed answer/confidence/rationale, the raw
+            text, a refusal flag, per-model usage split, and the parse mode.
+
+        Raises:
+            ValidationError: If ``image_path`` does not exist.
+            AuthenticationError: If no API key is configured for a mapped provider.
+        """
+        from .judge import judge as _judge
+
+        return await _judge(self, image_path, prompt, max_tokens=max_tokens, timeout=timeout)
+
+    async def judge_batch(
+        self,
+        requests: list[BatchRequest],
+        *,
+        max_tokens: int | _Auto = AUTO,
+        resume: bool = True,
+        manifest_path: str | Path | None = None,
+        poll_interval: float = 10.0,
+        poll_timeout: float = 24 * 3600.0,
+    ) -> dict[str, JudgeResult]:
+        """Judge many image+prompt requests over a provider batch transport.
+
+        The batched counterpart to :meth:`judge`: each request sends its prompt
+        VERBATIM with its image (byte-identical to :meth:`judge`), honors the
+        reasoning-aware ``max_tokens`` default and the per-model parameter
+        policy, and is parsed into a :class:`JudgeResult`. Batch APIs are ~50%
+        cheaper and the right transport for bulk offline evaluation (e.g.
+        UIJudgeBench). LayoutLens is thus the reference *batched* judge.
+
+        The backend is chosen from ``self.model``: ``gemini/*`` (AI Studio) uses
+        the google-genai inline batch (optional extra ``layoutlens[gemini]``);
+        every other model uses the litellm file-based batch (OpenAI, Anthropic,
+        Vertex, Bedrock, ...). Both are resumable via a manifest.
+
+        Args:
+            requests: The batch items. Each ``id`` keys its result. A request
+                whose image is missing yields an ``"unknown"`` result rather
+                than aborting the batch.
+            max_tokens: Per-request token budget. Defaults to ``AUTO`` (8000 for
+                reasoning models, else 300); an explicit integer overrides.
+            resume: When True (default), collect any prior jobs from the
+                manifest first and submit only uncovered ids.
+            manifest_path: Where submitted job ids persist for resume. Defaults
+                to a path under ``output_dir/batch`` keyed by the request-id set
+                and model.
+            poll_interval: Seconds between batch-status polls.
+            poll_timeout: Max seconds to wait for a single batch job.
+
+        Returns:
+            ``{request_id: JudgeResult}`` for every request.
+
+        Raises:
+            AuthenticationError: If no API key is configured for a mapped provider.
+            ImportError: If a ``gemini/*`` model is used without ``google-genai``.
+        """
+        from .batch import judge_batch as _judge_batch
+
+        return await _judge_batch(
+            self,
+            requests,
+            max_tokens=max_tokens,
+            resume=resume,
+            manifest_path=manifest_path,
+            poll_interval=poll_interval,
+            poll_timeout=poll_timeout,
+        )
 
     # Developer convenience methods
     async def check_accessibility(
