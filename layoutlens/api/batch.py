@@ -43,6 +43,7 @@ from typing import TYPE_CHECKING, Any
 
 from litellm import acreate_batch, acreate_file, afile_content, aretrieve_batch
 
+from ..exceptions import ValidationError
 from ..logger import get_logger
 from ..param_policy import AUTO, _Auto, _normalize_model, completion_params, resolved_max_tokens
 from .judge import (
@@ -158,11 +159,14 @@ def _split_missing_images(
 # --- litellm file-based backend -------------------------------------------
 
 # LiteLLM's batch helpers accept these custom_llm_provider values. NOTE: as of
-# litellm 1.80.10, ``acreate_file``'s provider Literal does NOT list "anthropic"
-# (only openai/azure/vertex_ai/bedrock/hosted_vllm); Anthropic's batch file
-# upload path may differ. We still forward the derived provider (the value is a
-# type hint, not enforced) and document the caveat — Anthropic live batch is
-# unverified here; offline tests mock the helpers.
+# litellm 1.80.10, BOTH ``acreate_file`` AND ``acreate_batch`` restrict
+# custom_llm_provider to openai/azure/vertex_ai/bedrock/hosted_vllm — NEITHER
+# lists "anthropic" (only aretrieve_batch/afile_content do). So a native
+# Anthropic/Claude model cannot even create a batch through litellm: it is FULLY
+# unsupported, not partially. ``judge_batch`` therefore fails loud and helpful at
+# submit time for such models (see ``_judge_batch_litellm``) rather than letting
+# a cryptic litellm error surface mid-run. Run Claude synchronously via
+# ``judge()``, or route it through Vertex.
 _LITELLM_PROVIDER_PREFIXES = frozenset(
     {"openai", "azure", "vertex_ai", "bedrock", "anthropic", "hosted_vllm", "vertex"}
 )
@@ -278,8 +282,23 @@ async def _judge_batch_litellm(
     poll_interval: float,
     poll_timeout: float,
 ) -> dict[str, JudgeResult]:
-    """litellm file-based batch backend (see module docstring)."""
+    """litellm file-based batch backend (see module docstring).
+
+    Raises:
+        ValidationError: For a native Anthropic/Claude model — litellm 1.80.10
+            supports neither ``acreate_file`` nor ``acreate_batch`` for the
+            ``anthropic`` provider, so a batch cannot be created at all.
+    """
     provider = _litellm_provider_for(lens.model)
+    if provider == "anthropic":
+        raise ValidationError(
+            "Anthropic batch is not supported by litellm 1.80.10 "
+            "(neither acreate_file nor acreate_batch accept the 'anthropic' provider). "
+            f"Use judge() (synchronous) for Claude model '{lens.model}', or run Claude via Vertex "
+            "(vertex_ai/…) for batch.",
+            field="model",
+            value=lens.model,
+        )
     results: dict[str, JudgeResult] = {}
     valid = _split_missing_images(lens, requests, results)
 

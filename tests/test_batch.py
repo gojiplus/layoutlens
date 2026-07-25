@@ -26,6 +26,7 @@ import layoutlens.api.batch as batch_mod
 from layoutlens.api.batch import BatchRequest, judge_batch
 from layoutlens.api.core import LayoutLens
 from layoutlens.api.judge import JudgeResult, build_judge_messages
+from layoutlens.exceptions import ValidationError
 
 # A minimal valid 1x1 PNG so image sources exist on disk.
 _PNG_1x1 = base64.b64decode(
@@ -425,3 +426,52 @@ async def test_genai_missing_image_unknown(gemini_lens, png, tmp_path):
 @pytest.mark.asyncio
 async def test_empty_requests_returns_empty(lens):
     assert await lens.judge_batch([]) == {}
+
+
+# --- Anthropic is fully unsupported via litellm batch ---------------------
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("model", ["claude-sonnet-5", "anthropic/claude-opus-4-8"])
+async def test_anthropic_batch_raises_clear_error(tmp_path, png, model):
+    """litellm 1.80.10 supports neither acreate_file nor acreate_batch for
+    anthropic, so a Claude model must fail loud and helpful at submit time."""
+    lens = LayoutLens(api_key="sk", model=model, provider="anthropic", output_dir=str(tmp_path / "o"))
+    acf, acb, arb, afc = _make_litellm_mocks("")
+    with (
+        patch.object(batch_mod, "acreate_file", acf),
+        patch.object(batch_mod, "acreate_batch", acb),
+        patch.object(batch_mod, "aretrieve_batch", arb),
+        patch.object(batch_mod, "afile_content", afc),
+        pytest.raises(ValidationError, match="Anthropic batch is not supported"),
+    ):
+        await lens.judge_batch([BatchRequest("r1", png, "p")])
+    # Failed loud BEFORE any batch API call.
+    acf.assert_not_awaited()
+    acb.assert_not_awaited()
+
+
+# --- Malformed/error output line -> unknown, no crash ---------------------
+
+
+@pytest.mark.asyncio
+async def test_litellm_malformed_line_yields_unknown(lens, png, png2):
+    """An error/malformed output line (no body/choices) → unknown for that id;
+    the batch does not crash and other ids parse normally."""
+    good = _openai_batch_line("good", '{"answer": "A", "confidence": 0.9}')
+    # Error line as a real batch API failure emits: response null / error set.
+    err_line = json.dumps({"custom_id": "bad", "response": None, "error": {"message": "boom"}})
+    output = good + "\n" + err_line + "\n"
+    acf, acb, arb, afc = _make_litellm_mocks(output)
+    with (
+        patch.object(batch_mod, "acreate_file", acf),
+        patch.object(batch_mod, "acreate_batch", acb),
+        patch.object(batch_mod, "aretrieve_batch", arb),
+        patch.object(batch_mod, "afile_content", afc),
+    ):
+        results = await lens.judge_batch([BatchRequest("good", png, "p1"), BatchRequest("bad", png2, "p2")])
+    assert set(results) == {"good", "bad"}
+    assert results["good"].answer == "A"
+    # Malformed line: parsed into an unknown result (empty raw, no crash).
+    assert results["bad"].answer == "unknown"
+    assert results["bad"].parse_mode == "none"
