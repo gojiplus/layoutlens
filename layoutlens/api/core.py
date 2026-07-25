@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Any, Literal
 from urllib.parse import urlparse
 
 if TYPE_CHECKING:
+    from .batch import BatchRequest
     from .judge import JudgeResult
 
 # Import LiteLLM directly
@@ -1337,6 +1338,63 @@ Focus on:
         from .judge import judge as _judge
 
         return await _judge(self, image_path, prompt, max_tokens=max_tokens, timeout=timeout)
+
+    async def judge_batch(
+        self,
+        requests: list[BatchRequest],
+        *,
+        max_tokens: int | _Auto = AUTO,
+        resume: bool = True,
+        manifest_path: str | Path | None = None,
+        poll_interval: float = 10.0,
+        poll_timeout: float = 24 * 3600.0,
+    ) -> dict[str, JudgeResult]:
+        """Judge many image+prompt requests over a provider batch transport.
+
+        The batched counterpart to :meth:`judge`: each request sends its prompt
+        VERBATIM with its image (byte-identical to :meth:`judge`), honors the
+        reasoning-aware ``max_tokens`` default and the per-model parameter
+        policy, and is parsed into a :class:`JudgeResult`. Batch APIs are ~50%
+        cheaper and the right transport for bulk offline evaluation (e.g.
+        UIJudgeBench). LayoutLens is thus the reference *batched* judge.
+
+        The backend is chosen from ``self.model``: ``gemini/*`` (AI Studio) uses
+        the google-genai inline batch (optional extra ``layoutlens[gemini]``);
+        every other model uses the litellm file-based batch (OpenAI, Anthropic,
+        Vertex, Bedrock, ...). Both are resumable via a manifest.
+
+        Args:
+            requests: The batch items. Each ``id`` keys its result. A request
+                whose image is missing yields an ``"unknown"`` result rather
+                than aborting the batch.
+            max_tokens: Per-request token budget. Defaults to ``AUTO`` (8000 for
+                reasoning models, else 300); an explicit integer overrides.
+            resume: When True (default), collect any prior jobs from the
+                manifest first and submit only uncovered ids.
+            manifest_path: Where submitted job ids persist for resume. Defaults
+                to a path under ``output_dir/batch`` keyed by the request-id set
+                and model.
+            poll_interval: Seconds between batch-status polls.
+            poll_timeout: Max seconds to wait for a single batch job.
+
+        Returns:
+            ``{request_id: JudgeResult}`` for every request.
+
+        Raises:
+            AuthenticationError: If no API key is configured for a mapped provider.
+            ImportError: If a ``gemini/*`` model is used without ``google-genai``.
+        """
+        from .batch import judge_batch as _judge_batch
+
+        return await _judge_batch(
+            self,
+            requests,
+            max_tokens=max_tokens,
+            resume=resume,
+            manifest_path=manifest_path,
+            poll_interval=poll_interval,
+            poll_timeout=poll_timeout,
+        )
 
     # Developer convenience methods
     async def check_accessibility(

@@ -8,6 +8,7 @@ natural language visual testing.
 from .a11y import AXE_VERSION, A11yFinding, A11yReport, AxeAuditor
 
 # Import the main API
+from .api.batch import BatchRequest
 from .api.core import AnalysisResult, BatchResult, ComparisonResult, LayoutLens
 from .api.judge import JudgeResult
 from .api.test_suite import UITestCase, UITestResult, UITestSuite
@@ -53,6 +54,7 @@ __all__ = [
     "ComparisonResult",
     "BatchResult",
     "JudgeResult",
+    "BatchRequest",
     "UITestCase",
     "UITestSuite",
     "UITestResult",

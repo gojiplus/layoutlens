@@ -6,6 +6,29 @@ All notable changes to LayoutLens are documented in this file.
 
 ### 🚀 Major Features
 
+- **Multi-provider batch judging** (`LayoutLens.judge_batch`, `BatchRequest`):
+  the batched counterpart to `judge()` for bulk offline evaluation (e.g.
+  UIJudgeBench) — provider batch APIs are ~50% cheaper and the correct transport
+  for thousands of independent judgments. Each request sends its prompt
+  **verbatim** with one image, **byte-identical** to `judge()` (a parity test
+  enforces this by reusing the same message/result builders). Two backends,
+  dispatched by model: `gemini/*` (AI Studio) uses a **google-genai inline
+  batch** (optional extra `layoutlens[gemini]`, imported lazily); every other
+  model (`gpt-*`/`openai/*`/`anthropic/*`/`vertex_ai/*`/`bedrock/*`) uses the
+  **litellm file-based batch** (`acreate_file` → `acreate_batch` →
+  `aretrieve_batch` → `afile_content`). Both are **resumable** via a manifest
+  that persists submitted job ids before polling, so a killed run collects prior
+  work and re-submits only uncovered ids (never re-billing). Missing images
+  yield an `"unknown"` result instead of aborting the batch. New module:
+  `layoutlens/api/batch.py`.
+- **Reasoning-aware `max_tokens` defaults**: `judge()`/`judge_batch()` now
+  default `max_tokens` to `AUTO`, which resolves to **8000 for reasoning/thinking
+  models** (Gemini 3, Gemini 2.5, GPT-5, o1/o3/o4 — they spend thinking tokens
+  inside the completion budget) and **300 otherwise**. An explicit integer still
+  passes through unchanged. Detection lives in a data-driven registry
+  (`param_policy.is_reasoning_model`), mirroring the temperature registry.
+  `JudgeResult` gains **`truncated`**, set when the model stopped on the token
+  budget (`finish_reason == "length"`), with a logged warning.
 - **Faithful judge interface** (`LayoutLens.judge`, `JudgeResult`): LayoutLens
   can now serve as a reference judge for external evaluation harnesses (e.g.
   [UIJudgeBench](https://github.com/soodoku/UIJudgeBench)). The caller-supplied
