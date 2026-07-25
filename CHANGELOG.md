@@ -2,7 +2,7 @@
 
 All notable changes to LayoutLens are documented in this file.
 
-## [1.8.0] - Unreleased
+## [1.8.0] - 2026-07-25
 
 ### 🚀 Major Features
 
@@ -31,7 +31,7 @@ All notable changes to LayoutLens are documented in this file.
   budget (`finish_reason == "length"`), with a logged warning.
 - **Faithful judge interface** (`LayoutLens.judge`, `JudgeResult`): LayoutLens
   can now serve as a reference judge for external evaluation harnesses (e.g.
-  [UIJudgeBench](https://github.com/soodoku/UIJudgeBench)). The caller-supplied
+  [UIJudgeBench](https://github.com/gojiplus/uijudge-bench)). The caller-supplied
   prompt is sent **verbatim** — no system persona, no query scaffolding, no
   appended JSON-format instruction — alongside a single image. The response is
   parsed (strict JSON, then a yes/no fallback, then `"unknown"`), refusals are
