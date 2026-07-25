@@ -38,9 +38,12 @@ _SCAFFOLDING_MARKERS = [
 ]
 
 
-def _mock_response(content: str, *, prompt_tokens=11, completion_tokens=7, total_tokens=18) -> MagicMock:
+def _mock_response(
+    content: str, *, prompt_tokens=11, completion_tokens=7, total_tokens=18, finish_reason="stop"
+) -> MagicMock:
     response = MagicMock()
     response.choices[0].message.content = content
+    response.choices[0].finish_reason = finish_reason
     response.usage.prompt_tokens = prompt_tokens
     response.usage.completion_tokens = completion_tokens
     response.usage.total_tokens = total_tokens
@@ -136,6 +139,52 @@ async def test_judge_max_tokens_from_kwarg(lens, png):
     with patch("layoutlens.api.judge.acompletion", new=AsyncMock(return_value=resp)) as mock_llm:
         await lens.judge(png, "prompt", max_tokens=1234)
     assert mock_llm.await_args.kwargs["max_tokens"] == 1234
+
+
+# --- Reasoning-aware AUTO max_tokens --------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_judge_auto_max_tokens_non_reasoning(lens, png):
+    """AUTO default resolves to 300 for a non-reasoning model (gpt-4o-mini)."""
+    resp = _mock_response('{"answer": "A", "confidence": 0.5}')
+    with patch("layoutlens.api.judge.acompletion", new=AsyncMock(return_value=resp)) as mock_llm:
+        await lens.judge(png, "prompt")
+    assert mock_llm.await_args.kwargs["max_tokens"] == 300
+
+
+@pytest.mark.asyncio
+async def test_judge_auto_max_tokens_reasoning(tmp_path, png):
+    """AUTO default resolves to 8000 for a reasoning model (gemini-3)."""
+    lens = LayoutLens(
+        api_key="sk",
+        model="gemini/gemini-3-flash-preview",
+        provider="gemini",
+        output_dir=str(tmp_path / "o"),
+    )
+    resp = _mock_response('{"answer": "A", "confidence": 0.5}')
+    with patch("layoutlens.api.judge.acompletion", new=AsyncMock(return_value=resp)) as mock_llm:
+        await lens.judge(png, "prompt")
+    assert mock_llm.await_args.kwargs["max_tokens"] == 8000
+
+
+# --- Truncation flag ------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_truncated_flag_set_on_length_finish(lens, png):
+    resp = _mock_response('{"answer": "A", "confidence": 0.5}', finish_reason="length")
+    with patch("layoutlens.api.judge.acompletion", new=AsyncMock(return_value=resp)):
+        result = await lens.judge(png, "prompt")
+    assert result.truncated is True
+
+
+@pytest.mark.asyncio
+async def test_truncated_flag_false_on_stop_finish(lens, png):
+    resp = _mock_response('{"answer": "A", "confidence": 0.5}', finish_reason="stop")
+    with patch("layoutlens.api.judge.acompletion", new=AsyncMock(return_value=resp)):
+        result = await lens.judge(png, "prompt")
+    assert result.truncated is False
 
 
 # --- api_base -------------------------------------------------------------

@@ -34,7 +34,8 @@ from typing import TYPE_CHECKING, Any
 from litellm import acompletion
 
 from ..exceptions import ValidationError
-from ..param_policy import completion_params
+from ..logger import get_logger
+from ..param_policy import AUTO, _Auto, completion_params, resolved_max_tokens
 
 # ``.test_suite`` fully imports ``.core`` at its top, so ``.core`` is guaranteed
 # loaded by the time this line runs — importing ``_read_usage`` from it here is
@@ -44,6 +45,8 @@ from .test_suite import _parse_yes_no
 
 if TYPE_CHECKING:
     from .core import LayoutLens
+
+logger = get_logger("api.judge")
 
 # Conservative refusal markers. Kept small and specific to avoid false positives
 # on legitimate answers (e.g. "the nav could not be simpler").
@@ -72,6 +75,8 @@ class JudgeResult:
         usage: Token counts with keys prompt_tokens/completion_tokens/total_tokens.
         model: The model that produced the response.
         parse_mode: "json", "fallback", or "none".
+        truncated: True if the model stopped because it hit the token budget
+            (``finish_reason == "length"``) — the verdict may be incomplete.
     """
 
     answer: str
@@ -82,6 +87,7 @@ class JudgeResult:
     usage: dict[str, int]
     model: str
     parse_mode: str
+    truncated: bool = False
 
 
 def detect_refusal(text: str) -> bool:
@@ -227,8 +233,72 @@ def _image_data_url(lens: LayoutLens, image_path: str | Path) -> str:
     return f"data:{mime};base64,{image_b64}"
 
 
+def build_judge_messages(lens: LayoutLens, image_path: str | Path, prompt: str) -> list[dict[str, Any]]:
+    """Build the single-user-message payload a judge call sends.
+
+    One user message with the caller's ``prompt`` VERBATIM as the only text
+    block followed by the base64 image. Extracted so the batch path
+    (:mod:`layoutlens.api.batch`) reuses the exact same construction and its
+    per-request prompt stays byte-identical to :func:`judge` (parity contract).
+
+    Raises:
+        ValidationError: If ``image_path`` does not exist.
+    """
+    data_url = _image_data_url(lens, image_path)
+    return [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": prompt},
+                {"type": "image_url", "image_url": {"url": data_url}},
+            ],
+        }
+    ]
+
+
+def _finish_reason(response: Any) -> str | None:
+    """Read ``finish_reason`` off the first choice, or None if absent."""
+    try:
+        return response.choices[0].finish_reason
+    except (AttributeError, IndexError, TypeError):
+        return None
+
+
+def build_judge_result(lens: LayoutLens, raw: str, usage: dict[str, int], finish_reason: Any = None) -> JudgeResult:
+    """Assemble a :class:`JudgeResult` from raw text + usage (shared by batch).
+
+    Parses ``raw`` with :func:`parse_judge_response`, flags refusals, and sets
+    ``truncated`` when ``finish_reason == "length"``. Kept public so the batch
+    backends produce results identically to the synchronous :func:`judge`.
+    """
+    answer, confidence, rationale, parse_mode = parse_judge_response(raw)
+    truncated = finish_reason == "length"
+    if truncated:
+        logger.warning(
+            "Judge response truncated (finish_reason=length) for model %s — "
+            "raise max_tokens (reasoning models spend thinking tokens in the budget).",
+            lens.model,
+        )
+    return JudgeResult(
+        answer=answer,
+        confidence=confidence,
+        rationale=rationale,
+        raw=raw,
+        refused=detect_refusal(raw),
+        usage=usage,
+        model=lens.model,
+        parse_mode=parse_mode,
+        truncated=truncated,
+    )
+
+
 async def judge(
-    lens: LayoutLens, image_path: str | Path, prompt: str, *, max_tokens: int = 300, timeout: float = 120.0
+    lens: LayoutLens,
+    image_path: str | Path,
+    prompt: str,
+    *,
+    max_tokens: int | _Auto = AUTO,
+    timeout: float = 120.0,
 ) -> JudgeResult:
     """Send ``prompt`` verbatim with ``image_path`` and parse the response.
 
@@ -241,23 +311,20 @@ async def judge(
     """
     # Validate the image FIRST: a missing image must raise ValidationError
     # regardless of whether an API key is configured (and before any API call).
-    data_url = _image_data_url(lens, image_path)
+    # ``build_judge_messages`` performs the existence check while encoding.
+    messages = build_judge_messages(lens, image_path, prompt)
 
     lens._ensure_api_key()
 
+    # Resolve AUTO to a reasoning-aware budget (8000 for thinking models, else
+    # 300); an explicit integer passes through unchanged.
+    max_tokens_value = resolved_max_tokens(lens.model, max_tokens)
+
     completion_kwargs: dict[str, Any] = {
         "model": lens.model,
-        "messages": [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt},
-                    {"type": "image_url", "image_url": {"url": data_url}},
-                ],
-            }
-        ],
+        "messages": messages,
         "timeout": timeout,
-        **completion_params(lens.model, temperature=0.0, max_tokens=max_tokens),
+        **completion_params(lens.model, temperature=0.0, max_tokens=max_tokens_value),
     }
     if lens.api_key:
         completion_kwargs["api_key"] = lens.api_key
@@ -267,15 +334,4 @@ async def judge(
     response = await acompletion(**completion_kwargs)
 
     raw = response.choices[0].message.content or ""
-    answer, confidence, rationale, parse_mode = parse_judge_response(raw)
-
-    return JudgeResult(
-        answer=answer,
-        confidence=confidence,
-        rationale=rationale,
-        raw=raw,
-        refused=detect_refusal(raw),
-        usage=_read_usage(response),
-        model=lens.model,
-        parse_mode=parse_mode,
-    )
+    return build_judge_result(lens, raw, _read_usage(response), _finish_reason(response))

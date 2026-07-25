@@ -55,7 +55,7 @@ from ..exceptions import (
 from ..logger import get_logger, log_function_call, log_performance_metric
 
 # Import per-model parameter policy
-from ..param_policy import completion_params
+from ..param_policy import AUTO, _Auto, completion_params
 
 # Import enhanced prompt system
 from ..prompts import Instructions, get_expert
@@ -1299,7 +1299,12 @@ Focus on:
     # Faithful judge interface (for external eval harnesses)
 
     async def judge(
-        self, image_path: str | Path, prompt: str, *, max_tokens: int = 300, timeout: float = 120.0
+        self,
+        image_path: str | Path,
+        prompt: str,
+        *,
+        max_tokens: int | _Auto = AUTO,
+        timeout: float = 120.0,
     ) -> JudgeResult:
         """Send ``prompt`` VERBATIM with an image and return a parsed verdict.
 
@@ -1314,9 +1319,10 @@ Focus on:
             image_path: Path to an existing image file (mime inferred from the
                 extension: ``.jpg``/``.jpeg`` -> JPEG, otherwise PNG).
             prompt: The exact text to send as the sole text block.
-            max_tokens: Maximum tokens to generate (default 300). Reasoning
-                models spend thinking tokens inside this budget — raise it
-                (e.g. 2000-6000) for such models or verdicts get truncated.
+            max_tokens: Maximum tokens to generate. Defaults to ``AUTO``, which
+                resolves to 8000 for reasoning/thinking models (they spend
+                thinking tokens inside this budget) and 300 otherwise. Pass an
+                explicit integer to override.
             timeout: Per-call timeout in seconds (default 120 — reasoning
                 models can take well over 30s on a single judgment).
 
