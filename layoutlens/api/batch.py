@@ -485,6 +485,9 @@ async def _judge_batch_genai(
 ) -> dict[str, JudgeResult]:
     """google-genai inline batch backend (see module docstring)."""
     display_name = f"layoutlens-batch:{lens.model}"
+    # google-genai wants the bare model id (``gemini-3-flash-preview``); ``lens.model`` carries
+    # the LiteLLM ``gemini/`` prefix that routes here — strip it for the batch call.
+    genai_model = lens.model.split("/", 1)[1] if lens.model.lower().startswith("gemini/") else lens.model
     results: dict[str, JudgeResult] = {}
     valid = _split_missing_images(lens, requests, results)
 
@@ -511,7 +514,7 @@ async def _judge_batch_genai(
     # submitted (the next resume just collects).
     new_jobs: list[str] = []
     for chunk in _chunk_genai(remaining):
-        job_name = _submit_genai_chunk(client, lens.model, chunk, max_tokens_value, display_name)
+        job_name = _submit_genai_chunk(client, genai_model, chunk, max_tokens_value, display_name)
         new_jobs.append(job_name)
         jobs.append({"job_name": job_name, "ids": [req.id for req, _ in chunk]})
         _write_manifest(manifest_path, {"model": lens.model, "backend": "genai", "jobs": jobs})
