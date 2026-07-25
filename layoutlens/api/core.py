@@ -1298,7 +1298,9 @@ Focus on:
 
     # Faithful judge interface (for external eval harnesses)
 
-    async def judge(self, image_path: str | Path, prompt: str, *, max_tokens: int = 300) -> JudgeResult:
+    async def judge(
+        self, image_path: str | Path, prompt: str, *, max_tokens: int = 300, timeout: float = 120.0
+    ) -> JudgeResult:
         """Send ``prompt`` VERBATIM with an image and return a parsed verdict.
 
         This is the faithful judge interface for external evaluation harnesses
@@ -1312,7 +1314,11 @@ Focus on:
             image_path: Path to an existing image file (mime inferred from the
                 extension: ``.jpg``/``.jpeg`` -> JPEG, otherwise PNG).
             prompt: The exact text to send as the sole text block.
-            max_tokens: Maximum tokens to generate (default 300).
+            max_tokens: Maximum tokens to generate (default 300). Reasoning
+                models spend thinking tokens inside this budget — raise it
+                (e.g. 2000-6000) for such models or verdicts get truncated.
+            timeout: Per-call timeout in seconds (default 120 — reasoning
+                models can take well over 30s on a single judgment).
 
         Returns:
             JudgeResult with the parsed answer/confidence/rationale, the raw
@@ -1324,7 +1330,7 @@ Focus on:
         """
         from .judge import judge as _judge
 
-        return await _judge(self, image_path, prompt, max_tokens=max_tokens)
+        return await _judge(self, image_path, prompt, max_tokens=max_tokens, timeout=timeout)
 
     # Developer convenience methods
     async def check_accessibility(

@@ -227,7 +227,9 @@ def _image_data_url(lens: LayoutLens, image_path: str | Path) -> str:
     return f"data:{mime};base64,{image_b64}"
 
 
-async def judge(lens: LayoutLens, image_path: str | Path, prompt: str, *, max_tokens: int = 300) -> JudgeResult:
+async def judge(
+    lens: LayoutLens, image_path: str | Path, prompt: str, *, max_tokens: int = 300, timeout: float = 120.0
+) -> JudgeResult:
     """Send ``prompt`` verbatim with ``image_path`` and parse the response.
 
     See :meth:`LayoutLens.judge` for the public contract. This is the module
@@ -254,7 +256,7 @@ async def judge(lens: LayoutLens, image_path: str | Path, prompt: str, *, max_to
                 ],
             }
         ],
-        "timeout": 30.0,
+        "timeout": timeout,
         **completion_params(lens.model, temperature=0.0, max_tokens=max_tokens),
     }
     if lens.api_key:
