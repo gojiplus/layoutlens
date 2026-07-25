@@ -2,6 +2,36 @@
 
 All notable changes to LayoutLens are documented in this file.
 
+## [1.9.0] - 2026-07-25
+
+### 🚀 Major Features
+
+- **Deterministic layout scorers** (`LayoutScorer`, `LayoutReport`, `LayoutFinding`,
+  `check_contrast`, `contrast_ratio`, `read_computed_styles`, `element_geometry`):
+  the geometry/contrast analog of the axe-core accessibility engine — keyless,
+  LLM-free detectors that measure defects directly off the rendered page with the
+  browser's own layout engine. Five defect classes: **contrast** (WCAG AA ratio,
+  4.5:1 normal / 3.0:1 large, with the measured ratio), **overlap** (sibling
+  bounding-box collision), **clipping** (content cut off by hidden overflow),
+  **viewport-protrusion** (elements past the viewport width), and **target-size**
+  (interactive targets under 24×24px, WCAG 2.5.8). Every finding is a receipt —
+  offending selector, bbox, measured value, and violated threshold. `scan(source,
+  viewport=...)` owns the browser; `scan_page(page)` runs on an open page. New
+  module: `layoutlens/layout/`.
+- The measurement math (WCAG relative-luminance/contrast-ratio, bbox intersection,
+  `scrollHeight`/`clientHeight`, right-edge vs viewport) and the computed-style
+  reader are ported verbatim from the UIJudgeBench render-verifier
+  (`uijudge/engine/verify.py`, `wcag.py`, `referring.py`) — the same detectors the
+  benchmark used to build its layout ground truth — generalised from verifying one
+  claimed selector to scanning the whole page for every instance.
+
+### ✅ Tests
+
+- `tests/test_layout.py`: pure WCAG contrast-math unit tests against published
+  pairs (`#767676`/white = 4.54:1) plus browser-marked tests that plant one defect
+  per class and assert the matching finding fires with the right measured value,
+  and that a clean page yields none.
+
 ## [1.8.0] - 2026-07-25
 
 ### 🚀 Major Features

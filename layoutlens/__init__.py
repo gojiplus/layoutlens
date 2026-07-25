@@ -29,6 +29,17 @@ from .exceptions import (
     TimeoutError,
     ValidationError,
 )
+
+# Import deterministic layout/geometry scorers
+from .layout import (
+    LayoutFinding,
+    LayoutReport,
+    LayoutScorer,
+    check_contrast,
+    contrast_ratio,
+    element_geometry,
+    read_computed_styles,
+)
 from .logger import (
     configure_for_development,
     configure_for_production,
@@ -65,6 +76,14 @@ __all__ = [
     "A11yReport",
     "A11yFinding",
     "AXE_VERSION",
+    # Deterministic layout/geometry scorers
+    "LayoutScorer",
+    "LayoutReport",
+    "LayoutFinding",
+    "check_contrast",
+    "contrast_ratio",
+    "read_computed_styles",
+    "element_geometry",
     # Types and Enums
     "ComplianceLevel",
     "Expert",

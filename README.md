@@ -121,6 +121,37 @@ print(result.metadata["a11y"])   # full axe report dict
 print(result.metadata["engine"])  # "axe-core 4.10.3"
 ```
 
+## Deterministic Layout Scorers (geometry & contrast) — No API Key Required
+
+Alongside axe-core, LayoutLens ships `LayoutScorer` — a keyless, LLM-free detector for
+geometric and contrast defects, measured directly off the rendered page with the browser's
+own layout engine. These are the same detectors [UIJudgeBench](https://github.com/gojiplus/uijudge-bench)
+uses to build its layout ground truth, ported into the product. It finds:
+
+- **contrast** — text below the WCAG AA ratio (4.5:1 normal, 3.0:1 large), with the measured ratio
+- **overlap** — sibling elements whose bounding boxes collide
+- **clipping** — content cut off by a fixed-size box with hidden overflow
+- **viewport-protrusion** — elements extending past the viewport width (horizontal-scroll bugs)
+- **target-size** — interactive targets smaller than 24×24px (WCAG 2.5.8)
+
+```python
+from layoutlens.layout import LayoutScorer, contrast_ratio, read_computed_styles
+
+# Scan a page — no LayoutLens instance, no API key, deterministic.
+report = await LayoutScorer().scan("page.html", viewport="mobile")
+print(report.ok)          # True if no defects found
+print(report.summary())   # findings grouped by class, with measured receipts
+for f in report.findings:
+    print(f.defect_class, f.selector, f.measured)  # each finding carries the numbers behind it
+
+# Or use the pure WCAG contrast math directly (no browser):
+contrast_ratio((0x76, 0x76, 0x76), (0xff, 0xff, 0xff))  # -> 4.54
+```
+
+Every finding is a receipt: the offending selector, its bounding box, the measured value, and
+the threshold it violated. `scan(viewport=...)` re-runs the geometry at any viewport, so
+protrusion/overlap that only appear on mobile are caught.
+
 ## Key Functions
 
 ### 1. Analyze Pages

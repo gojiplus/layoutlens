@@ -1,4 +1,4 @@
-# CLAUDE.md - LayoutLens v1.7.0
+# CLAUDE.md - LayoutLens v1.9.0
 
 Guidance for Claude Code when working in this repository. Describes what the
 code actually does — verify against source before trusting older assumptions;
@@ -12,18 +12,26 @@ vision-capable LLM (through LiteLLM; `gpt-4o-mini` by default). It also ships
 a fully deterministic, keyless WCAG 2.1 A/AA accessibility engine built on a
 vendored axe-core bundle.
 
-## Package Structure (real, as of v1.7.0)
+## Package Structure (real, as of v1.9.0)
 
 ```
 layoutlens/
 ├── __init__.py                    # Public exports
 ├── api/
 │   ├── core.py                    # LayoutLens class (analyze/compare/capture/checks)
+│   ├── judge.py                   # judge() + JudgeResult (verbatim-prompt vision judge)
+│   ├── batch.py                   # judge_batch() + BatchRequest (multi-provider batch)
 │   └── test_suite.py              # UITestCase/UITestSuite/UITestResult + run_test_suite
 ├── a11y/
 │   ├── axe.py                     # AxeAuditor, AXE_VERSION
 │   ├── types.py                   # A11yFinding, A11yReport
 │   └── assets/                    # Vendored axe-core bundle (axe.min.js, LICENSE-axe.txt)
+├── layout/                        # Deterministic geometry/contrast scorers (keyless, no LLM)
+│   ├── geometry.py                # LayoutScorer: overlap/clipping/protrusion/target-size
+│   ├── contrast.py                # WCAG contrast math + check_contrast page scan
+│   ├── styles.py                  # read_computed_styles, element_geometry
+│   └── types.py                   # LayoutFinding, LayoutReport
+│                                  #   (math ported from UIJudgeBench's render-verifier)
 ├── prompts/                       # Expert persona system (Instructions, get_expert, ...)
 ├── integrations/
 │   └── browser_use/               # AgentValidator, SessionRecorder/Replayer, reports
