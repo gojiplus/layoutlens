@@ -9,7 +9,7 @@ size for undersized interactive targets. It also folds in the contrast scan
 
 The measurement math is ported from the UIJudgeBench render-verifier
 (``uijudge/engine/verify.py``) — the same detectors the benchmark used to build
-its layout ground truth — generalised from verifying one claimed selector to
+its layout ground truth — generalized from verifying one claimed selector to
 scanning the whole page for every instance.
 """
 

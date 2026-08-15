@@ -57,7 +57,7 @@ class TestContrastMath:
         assert parse_css_color("#767676") == (118, 118, 118)
         assert parse_css_color("rgb(118, 118, 118)") == (118, 118, 118)
         assert parse_css_color("rgba(118, 118, 118, 0.5)") == (118, 118, 118)
-        with pytest.raises(ValueError, match="unrecognised CSS colour"):
+        with pytest.raises(ValueError, match="unrecognized CSS color"):
             parse_css_color("not-a-color")
 
     def test_is_large_text(self):
@@ -69,7 +69,7 @@ class TestContrastMath:
 
 @pytest.mark.unit
 class TestLayoutReport:
-    """Report container behaviour (no browser)."""
+    """Report container behavior (no browser)."""
 
     def test_ok_and_grouping(self):
         empty = LayoutReport(source="p.html", viewport="desktop", findings=[])

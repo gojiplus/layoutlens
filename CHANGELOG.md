@@ -114,7 +114,7 @@ _Nothing yet._
   `scrollHeight`/`clientHeight`, right-edge vs viewport) and the computed-style
   reader are ported verbatim from the UIJudgeBench render-verifier
   (`uijudge/engine/verify.py`, `wcag.py`, `referring.py`) — the same detectors the
-  benchmark used to build its layout ground truth — generalised from verifying one
+  benchmark used to build its layout ground truth — generalized from verifying one
   claimed selector to scanning the whole page for every instance.
 
 ### ✅ Tests

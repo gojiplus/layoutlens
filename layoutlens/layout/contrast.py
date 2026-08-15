@@ -36,13 +36,13 @@ def _linearize_channel(c8: int) -> float:
 
 
 def relative_luminance(rgb: RGB) -> float:
-    """Return the WCAG relative luminance (0..1) of an sRGB colour."""
+    """Return the WCAG relative luminance (0..1) of an sRGB color."""
     r, g, b = (_linearize_channel(v) for v in rgb)
     return 0.2126 * r + 0.7152 * g + 0.0722 * b
 
 
 def contrast_ratio(rgb1: RGB, rgb2: RGB) -> float:
-    """Return the WCAG contrast ratio (1..21) between two sRGB colours (symmetric)."""
+    """Return the WCAG contrast ratio (1..21) between two sRGB colors (symmetric)."""
     l1 = relative_luminance(rgb1)
     l2 = relative_luminance(rgb2)
     lighter, darker = (l1, l2) if l1 >= l2 else (l2, l1)
@@ -55,20 +55,20 @@ _RGB = re.compile(r"^rgba?\(\s*([0-9.]+)[,\s]+([0-9.]+)[,\s]+([0-9.]+)")
 
 
 def parse_css_color(value: str) -> RGB:
-    """Parse a CSS colour string into an ``(r, g, b)`` tuple.
+    """Parse a CSS color string into an ``(r, g, b)`` tuple.
 
     Supports ``#rgb``, ``#rrggbb``, ``rgb(...)`` and ``rgba(...)`` (comma- or
     space-separated). Alpha is ignored — the effective opaque background is
     resolved separately by walking the ancestor chain.
 
     Args:
-        value: A CSS colour string.
+        value: A CSS color string.
 
     Returns:
         The ``(r, g, b)`` channels as integers 0..255.
 
     Raises:
-        ValueError: If ``value`` is not a recognised colour form.
+        ValueError: If ``value`` is not a recognised color form.
     """
     s = value.strip()
     m = _HEX6.match(s)
@@ -86,7 +86,7 @@ def parse_css_color(value: str) -> RGB:
             round(float(m.group(2))),
             round(float(m.group(3))),
         )
-    raise ValueError(f"unrecognised CSS colour: {value!r}")
+    raise ValueError(f"unrecognized CSS color: {value!r}")
 
 
 def is_large_text(font_size_px: float, font_weight: str) -> bool:
@@ -99,9 +99,9 @@ def is_large_text(font_size_px: float, font_weight: str) -> bool:
 
 
 # Enumerate every element with direct visible text, returning its computed
-# foreground colour, effective opaque background (walking ancestors), font
+# foreground color, effective opaque background (walking ancestors), font
 # metrics, and bbox. The effective-background walk is the ``_JS_CONTRAST`` logic
-# from the bench verifier, generalised from one selector to the whole page.
+# from the bench verifier, generalized from one selector to the whole page.
 _JS_CONTRAST_SCAN = """() => {
   const transparent = c => !c || c === 'transparent' || c === 'rgba(0, 0, 0, 0)';
   function visible(el) {
@@ -169,7 +169,7 @@ async def check_contrast(
         try:
             ratio = contrast_ratio(parse_css_color(el["fg"]), parse_css_color(el["bg"]))
         except ValueError:
-            continue  # unparseable computed colour (e.g. background image) — skip
+            continue  # unparseable computed color (e.g. background image) — skip
         limit = (
             AA_LARGE_TEXT
             if is_large_text(el["fontSize"], el["fontWeight"])
