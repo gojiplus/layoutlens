@@ -4,6 +4,10 @@ All notable changes to LayoutLens are documented in this file.
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [2.0.0] - 2026-08-15
+
 ### Added
 
 - **`check_layout(source, mode="hybrid"|"deterministic"|"llm")`** — the
