@@ -95,7 +95,12 @@ async def test_compare_routes_local_html_through_capture(tmp_path):
         }
     )
 
-    await lens.compare([str(a), str(b)], "Which is better?")
+    from layoutlens.prompts import Instructions
+
+    sentinel_instructions = Instructions(expert_persona="accessibility_expert")
+    await lens.compare(
+        [str(a), str(b)], "Which is better?", instructions=sentinel_instructions
+    )
 
     # Both HTML sources were rendered to screenshots.
     assert lens._serve_html_and_capture.await_count == 2
@@ -111,3 +116,7 @@ async def test_compare_routes_local_html_through_capture(tmp_path):
     query_sent = lens._call_vision_api.await_args.kwargs["query"]
     assert f"Image 1: {a}" in query_sent
     assert f"Image 2: {b}" in query_sent
+    # Expert instructions flow into the individual analyses too, not just the
+    # comparative call.
+    for call in lens.analyze.await_args_list:
+        assert call.kwargs.get("instructions") is sentinel_instructions

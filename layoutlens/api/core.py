@@ -953,7 +953,11 @@ Focus on:
                 # each source is rendered exactly once. Restore the original
                 # source name afterwards for the caller's benefit.
                 individual_result = await self.analyze(
-                    screenshot_path, query, viewport_value, context
+                    screenshot_path,
+                    query,
+                    viewport_value,
+                    context,
+                    instructions=instructions,
                 )
                 individual_result.source = str(source)
                 individual_results.append(individual_result)

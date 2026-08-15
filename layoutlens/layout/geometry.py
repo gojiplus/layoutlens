@@ -136,11 +136,11 @@ _JS_PROTRUDE = (
     const parentProtrudes = pr && (pr.right > vw + tol || pr.left < -tol);
     if (parentProtrudes) continue;
     if (r.right > vw + tol) {
-      out.push({ selector: cssPath(el), edge: 'right', right: r.right,
+      out.push({ selector: cssPath(el), edge: 'right', coord: r.right,
                  viewportWidth: vw, overflow: r.right - vw,
                  bbox: [r.x, r.y, r.width, r.height] });
     } else if (r.left < -tol) {
-      out.push({ selector: cssPath(el), edge: 'left', right: r.right,
+      out.push({ selector: cssPath(el), edge: 'left', coord: r.left,
                  viewportWidth: vw, overflow: -r.left,
                  bbox: [r.x, r.y, r.width, r.height] });
     }
@@ -313,7 +313,7 @@ class LayoutScorer:
                     bbox=_round_bbox(m["bbox"]),
                     measured={
                         "edge": m["edge"],
-                        "right_px": round(m["right"]),
+                        "edge_px": round(m["coord"]),
                         "viewport_width_px": round(m["viewportWidth"]),
                         "overflow_px": round(m["overflow"]),
                     },

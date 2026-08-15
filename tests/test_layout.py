@@ -230,6 +230,9 @@ class TestLayoutBrowser:
         off = next(f for f in protrusions if f.selector == "#off")
         assert off.measured["edge"] == "left"
         assert off.measured["overflow_px"] >= 119
+        # The reported coordinate must be the offending edge itself (the
+        # element's LEFT edge, ~-120px), not its right edge.
+        assert off.measured["edge_px"] <= -119
 
     def test_page_overflow_defect(self, tmp_path):
         path = _write(
