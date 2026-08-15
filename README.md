@@ -5,37 +5,43 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Documentation](https://img.shields.io/badge/docs-github.io-blue)](https://gojiplus.github.io/layoutlens/)
 
-## The Problem
+LayoutLens catches the layout and accessibility bugs your pixel baseline can't
+see and your LLM can't be trusted about — **deterministic axe-core and
+geometry checks that run keyless and free in CI, with an optional vision-LLM
+tier that the deterministic layer is allowed to overrule.**
 
-Traditional UI testing is painful:
-- **Brittle selectors** break with every design change
-- **Pixel-perfect comparisons** fail on minor, acceptable variations
-- **Writing test assertions** requires deep technical knowledge
-- **Cross-browser testing** multiplies complexity
-- **Generic analysis lacks domain expertise** - accessibility, conversion optimization, mobile UX
-- **Accessibility checks** need specialized tools and expertise
+Three tiers, use what you need:
 
-## The Solution
-
-LayoutLens lets you test UIs the way humans see them - using natural language and domain expert knowledge:
+| Tier | What runs | Needs | Reliability |
+|---|---|---|---|
+| **Deterministic** | axe-core WCAG A/AA + geometry/contrast scorers (overlap, clipping, page overflow, truncation, tap-target size) | nothing — no API key, no network | measured facts, reproducible; this is the CI gate |
+| **Hybrid** (default) | deterministic scan grounds the vision LLM; **measured violations force the verdict** | an LLM API key | precision-preserving: the model can add findings, never erase measured ones |
+| **LLM** | natural-language questions answered from a screenshot | an LLM API key (any LiteLLM provider, incl. Ollama/vLLM via `api_base`) | honest numbers below |
 
 ```python
-# Basic analysis
-result = await lens.analyze("https://example.com", "Is the navigation user-friendly?")
+# Keyless, deterministic — safe as a required check on any fork
+result = await lens.check_accessibility("page.html", mode="axe")
+result = await lens.check_layout("page.html", viewport="mobile", mode="deterministic")
 
-# Expert-powered analysis
-result = await lens.check_accessibility("https://example.com", compliance_level="AA")
-# Returns: "WCAG AA compliant with 4.7:1 contrast ratio. Focus indicators visible..."
+# Natural-language, grounded by the deterministic scan (hybrid)
+result = await lens.analyze("https://example.com", "Is the navigation user-friendly?")
 ```
 
-Instead of writing complex selectors and assertions, just ask questions like:
-- "Is this page mobile-friendly?"
-- "Are all buttons accessible?"
-- "Does the layout look professional?"
+Or from pytest — the deterministic assertions need no key, and `assert_ui`
+skips (never fails) without one:
 
-Get expert-level insights from built-in domain knowledge in **accessibility**, **conversion optimization**, **mobile UX**, and more.
+```python
+def test_landing_page(layoutlens):
+    layoutlens.assert_a11y("landing.html")  # axe, keyless
+    layoutlens.assert_layout("landing.html", viewport="mobile")  # keyless
+    layoutlens.assert_ui("landing.html", "Is the CTA above the fold?")
+```
 
-**81.1% accuracy** (60/74 labeled queries, `gpt-4o-mini`, measured 2026-07-21) on the bundled benchmark suite — see [`benchmarks/results/2026-07-21_gpt-4o-mini.json`](benchmarks/results/2026-07-21_gpt-4o-mini.json)
+**Honest numbers:** the LLM tier measures **81.1%** on the bundled benchmark
+(60/74 labeled queries, `gpt-4o-mini`, measured 2026-07-21 —
+[artifact](benchmarks/results/2026-07-21_gpt-4o-mini.json)). See
+[Limitations](#limitations) for what vision models can and cannot reliably
+judge — the deterministic tier exists precisely because of those limits.
 
 ## Quick Start
 
@@ -159,6 +165,60 @@ contrast_ratio((0x76, 0x76, 0x76), (0xFF, 0xFF, 0xFF))  # -> 4.54
 Every finding is a receipt: the offending selector, its bounding box, the measured value, and
 the threshold it violated. `scan(viewport=...)` re-runs the geometry at any viewport, so
 protrusion/overlap that only appear on mobile are caught.
+
+## pytest Plugin
+
+Installing layoutlens registers a pytest plugin (entry point `layoutlens`).
+The `layoutlens` fixture gives you three assertions:
+
+```python
+def test_checkout(layoutlens):
+    layoutlens.assert_a11y("checkout.html")  # keyless axe gate
+    layoutlens.assert_layout(
+        "checkout.html", viewport="mobile"
+    )  # keyless geometry gate
+    layoutlens.assert_ui(
+        "checkout.html", "Is the pay button the most prominent element?"
+    )
+```
+
+- `assert_a11y` / `assert_layout` are **keyless and deterministic** — they run
+  on every fork and PR with no secrets, and failure messages carry the rule
+  id, selector, and measured numbers.
+- `assert_ui` (vision LLM) **skips instead of failing** when no API key is
+  configured, or always with `--layoutlens-no-llm` — so one suite serves both
+  the free deterministic lane and the LLM lane.
+- `--layoutlens-model` picks the model for `assert_ui`.
+
+## MCP Server (for coding agents)
+
+`layoutlens-mcp` exposes the checks as [MCP](https://modelcontextprotocol.io)
+tools for Claude Code, Cursor, and friends:
+
+```bash
+pip install "layoutlens[mcp]"
+# register the stdio server in your agent config:
+#   command: layoutlens-mcp
+```
+
+Tools: `audit_accessibility` and `scan_layout` (keyless, deterministic —
+they return **measured numbers, not model opinions**, in compact summaries of
+a few hundred tokens), plus `check_ui` and `compare_ui` (vision LLM). The
+deterministic tools cover exactly what accessibility-tree snapshots can't
+see: contrast, overlap, clipping, page overflow, truncation, tap-target size.
+
+## SARIF Output for GitHub Code Scanning
+
+Both deterministic engines emit [SARIF 2.1.0](https://sarifweb.azurewebsites.net/):
+
+```bash
+layoutlens page.html --layout deterministic --output sarif > layout.sarif
+layoutlens page.html --a11y axe --output sarif > a11y.sarif
+```
+
+Upload with `github/codeql-action/upload-sarif` and findings appear as PR
+annotations with stable rule ids (`layout/page-overflow`, `axe/color-contrast`,
+...) tracked over time — keyless, so it works on every fork.
 
 ## Key Functions
 
@@ -545,6 +605,30 @@ lens = LayoutLens(
     cache_type="memory",  # "memory" or "file"
 )
 ```
+
+## Limitations
+
+Calibrate your trust to the tier you use:
+
+- **Vision LLMs miss fine-grained UI differences.** On DiffSpot
+  ([arXiv 2605.29615](https://arxiv.org/abs/2605.29615)), a 2026 benchmark of
+  fine-grained web-UI changes, the best frontier model scored 47.2% overall
+  and **under 23% recall on the hard tier**; open models hallucinated
+  differences on 18–24% of identical pairs. Do not use the LLM tier as a
+  sole gate for subtle visual regressions — that is what the deterministic
+  scorers are for.
+- **Passing axe-core is not WCAG conformance.** Automated rules cover only a
+  subset of WCAG; Microsoft's a11y LLM evaluation makes the same disclaimer
+  for its own checks. axe passing means "no automated rule failed", not
+  "accessible".
+- **The deterministic scorers measure geometry, not intent.** An overlap can
+  be a deliberate design; a small target may have a large hit area via
+  spacing (the WCAG 2.5.8 spacing exception is not yet modeled). Findings
+  carry their measured numbers so you can judge.
+- **Our own benchmark is small** (74 labeled queries) and easier than
+  DiffSpot-class tasks; the 81.1% figure is honest but narrow. The harness is
+  model-agnostic (`benchmarks/run_benchmark.py --model ...`) — re-run it
+  rather than trusting ours.
 
 ## Resources
 

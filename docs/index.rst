@@ -69,6 +69,12 @@ LayoutLens is an AI-powered UI testing framework that enables natural language v
 
    api/core
    api/a11y
+   api/layout
+   api/judge
+   api/pytest_plugin
+   api/sarif
+   api/prompts
+   api/exceptions
    api/capture
 
 📊 Performance Metrics

@@ -4,6 +4,64 @@ All notable changes to LayoutLens are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **`check_layout(source, mode="hybrid"|"deterministic"|"llm")`** — the
+  deterministic layout scorer now grounds and can overrule the vision model,
+  exactly like axe-core does for accessibility: one browser session for
+  screenshot + scan, `LayoutReport.summary()` injected as LLM context, and
+  measured defects forcing the verdict to "no" at confidence 1.0.
+  `deterministic` mode is fully keyless. CLI: `--layout {hybrid,deterministic,llm}`.
+- **Three new layout detectors**: page-level horizontal overflow, ellipsis
+  text truncation, and left-edge viewport protrusion.
+- **pytest plugin** (auto-registered): `layoutlens` fixture with keyless
+  `assert_a11y`/`assert_layout` (fail with rule ids, selectors, and measured
+  numbers) and LLM-backed `assert_ui` (skips without an API key or with
+  `--layoutlens-no-llm`).
+- **MCP server** (`layoutlens-mcp`, extra `layoutlens[mcp]`): tools
+  `audit_accessibility` + `scan_layout` (keyless, compact summaries) and
+  `check_ui` + `compare_ui` (vision LLM).
+- **SARIF 2.1.0 output** (`--output sarif` with `--a11y`/`--layout`),
+  validated against the official OASIS schema, for GitHub Code Scanning.
+- `JudgeResult.prompt_sha256` (judge-contract pinning),
+  `batch_usage_summary()`, and `BatchResult` token totals +
+  `estimated_cost_usd`.
+- `UITestSuite.from_yaml`/`from_specs`; `layoutlens --suite FILE`;
+  `run_test_suite(parallel=..., max_workers=...)` actually parallelizes.
+- `benchmarks/run_benchmark.py --model/--provider/--api-base` (harness is now
+  model-agnostic).
+
+### Fixed
+
+- `compare()` sent only the first screenshot to the vision model (the rest
+  were pasted in as filenames); it now sends every image with an "Image N"
+  legend, and renders each source once instead of twice.
+- Cache keys now include model/provider/api_base and an instructions hash —
+  previously a persistent cache could serve one model's answers for another.
+- Typed errors from single-source `analyze()` calls now propagate instead of
+  being flattened into error-results; batch runs still isolate per item.
+- The analyze-path JSON parser now tolerates nested objects and code fences
+  (shared with the judge parser).
+- Capture batches share one Chromium launch instead of one per URL.
+
+### Changed (breaking)
+
+- `audit_accessibility` merged into `check_accessibility(compliance_level=...)`;
+  `check_mobile_friendly`/`check_conversion_optimization` removed (use
+  `analyze_mobile_ux`/`optimize_conversions`).
+- `run_test_suite`/`create_test_suite` are real methods (no monkey-patching).
+- browser-use integration rewritten as `validate_agent_run(lens, history)`
+  over the stable `AgentHistoryList` seam (the old per-step hooks targeted an
+  API browser-use removed and silently no-oped); extra pinned
+  `browser-use>=0.13,<0.14`.
+- Removed: `streamlit/` app, `Config`/`config.py`, prompt-optimizer
+  heuristics, unused exception classes (`APIError`, `RateLimitError`,
+  `ScreenshotError`, `NetworkError`, `TestSuiteError`, custom `TimeoutError`).
+- `Instructions`/`UserContext`/`get_expert`/`list_available_experts` exported
+  at top level; `Instructions.for_healthcare()`/`for_finance()` added.
+- aiohttp/openai overridden past browser-use's lockstep pins to pick up
+  security-patched litellm/aiohttp lines.
+
 ### Changed
 
 - **Adopted the py-canon fleet standard** (`preen adopt --release-migration`):

@@ -17,6 +17,7 @@ maintainers = [
 keywords = ["ui testing", "visual regression", "ai", "computer vision", "web testing", "layout testing"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
+    "Framework :: Pytest",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
@@ -45,6 +46,8 @@ dynamic = ["version"]
 # ``gemini/*`` models) used by ``LayoutLens.judge_batch``. Imported lazily, so
 # the base install and all other backends never require it.
 gemini = ["google-genai>=1.0"]
+# MCP server (layoutlens-mcp): deterministic UI checks as agent tools.
+mcp = ["fastmcp>=3"]
 
 [dependency-groups]
 dev = [
@@ -91,6 +94,10 @@ browser-use = [
 
 [project.scripts]
 layoutlens = "layoutlens.cli:cli"
+layoutlens-mcp = "layoutlens.mcp_server:main"
+
+[project.entry-points.pytest11]
+layoutlens = "layoutlens.pytest_plugin"
 
 [tool.uv]
 # browser-use 0.13.x hard-pins aiohttp==3.13.4 (known CVEs, fixed in 3.14)
