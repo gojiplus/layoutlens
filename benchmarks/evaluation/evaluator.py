@@ -116,7 +116,9 @@ class BenchmarkEvaluator:
         """Evaluate a single LayoutLens answer against the ground truth."""
         expected_data = self.find_expected_answer(html_file, query)
         if not expected_data:
-            print(f"[warn] no expected answer for: {Path(html_file).name} - {query[:60]}...")
+            print(
+                f"[warn] no expected answer for: {Path(html_file).name} - {query[:60]}..."
+            )
             return None
 
         expected = str(expected_data["expected"]).strip().lower()
@@ -136,7 +138,9 @@ class BenchmarkEvaluator:
             metadata=expected_data,
         )
 
-    def evaluate_layoutlens_results(self, results_dir: str) -> dict[str, BenchmarkResults]:
+    def evaluate_layoutlens_results(
+        self, results_dir: str
+    ) -> dict[str, BenchmarkResults]:
         """Evaluate LayoutLens benchmark result JSON files in a directory."""
         results_path = Path(results_dir)
         category_results: dict[str, BenchmarkResults] = {}
@@ -151,7 +155,9 @@ class BenchmarkEvaluator:
                 print(f"[skip] {result_file.name}: not a benchmark results file")
                 continue
 
-            self.model_used = ll_data["benchmark_info"].get("model_used") or self.model_used
+            self.model_used = (
+                ll_data["benchmark_info"].get("model_used") or self.model_used
+            )
 
             for test_result in ll_data["results"]:
                 html_file = test_result["html_file"]
@@ -159,7 +165,9 @@ class BenchmarkEvaluator:
                 answer = test_result["answer"]
                 confidence = test_result.get("confidence", 1.0)
 
-                eval_result = self.evaluate_single_result(html_file, query, answer, confidence)
+                eval_result = self.evaluate_single_result(
+                    html_file, query, answer, confidence
+                )
                 if eval_result is None:
                     continue
 
@@ -190,11 +198,15 @@ class BenchmarkEvaluator:
             if cat.total_tests > 0:
                 cat.accuracy = cat.correct_predictions / cat.total_tests
                 cat.avg_ai_confidence = conf_totals[category] / cat.total_tests
-            print(f"[category] {category}: {cat.accuracy:.1%} ({cat.correct_predictions}/{cat.total_tests})")
+            print(
+                f"[category] {category}: {cat.accuracy:.1%} ({cat.correct_predictions}/{cat.total_tests})"
+            )
 
         return category_results
 
-    def generate_report(self, category_results: dict[str, BenchmarkResults], output_file: str) -> dict[str, Any]:
+    def generate_report(
+        self, category_results: dict[str, BenchmarkResults], output_file: str
+    ) -> dict[str, Any]:
         """Generate and write a JSON evaluation report; return the report dict."""
         total_tests = sum(r.total_tests for r in category_results.values())
         total_correct = sum(r.correct_predictions for r in category_results.values())
@@ -239,7 +251,9 @@ class BenchmarkEvaluator:
                         "expected": result.expected,
                         "parsed_answer": result.parsed_answer,
                         "ai_answer": (
-                            result.ai_answer[:200] + "..." if len(result.ai_answer) > 200 else result.ai_answer
+                            result.ai_answer[:200] + "..."
+                            if len(result.ai_answer) > 200
+                            else result.ai_answer
                         ),
                         "is_correct": result.is_correct,
                         "ai_confidence": result.ai_confidence,
@@ -255,12 +269,16 @@ class BenchmarkEvaluator:
         print("BENCHMARK EVALUATION SUMMARY")
         print(f"{'=' * 60}")
         print(f"Model: {self.model_used or 'unknown'}")
-        print(f"Overall Accuracy: {overall_accuracy:.1%} ({total_correct}/{total_tests})")
+        print(
+            f"Overall Accuracy: {overall_accuracy:.1%} ({total_correct}/{total_tests})"
+        )
         print(f"Ambiguous (unparseable) answers: {total_ambiguous}")
         print(f"Categories Evaluated: {len(category_results)}")
         for category, results in category_results.items():
             print(f"\n{category.replace('_', ' ').title()}:")
-            print(f"  Accuracy: {results.accuracy:.1%} ({results.correct_predictions}/{results.total_tests})")
+            print(
+                f"  Accuracy: {results.accuracy:.1%} ({results.correct_predictions}/{results.total_tests})"
+            )
             print(f"  Ambiguous: {results.ambiguous_answers}")
             print(f"  Avg AI Confidence: {results.avg_ai_confidence:.2f}")
         print(f"\nReport saved to: {output_file}")
@@ -269,7 +287,9 @@ class BenchmarkEvaluator:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Evaluate LayoutLens benchmark performance")
+    parser = argparse.ArgumentParser(
+        description="Evaluate LayoutLens benchmark performance"
+    )
     parser.add_argument(
         "--answer-keys",
         "-k",

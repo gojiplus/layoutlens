@@ -59,7 +59,10 @@ class TestSimpleCLI:
 
         # Test with args
         test_args = ["layoutlens", "page1.html", "page2.html", "--compare"]
-        with patch("sys.argv", test_args), patch("pathlib.Path.exists", return_value=True):
+        with (
+            patch("sys.argv", test_args),
+            patch("pathlib.Path.exists", return_value=True),
+        ):
             result = await main()
 
         assert result == 0
@@ -78,7 +81,10 @@ class TestSimpleCLI:
 
         # Test with args
         test_args = ["layoutlens", "test.html", "--output", "json"]
-        with patch("sys.argv", test_args), patch("pathlib.Path.exists", return_value=True):
+        with (
+            patch("sys.argv", test_args),
+            patch("pathlib.Path.exists", return_value=True),
+        ):
             result = await main()
 
         captured = capsys.readouterr()
@@ -93,13 +99,20 @@ class TestSimpleCLI:
         mock_lens_class.return_value = mock_lens
 
         mock_result = AnalysisResult(
-            source="test.html", query="Is it good?", answer="Yes, it's good", confidence=0.8, reasoning="Clean design"
+            source="test.html",
+            query="Is it good?",
+            answer="Yes, it's good",
+            confidence=0.8,
+            reasoning="Clean design",
         )
         mock_lens.analyze = AsyncMock(return_value=mock_result)
 
         # Test with args
         test_args = ["layoutlens", "test.html", "Is it good?", "--output", "text"]
-        with patch("sys.argv", test_args), patch("pathlib.Path.exists", return_value=True):
+        with (
+            patch("sys.argv", test_args),
+            patch("pathlib.Path.exists", return_value=True),
+        ):
             result = await main()
 
         captured = capsys.readouterr()
@@ -118,10 +131,18 @@ class TestSimpleCLI:
         mock_result = BatchResult(
             results=[
                 AnalysisResult(
-                    source="page1.html", query="Is it good?", answer="Yes", confidence=0.9, reasoning="Good"
+                    source="page1.html",
+                    query="Is it good?",
+                    answer="Yes",
+                    confidence=0.9,
+                    reasoning="Good",
                 ),
                 AnalysisResult(
-                    source="page2.html", query="Is it good?", answer="Yes", confidence=0.8, reasoning="Also good"
+                    source="page2.html",
+                    query="Is it good?",
+                    answer="Yes",
+                    confidence=0.8,
+                    reasoning="Also good",
                 ),
             ],
             total_queries=2,
@@ -133,7 +154,10 @@ class TestSimpleCLI:
 
         # Test with args
         test_args = ["layoutlens", "page1.html", "page2.html", "--query", "Is it good?"]
-        with patch("sys.argv", test_args), patch("pathlib.Path.exists", return_value=True):
+        with (
+            patch("sys.argv", test_args),
+            patch("pathlib.Path.exists", return_value=True),
+        ):
             result = await main()
 
         assert result == 0
@@ -157,11 +181,16 @@ class TestSimpleCLI:
         mock_lens.check_accessibility = AsyncMock(return_value=mock_result)
 
         test_args = ["layoutlens", "test.html", "--a11y", "axe"]
-        with patch("sys.argv", test_args), patch("pathlib.Path.exists", return_value=True):
+        with (
+            patch("sys.argv", test_args),
+            patch("pathlib.Path.exists", return_value=True),
+        ):
             result = await main()
 
         assert result == 0
-        mock_lens.check_accessibility.assert_called_once_with("test.html", viewport="desktop", mode="axe")
+        mock_lens.check_accessibility.assert_called_once_with(
+            "test.html", viewport="desktop", mode="axe"
+        )
 
     @patch("layoutlens.cli.LayoutLens")
     async def test_a11y_query_conflict_errors(self, mock_lens_class, capsys):
@@ -170,8 +199,18 @@ class TestSimpleCLI:
         mock_lens_class.return_value = mock_lens
         mock_lens.check_accessibility = AsyncMock()
 
-        test_args = ["layoutlens", "test.html", "--a11y", "axe", "--query", "Is it good?"]
-        with patch("sys.argv", test_args), patch("pathlib.Path.exists", return_value=True):
+        test_args = [
+            "layoutlens",
+            "test.html",
+            "--a11y",
+            "axe",
+            "--query",
+            "Is it good?",
+        ]
+        with (
+            patch("sys.argv", test_args),
+            patch("pathlib.Path.exists", return_value=True),
+        ):
             result = await main()
 
         assert result == 1
@@ -188,7 +227,10 @@ class TestSimpleCLI:
         mock_lens.compare = AsyncMock()
 
         test_args = ["layoutlens", "a.html", "b.html", "--a11y", "axe", "--compare"]
-        with patch("sys.argv", test_args), patch("pathlib.Path.exists", return_value=True):
+        with (
+            patch("sys.argv", test_args),
+            patch("pathlib.Path.exists", return_value=True),
+        ):
             result = await main()
 
         assert result == 1

@@ -104,7 +104,9 @@ async def demo_test_suite_functionality():
 
         # Load test suite back
         loaded_suite = UITestSuite.load(temp_path)
-        print(f"✅ Loaded test suite: '{loaded_suite.name}' with {len(loaded_suite.test_cases)} test cases")
+        print(
+            f"✅ Loaded test suite: '{loaded_suite.name}' with {len(loaded_suite.test_cases)} test cases"
+        )
 
     finally:
         if temp_path.exists():
@@ -192,7 +194,9 @@ async def demo_layoutlens_with_cache():
             print(f"   Hit rate: {cache_stats['hit_rate']:.1%}")
 
             # Demonstrate cache management
-            print(f"   Available cache methods: get_cache_stats(), clear_cache(), enable_cache(), disable_cache()")
+            print(
+                f"   Available cache methods: get_cache_stats(), clear_cache(), enable_cache(), disable_cache()"
+            )
 
         except Exception as e:
             print(f"   Configuration validated: {type(e).__name__}")

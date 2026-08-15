@@ -16,9 +16,12 @@ import pytest
 
 # The evaluator lives under benchmarks/ (not an installed package), so load it
 # by file path.
-_EVALUATOR_PATH = Path(__file__).parent.parent / "benchmarks" / "evaluation" / "evaluator.py"
+_EVALUATOR_PATH = (
+    Path(__file__).parent.parent / "benchmarks" / "evaluation" / "evaluator.py"
+)
 _spec = importlib.util.spec_from_file_location("benchmark_evaluator", _EVALUATOR_PATH)
-assert _spec and _spec.loader
+assert _spec
+assert _spec.loader
 evaluator_mod = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(evaluator_mod)
 
@@ -35,13 +38,22 @@ def _write_answer_keys(root: Path) -> Path:
         "test_cases": {
             "good.html": {
                 "queries": {
-                    "Is the contrast sufficient?": {"expected": "yes", "reasoning": "good contrast"},
+                    "Is the contrast sufficient?": {
+                        "expected": "yes",
+                        "reasoning": "good contrast",
+                    },
                 }
             },
             "bad.html": {
                 "queries": {
-                    "Does it meet WCAG?": {"expected": "no", "reasoning": "violations present"},
-                    "Are images labeled?": {"expected": "no", "reasoning": "missing alt"},
+                    "Does it meet WCAG?": {
+                        "expected": "no",
+                        "reasoning": "violations present",
+                    },
+                    "Are images labeled?": {
+                        "expected": "no",
+                        "reasoning": "missing alt",
+                    },
                 }
             },
         },
@@ -51,7 +63,10 @@ def _write_answer_keys(root: Path) -> Path:
         "test_cases": {
             "nav.html": {
                 "queries": {
-                    "Is the nav centered?": {"expected": "yes", "reasoning": "centered"},
+                    "Is the nav centered?": {
+                        "expected": "yes",
+                        "reasoning": "centered",
+                    },
                 }
             },
         },
@@ -80,28 +95,36 @@ def evaluator(tmp_path: Path) -> BenchmarkEvaluator:
 
 
 def test_correct_yes_scores_correct(evaluator):
-    result = evaluator.evaluate_single_result("good.html", "Is the contrast sufficient?", "Yes, plenty.", 0.9)
+    result = evaluator.evaluate_single_result(
+        "good.html", "Is the contrast sufficient?", "Yes, plenty.", 0.9
+    )
     assert result is not None
     assert result.parsed_answer == "yes"
     assert result.is_correct is True
 
 
 def test_correct_no_scores_correct(evaluator):
-    result = evaluator.evaluate_single_result("bad.html", "Does it meet WCAG?", "No, it fails badly.", 0.9)
+    result = evaluator.evaluate_single_result(
+        "bad.html", "Does it meet WCAG?", "No, it fails badly.", 0.9
+    )
     assert result.parsed_answer == "no"
     assert result.is_correct is True
 
 
 def test_wrong_answer_scores_incorrect(evaluator):
     # Expected "yes" but model says "no".
-    result = evaluator.evaluate_single_result("good.html", "Is the contrast sufficient?", "No, too low.", 0.9)
+    result = evaluator.evaluate_single_result(
+        "good.html", "Is the contrast sufficient?", "No, too low.", 0.9
+    )
     assert result.parsed_answer == "no"
     assert result.is_correct is False
 
 
 def test_ambiguous_answer_scores_incorrect_not_no(evaluator):
     # Expected "no". An unparseable/hedged answer must NOT be treated as "no".
-    result = evaluator.evaluate_single_result("bad.html", "Does it meet WCAG?", "It depends on interpretation.", 0.5)
+    result = evaluator.evaluate_single_result(
+        "bad.html", "Does it meet WCAG?", "It depends on interpretation.", 0.5
+    )
     assert result.parsed_answer is None
     assert result.is_correct is False
 
@@ -118,11 +141,31 @@ def test_per_category_accuracy_math(tmp_path: Path):
     keys_dir = _write_answer_keys(tmp_path)
     results = [
         # accessibility: good.html yes/correct, bad.html one correct + one ambiguous(=incorrect)
-        {"html_file": "good.html", "query": "Is the contrast sufficient?", "answer": "Yes.", "confidence": 0.9},
-        {"html_file": "bad.html", "query": "Does it meet WCAG?", "answer": "No.", "confidence": 0.9},
-        {"html_file": "bad.html", "query": "Are images labeled?", "answer": "Maybe?", "confidence": 0.4},
+        {
+            "html_file": "good.html",
+            "query": "Is the contrast sufficient?",
+            "answer": "Yes.",
+            "confidence": 0.9,
+        },
+        {
+            "html_file": "bad.html",
+            "query": "Does it meet WCAG?",
+            "answer": "No.",
+            "confidence": 0.9,
+        },
+        {
+            "html_file": "bad.html",
+            "query": "Are images labeled?",
+            "answer": "Maybe?",
+            "confidence": 0.4,
+        },
         # layout: nav.html wrong
-        {"html_file": "nav.html", "query": "Is the nav centered?", "answer": "No.", "confidence": 0.9},
+        {
+            "html_file": "nav.html",
+            "query": "Is the nav centered?",
+            "answer": "No.",
+            "confidence": 0.9,
+        },
     ]
     results_dir = _write_results(tmp_path, results)
 
@@ -144,9 +187,24 @@ def test_per_category_accuracy_math(tmp_path: Path):
 def test_report_overall_accuracy_and_metadata(tmp_path: Path):
     keys_dir = _write_answer_keys(tmp_path)
     results = [
-        {"html_file": "good.html", "query": "Is the contrast sufficient?", "answer": "Yes.", "confidence": 0.9},
-        {"html_file": "bad.html", "query": "Does it meet WCAG?", "answer": "No.", "confidence": 0.9},
-        {"html_file": "nav.html", "query": "Is the nav centered?", "answer": "Yes.", "confidence": 0.9},
+        {
+            "html_file": "good.html",
+            "query": "Is the contrast sufficient?",
+            "answer": "Yes.",
+            "confidence": 0.9,
+        },
+        {
+            "html_file": "bad.html",
+            "query": "Does it meet WCAG?",
+            "answer": "No.",
+            "confidence": 0.9,
+        },
+        {
+            "html_file": "nav.html",
+            "query": "Is the nav centered?",
+            "answer": "Yes.",
+            "confidence": 0.9,
+        },
     ]
     results_dir = _write_results(tmp_path, results)
     ev = BenchmarkEvaluator(str(keys_dir))

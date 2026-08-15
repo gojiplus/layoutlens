@@ -33,7 +33,9 @@ def _parse_yes_no(text: str) -> str | None:
     return None
 
 
-def _require_expected_results(name: str, expected_results: dict[str, Any] | None) -> dict[str, Any]:
+def _require_expected_results(
+    name: str, expected_results: dict[str, Any] | None
+) -> dict[str, Any]:
     """Validate that a test case declares at least one assertion to grade against.
 
     This is the single source of truth for the "expected_results is required"
@@ -137,7 +139,9 @@ class UITestSuite:
         test_cases = []
         for tc in data["test_cases"]:
             name = tc.get("name", "<unnamed test case>")
-            expected_results = _require_expected_results(name, tc.get("expected_results"))
+            expected_results = _require_expected_results(
+                name, tc.get("expected_results")
+            )
 
             test_cases.append(
                 UITestCase(
@@ -223,7 +227,9 @@ class UITestResult:
         return json.dumps(self.to_dict(), indent=2, default=str)
 
 
-def _evaluate_case_assertions(case: UITestCase, result: AnalysisResult) -> dict[str, Any]:
+def _evaluate_case_assertions(
+    case: UITestCase, result: AnalysisResult
+) -> dict[str, Any]:
     """Evaluate a test case's expectations against an analysis result.
 
     Checks the case's ``expected_results`` ("answer" and/or "contains") plus
@@ -253,7 +259,9 @@ def _evaluate_case_assertions(case: UITestCase, result: AnalysisResult) -> dict[
     if expected_answer is not None:
         expected_answer_norm = str(expected_answer).strip().lower()
         actual_answer = _parse_yes_no(result.answer)
-        answer_passed = actual_answer is not None and actual_answer == expected_answer_norm
+        answer_passed = (
+            actual_answer is not None and actual_answer == expected_answer_norm
+        )
         if actual_answer is None:
             detail = f"expected answer '{expected_answer_norm}' but could not parse yes/no from: {result.answer!r}"
         else:
@@ -312,10 +320,10 @@ def extend_layoutlens_with_test_suite():
     async def run_test_suite(
         self, suite: UITestSuite, parallel: bool = False, max_workers: int = 4
     ) -> list[UITestResult]:
-        """
-        Run a test suite and return results.
+        """Run a test suite and return results.
 
         Args:
+            self: The ``LayoutLens`` instance this method is attached to
             suite: The test suite to run
             parallel: Whether to run tests in parallel
             max_workers: Maximum number of parallel workers
@@ -363,7 +371,7 @@ def extend_layoutlens_with_test_suite():
                             AnalysisResult(
                                 source=test_case.html_path,
                                 query=query,
-                                answer=f"Test failed: {str(e)}",
+                                answer=f"Test failed: {e!s}",
                                 confidence=0.0,
                                 reasoning="Test execution failed",
                                 metadata={
@@ -371,7 +379,9 @@ def extend_layoutlens_with_test_suite():
                                     "assertion_detail": {
                                         "passed": False,
                                         "checks": [],
-                                        "failure_reasons": [f"Analysis raised an exception: {e}"],
+                                        "failure_reasons": [
+                                            f"Analysis raised an exception: {e}"
+                                        ],
                                     },
                                 },
                             )
@@ -395,9 +405,10 @@ def extend_layoutlens_with_test_suite():
 
         return results
 
-    def create_test_suite(self, name: str, description: str, test_cases: list[dict[str, Any]]) -> UITestSuite:
-        """
-        Create a test suite from specifications.
+    def create_test_suite(
+        self, name: str, description: str, test_cases: list[dict[str, Any]]
+    ) -> UITestSuite:
+        """Create a test suite from specifications.
 
         Each spec in ``test_cases`` follows the same shape as a YAML test
         case, including a required ``expected_results`` (see the
@@ -405,6 +416,7 @@ def extend_layoutlens_with_test_suite():
         via the same helper as, ``UITestSuite.from_dict``.
 
         Args:
+            self: The ``LayoutLens`` instance this method is attached to
             name: Name of the test suite
             description: Description of the test suite
             test_cases: List of test case specifications, each requiring
@@ -419,7 +431,9 @@ def extend_layoutlens_with_test_suite():
         cases = []
         for tc_spec in test_cases:
             case_name = tc_spec.get("name", "<unnamed test case>")
-            expected_results = _require_expected_results(case_name, tc_spec.get("expected_results"))
+            expected_results = _require_expected_results(
+                case_name, tc_spec.get("expected_results")
+            )
             test_case = UITestCase(
                 name=case_name,
                 html_path=tc_spec["html_path"],
@@ -433,9 +447,10 @@ def extend_layoutlens_with_test_suite():
 
         return UITestSuite(name=name, description=description, test_cases=cases)
 
-    # Add methods to LayoutLens class
-    LayoutLens.run_test_suite = run_test_suite
-    LayoutLens.create_test_suite = create_test_suite
+    # Add methods to LayoutLens class. Deliberate monkey-patching, invisible
+    # to the type checker by design.
+    LayoutLens.run_test_suite = run_test_suite  # pyright: ignore[reportAttributeAccessIssue]
+    LayoutLens.create_test_suite = create_test_suite  # pyright: ignore[reportAttributeAccessIssue]
 
 
 # Auto-extend when module is imported

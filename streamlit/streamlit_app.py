@@ -14,7 +14,9 @@ from layoutlens import LayoutLens
 
 
 def main():
-    st.set_page_config(page_title="LayoutLens - AI-Powered UI Testing", page_icon="🔍", layout="wide")
+    st.set_page_config(
+        page_title="LayoutLens - AI-Powered UI Testing", page_icon="🔍", layout="wide"
+    )
 
     st.title("🔍 LayoutLens")
     st.subheader("AI-Powered UI Testing with Natural Language")
@@ -83,7 +85,9 @@ def main():
         st.header("Input")
 
         # Input method selection
-        input_method = st.radio("Choose input method:", ["Upload Screenshot", "Enter URL"], horizontal=True)
+        input_method = st.radio(
+            "Choose input method:", ["Upload Screenshot", "Enter URL"], horizontal=True
+        )
 
         input_file = None
         input_url = None
@@ -96,7 +100,9 @@ def main():
             )
 
             if input_file:
-                st.image(input_file, caption="Uploaded Screenshot", use_container_width=True)
+                st.image(
+                    input_file, caption="Uploaded Screenshot", use_container_width=True
+                )
 
         elif input_method == "Enter URL":
             input_url = st.text_input(
@@ -112,12 +118,16 @@ def main():
         # Questions input
         st.subheader("Test Questions")
 
-        question_method = st.radio("Question method:", ["Custom Questions", "Auto-generate"], horizontal=True)
+        question_method = st.radio(
+            "Question method:", ["Custom Questions", "Auto-generate"], horizontal=True
+        )
 
         custom_questions = []
         if question_method == "Custom Questions":
             # Allow multiple questions
-            num_questions = st.number_input("Number of questions", min_value=1, max_value=10, value=1)
+            num_questions = st.number_input(
+                "Number of questions", min_value=1, max_value=10, value=1
+            )
 
             for i in range(num_questions):
                 question = st.text_input(
@@ -171,7 +181,9 @@ def main():
                 )
             elif not (input_file or input_url):
                 st.error("📁 **Input Required**")
-                st.markdown("Please either upload a screenshot or enter a URL to analyze.")
+                st.markdown(
+                    "Please either upload a screenshot or enter a URL to analyze."
+                )
             else:
                 with st.spinner("Analyzing UI... This may take a few moments."):
                     try:
@@ -182,7 +194,9 @@ def main():
 
                         if input_method == "Upload Screenshot":
                             # Handle uploaded screenshot
-                            result = analyze_uploaded_file(tester, input_file, custom_questions, question_method)
+                            result = analyze_uploaded_file(
+                                tester, input_file, custom_questions, question_method
+                            )
 
                         elif input_method == "Enter URL":
                             # Handle URL
@@ -198,11 +212,13 @@ def main():
                             display_results(result)
 
                     except Exception as e:
-                        st.error(f"Error during analysis: {str(e)}")
+                        st.error(f"Error during analysis: {e!s}")
                         st.exception(e)
 
 
-def analyze_uploaded_file(tester: LayoutLens, uploaded_file, custom_questions: list, question_method: str):
+def analyze_uploaded_file(
+    tester: LayoutLens, uploaded_file, custom_questions: list, question_method: str
+):
     """Analyze an uploaded image file"""
     # For uploaded screenshots, create a temporary image file for analysis
 
@@ -328,7 +344,7 @@ def analyze_url(
             }
 
     except Exception as e:
-        st.error(f"Error analyzing URL: {str(e)}")
+        st.error(f"Error analyzing URL: {e!s}")
         return None
 
 
@@ -356,7 +372,9 @@ def display_results(result):
                 st.write("**Answer:**")
                 st.write(test_result["answer"])
 
-                if "screenshot_path" in test_result and os.path.exists(test_result["screenshot_path"]):
+                if "screenshot_path" in test_result and os.path.exists(
+                    test_result["screenshot_path"]
+                ):
                     st.image(
                         test_result["screenshot_path"],
                         caption="Screenshot",
@@ -380,7 +398,9 @@ def display_results(result):
         st.subheader("Analysis Results")
 
         for i, test_result in enumerate(result["results"]):
-            with st.expander(f"Question {i + 1}: {test_result['query']}", expanded=True):
+            with st.expander(
+                f"Question {i + 1}: {test_result['query']}", expanded=True
+            ):
                 st.write("**Answer:**")
                 st.write(test_result["answer"])
 

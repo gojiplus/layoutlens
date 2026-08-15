@@ -81,7 +81,11 @@ def parse_css_color(value: str) -> RGB:
         return (int(h[0] * 2, 16), int(h[1] * 2, 16), int(h[2] * 2, 16))
     m = _RGB.match(s)
     if m:
-        return (round(float(m.group(1))), round(float(m.group(2))), round(float(m.group(3))))
+        return (
+            round(float(m.group(1))),
+            round(float(m.group(2))),
+            round(float(m.group(3))),
+        )
     raise ValueError(f"unrecognised CSS colour: {value!r}")
 
 
@@ -143,7 +147,9 @@ _JS_CONTRAST_SCAN = """() => {
 }"""
 
 
-async def check_contrast(page: Page, *, threshold: float = AA_NORMAL_TEXT) -> list[LayoutFinding]:
+async def check_contrast(
+    page: Page, *, threshold: float = AA_NORMAL_TEXT
+) -> list[LayoutFinding]:
     """Scan ``page`` for text below the WCAG AA contrast threshold.
 
     Reads every visible text element's computed foreground and effective opaque
@@ -164,7 +170,11 @@ async def check_contrast(page: Page, *, threshold: float = AA_NORMAL_TEXT) -> li
             ratio = contrast_ratio(parse_css_color(el["fg"]), parse_css_color(el["bg"]))
         except ValueError:
             continue  # unparseable computed colour (e.g. background image) — skip
-        limit = AA_LARGE_TEXT if is_large_text(el["fontSize"], el["fontWeight"]) else threshold
+        limit = (
+            AA_LARGE_TEXT
+            if is_large_text(el["fontSize"], el["fontWeight"])
+            else threshold
+        )
         if ratio >= limit:
             continue
         findings.append(

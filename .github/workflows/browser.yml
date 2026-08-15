@@ -1,0 +1,42 @@
+name: Browser tests
+
+# What the reusable fleet CI cannot check. py-canon's reusable-ci.yml has no
+# pre-test hook, so it cannot install a Chromium binary, and the tests marked
+# `browser` skip themselves there (requires_chromium guards). This sibling
+# workflow exists to actually run them. It must stay a separate file: preen
+# overwrites ci.yml wholesale on every template update, deleting any extra
+# jobs added there.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "17 6 * * 1"  # weekly: catch Playwright/Chromium drift on a quiet repo
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Sync environment
+        run: uv sync --frozen --all-groups --all-extras
+      - name: Install Chromium
+        run: uv run playwright install chromium --with-deps
+      - name: Run browser-marked tests
+        run: uv run pytest tests/ -m browser

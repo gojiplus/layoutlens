@@ -83,12 +83,16 @@ def _print_reconciliation(ground_truth: dict[str, dict], answer_key: dict) -> No
         print(f"  axe violations : {axe_rules or 'none'}  -> ok={gt['ok']}")
         if gt["violations"]:
             for v in gt["violations"]:
-                print(f"      - {v['rule_id']} [{v['impact']}] {v['wcag_refs']} x{v['node_count']}")
+                print(
+                    f"      - {v['rule_id']} [{v['impact']}] {v['wcag_refs']} x{v['node_count']}"
+                )
         claims = _claimed_violation_rules(entry)
         if claims:
             print(f"  answer-key metadata.violations claims: {claims}")
             print("  note: answer-key 'violations' are prose labels, not axe rule ids;")
-            print("        the axe_ground_truth block above is the machine-traceable record.")
+            print(
+                "        the axe_ground_truth block above is the machine-traceable record."
+            )
     print("\n" + "=" * 72)
 
 
@@ -138,7 +142,9 @@ def main() -> int:
 
     if args.check:
         if would_change:
-            print("\n--check: answer key axe_ground_truth blocks are stale (would change).")
+            print(
+                "\n--check: answer key axe_ground_truth blocks are stale (would change)."
+            )
             return 1
         print("\n--check: answer key axe_ground_truth blocks are up to date.")
         return 0

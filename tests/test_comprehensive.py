@@ -20,7 +20,11 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from layoutlens.exceptions import AuthenticationError, LayoutFileNotFoundError, ValidationError
+from layoutlens.exceptions import (
+    AuthenticationError,
+    LayoutFileNotFoundError,
+    ValidationError,
+)
 
 # Add project root to path
 project_root = Path(__file__).parent.parent
@@ -40,7 +44,7 @@ class TestImportsAndDependencies(unittest.TestCase):
                 LayoutLens,
             )
 
-            self.assertTrue(True, "Main API imports successful")
+            assert True, "Main API imports successful"
         except ImportError as e:
             self.fail(f"Main API import failed: {e}")
 
@@ -49,7 +53,7 @@ class TestImportsAndDependencies(unittest.TestCase):
         try:
             from layoutlens import Config
 
-            self.assertTrue(True, "Config import successful")
+            assert True, "Config import successful"
         except ImportError as e:
             self.fail(f"Config import failed: {e}")
 
@@ -58,7 +62,7 @@ class TestImportsAndDependencies(unittest.TestCase):
         try:
             from layoutlens import Capture
 
-            self.assertTrue(True, "Vision components imported successfully")
+            assert True, "Vision components imported successfully"
         except ImportError as e:
             self.fail(f"Vision components import failed: {e}")
 
@@ -66,7 +70,7 @@ class TestImportsAndDependencies(unittest.TestCase):
         """Test integration components - GitHub integrations removed."""
         # GitHub integrations have been removed from the project
         # This test is kept for compatibility but does nothing
-        self.assertTrue(True, "Integration components test - GitHub integrations removed")
+        assert True, "Integration components test - GitHub integrations removed"
 
 
 class TestAPIFunctionality(unittest.TestCase):
@@ -85,12 +89,12 @@ class TestAPIFunctionality(unittest.TestCase):
         # deferred to first LLM use so deterministic (axe) operations stay keyless.
         with patch.dict("os.environ", {}, clear=True):
             keyless = LayoutLens()
-            self.assertIsNone(keyless.api_key)
+            assert keyless.api_key is None
 
         # Test with API key (should succeed)
         lens = LayoutLens(api_key=self.mock_api_key)
-        self.assertEqual(lens.api_key, self.mock_api_key)
-        self.assertEqual(lens.model, "gpt-4o-mini")  # default
+        assert lens.api_key == self.mock_api_key
+        assert lens.model == "gpt-4o-mini"  # default
 
     def test_url_detection(self):
         """Test URL vs file path detection."""
@@ -99,13 +103,13 @@ class TestAPIFunctionality(unittest.TestCase):
         lens = LayoutLens(api_key=self.mock_api_key)
 
         # Test URL detection
-        self.assertTrue(lens._is_url("https://example.com"))
-        self.assertTrue(lens._is_url("http://test.org"))
+        assert lens._is_url("https://example.com")
+        assert lens._is_url("http://example.org")
 
         # Test file path detection
-        self.assertFalse(lens._is_url("/path/to/file.png"))
-        self.assertFalse(lens._is_url("screenshot.jpg"))
-        self.assertFalse(lens._is_url(Path("image.png")))
+        assert not lens._is_url("/path/to/file.png")
+        assert not lens._is_url("screenshot.jpg")
+        assert not lens._is_url(Path("image.png"))
 
     @pytest.mark.asyncio
     @patch("layoutlens.api.core.acompletion")
@@ -131,9 +135,14 @@ class TestAPIFunctionality(unittest.TestCase):
 
         with (
             patch("os.path.exists", return_value=True),
-            patch("layoutlens.api.core.LayoutLens._encode_image", return_value="fake-base64-data"),
+            patch(
+                "layoutlens.api.core.LayoutLens._encode_image",
+                return_value="fake-base64-data",
+            ),
         ):
-            result = await lens.analyze("https://example.com", "Is the navigation user-friendly?")
+            result = await lens.analyze(
+                "https://example.com", "Is the navigation user-friendly?"
+            )
 
             # Debug output
             print(f"Debug - Result confidence: {result.confidence}")
@@ -141,15 +150,15 @@ class TestAPIFunctionality(unittest.TestCase):
             print(f"Debug - Result metadata: {result.metadata}")
 
             # Verify result structure
-            self.assertIsInstance(result.source, str)
-            self.assertIsInstance(result.query, str)
-            self.assertIsInstance(result.answer, str)
-            self.assertIsInstance(result.confidence, float)
+            assert isinstance(result.source, str)
+            assert isinstance(result.query, str)
+            assert isinstance(result.answer, str)
+            assert isinstance(result.confidence, float)
 
             # Allow for error cases in test - the main thing is it doesn't crash
             if "Error" not in result.answer:
-                self.assertGreater(result.confidence, 0)
-                self.assertLessEqual(result.confidence, 1)
+                assert result.confidence > 0
+                assert result.confidence <= 1
 
     @pytest.mark.asyncio
     async def test_analyze_existing_file_flow(self):
@@ -159,7 +168,7 @@ class TestAPIFunctionality(unittest.TestCase):
         lens = LayoutLens(api_key=self.mock_api_key)
 
         # Test with non-existent file (should raise exception)
-        with self.assertRaises(LayoutFileNotFoundError):
+        with pytest.raises(LayoutFileNotFoundError):
             await lens.analyze("/nonexistent/file.png", "Test query")
 
     @patch("layoutlens.analyzer.openai.OpenAI")
@@ -171,7 +180,9 @@ class TestAPIFunctionality(unittest.TestCase):
         # Mock OpenAI response
         mock_response = Mock()
         mock_response.choices = [Mock()]
-        mock_response.choices[0].message.content = """ANSWER: The second design is better with improved layout.
+        mock_response.choices[
+            0
+        ].message.content = """ANSWER: The second design is better with improved layout.
 CONFIDENCE: 0.80
 REASONING: Better alignment and visual hierarchy."""
 
@@ -182,9 +193,11 @@ REASONING: Better alignment and visual hierarchy."""
         lens = LayoutLens(api_key=self.mock_api_key)
 
         # Test with non-existent files (should handle gracefully)
-        result = await lens.compare(["/nonexistent1.png", "/nonexistent2.png"], "Which design is better?")
-        self.assertEqual(result.confidence, 0.0)
-        self.assertIn("Error", result.answer)
+        result = await lens.compare(
+            ["/nonexistent1.png", "/nonexistent2.png"], "Which design is better?"
+        )
+        assert result.confidence == 0.0
+        assert "Error" in result.answer
 
     @patch("layoutlens.api.core.acompletion")
     @pytest.mark.asyncio
@@ -204,13 +217,15 @@ REASONING: Better alignment and visual hierarchy."""
         lens = LayoutLens(api_key=self.mock_api_key)
 
         # Test with non-existent sources and single query (should handle gracefully)
-        result = await lens.analyze(["/nonexistent1.png", "/nonexistent2.png"], ["Is the design good?"])
+        result = await lens.analyze(
+            ["/nonexistent1.png", "/nonexistent2.png"], ["Is the design good?"]
+        )
 
         # Should return BatchResult with 2 sources * 1 query = 2 results
-        self.assertIsNotNone(result)
-        self.assertIsInstance(result.results, list)
-        self.assertEqual(len(result.results), 2)
-        self.assertEqual(result.total_queries, 2)
+        assert result is not None
+        assert isinstance(result.results, list)
+        assert len(result.results) == 2
+        assert result.total_queries == 2
 
 
 class TestVisionComponents(unittest.TestCase):
@@ -224,7 +239,7 @@ class TestVisionComponents(unittest.TestCase):
         from layoutlens.api.core import LayoutLens
 
         lens = LayoutLens(api_key=self.mock_api_key)
-        self.assertEqual(lens.model, "gpt-4o-mini")
+        assert lens.model == "gpt-4o-mini"
 
     def test_url_capture_viewports(self):
         """Test Capture viewport configurations."""
@@ -234,26 +249,26 @@ class TestVisionComponents(unittest.TestCase):
         capture = Capture()
 
         # Test viewport configurations exist
-        self.assertIn("desktop", capture.VIEWPORTS)
-        self.assertIn("mobile", capture.VIEWPORTS)
-        self.assertIn("tablet", capture.VIEWPORTS)
+        assert "desktop" in capture.VIEWPORTS
+        assert "mobile" in capture.VIEWPORTS
+        assert "tablet" in capture.VIEWPORTS
 
         # Test viewport structure
         desktop = capture.VIEWPORTS["desktop"]
-        self.assertIsInstance(desktop, ViewportConfig)
-        self.assertEqual(desktop.width, 1920)
-        self.assertEqual(desktop.height, 1080)
-        self.assertEqual(desktop.device_scale_factor, 1.0)
-        self.assertFalse(desktop.is_mobile)
+        assert isinstance(desktop, ViewportConfig)
+        assert desktop.width == 1920
+        assert desktop.height == 1080
+        assert desktop.device_scale_factor == 1.0
+        assert not desktop.is_mobile
 
         # Test mobile viewport has proper mobile settings
         mobile = capture.VIEWPORTS["mobile"]
-        self.assertIsInstance(mobile, ViewportConfig)
-        self.assertEqual(mobile.width, 375)
-        self.assertEqual(mobile.height, 667)
-        self.assertEqual(mobile.device_scale_factor, 2.0)
-        self.assertTrue(mobile.is_mobile)
-        self.assertTrue(mobile.has_touch)
+        assert isinstance(mobile, ViewportConfig)
+        assert mobile.width == 375
+        assert mobile.height == 667
+        assert mobile.device_scale_factor == 2.0
+        assert mobile.is_mobile
+        assert mobile.has_touch
 
     # URL sanitization test removed - internal implementation detail not needed
 
@@ -261,7 +276,7 @@ class TestVisionComponents(unittest.TestCase):
         """Test that LayoutComparator was successfully removed."""
         # LayoutComparator functionality is now integrated into LayoutLens.compare()
         # This test verifies the old separate class is no longer available
-        with self.assertRaises(ImportError):
+        with pytest.raises(ImportError):
             # LayoutComparator was removed in favor of direct API methods
             from layoutlens.comparator import LayoutComparator
 
@@ -273,7 +288,7 @@ class TestGitHubIntegration(unittest.TestCase):
         """Test that GitHub integrations have been removed."""
         # GitHub integrations have been removed from the project
         # Verify that the integrations module is no longer available
-        with self.assertRaises(ImportError):
+        with pytest.raises(ImportError):
             from layoutlens.integrations import GitHubIntegration
 
 
@@ -290,7 +305,7 @@ class TestFileStructure(unittest.TestCase):
 
         for file_path in required_files:
             with self.subTest(file=file_path):
-                self.assertTrue(Path(file_path).exists(), f"Required file missing: {file_path}")
+                assert Path(file_path).exists(), f"Required file missing: {file_path}"
 
     def test_action_yml_structure(self):
         """Test GitHub Action YAML has required structure."""
@@ -305,7 +320,7 @@ class TestFileStructure(unittest.TestCase):
 
         for section in required_sections:
             with self.subTest(section=section):
-                self.assertIn(section, content, f"Missing section: {section}")
+                assert section in content, f"Missing section: {section}"
 
     def test_python_files_syntax(self):
         """Test that all Python files have valid syntax."""
@@ -336,7 +351,7 @@ class TestExamplesAndDocs(unittest.TestCase):
 
         for file_path in example_files:
             with self.subTest(file=file_path):
-                self.assertTrue(Path(file_path).exists(), f"Example file missing: {file_path}")
+                assert Path(file_path).exists(), f"Example file missing: {file_path}"
 
     def test_examples_syntax(self):
         """Test example Python files have valid syntax."""
@@ -368,7 +383,7 @@ class TestErrorHandling(unittest.TestCase):
             from layoutlens.capture import Capture
 
             # If we can import these, dependencies are available
-            self.assertTrue(True, "Core dependencies are available")
+            assert True, "Core dependencies are available"
         except ImportError as e:
             self.fail(f"Hard dependencies missing: {e}")
 
@@ -380,11 +395,11 @@ class TestErrorHandling(unittest.TestCase):
         lens = LayoutLens(api_key="test-key")
 
         # Test empty query (should raise ValidationError)
-        with self.assertRaises(ValidationError):
+        with pytest.raises(ValidationError):
             await lens.analyze("https://example.com", "")
 
         # Test invalid URL format (should raise LayoutFileNotFoundError for file path)
-        with self.assertRaises(LayoutFileNotFoundError):
+        with pytest.raises(LayoutFileNotFoundError):
             await lens.analyze("not-a-url", "test query")
 
 

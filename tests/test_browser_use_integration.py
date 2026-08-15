@@ -478,4 +478,7 @@ class TestIntegrationWorkflow:
             assert len(loaded.session.steps) == 1
             assert loaded.session.steps[0].trigger == ValidationTrigger.ON_CLICK
             assert len(loaded.session.steps[0].findings) == 1
-            assert loaded.session.steps[0].findings[0].severity == ValidationSeverity.MEDIUM
+            assert (
+                loaded.session.steps[0].findings[0].severity
+                == ValidationSeverity.MEDIUM
+            )

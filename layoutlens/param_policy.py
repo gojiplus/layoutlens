@@ -147,11 +147,15 @@ def resolved_max_tokens(model: str, max_tokens: int | _Auto) -> int:
         The concrete ``max_tokens`` integer to send.
     """
     if isinstance(max_tokens, _Auto):
-        return _REASONING_MAX_TOKENS if is_reasoning_model(model) else _DEFAULT_MAX_TOKENS
+        return (
+            _REASONING_MAX_TOKENS if is_reasoning_model(model) else _DEFAULT_MAX_TOKENS
+        )
     return max_tokens
 
 
-def completion_params(model: str, *, temperature: float | None, max_tokens: int) -> dict[str, Any]:
+def completion_params(
+    model: str, *, temperature: float | None, max_tokens: int
+) -> dict[str, Any]:
     """Build the policy-correct sampling kwargs for a completion call.
 
     ``max_tokens`` is always included. ``temperature`` is included only when it

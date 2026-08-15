@@ -34,7 +34,7 @@ def get_logger(name: str) -> logging.Logger:
     name : str
         Logger name, typically the module name
 
-    Returns
+    Returns:
     -------
     logging.Logger
         Configured logger instance
@@ -156,7 +156,13 @@ def configure_for_development(output_dir: str | None = None) -> None:
 
     log_file = Path(output_dir) / "layoutlens.log"
 
-    setup_logging(level="DEBUG", console=True, file_path=str(log_file), file_level="DEBUG", format_type="debug")
+    setup_logging(
+        level="DEBUG",
+        console=True,
+        file_path=str(log_file),
+        file_level="DEBUG",
+        format_type="debug",
+    )
 
 
 def configure_for_production(output_dir: str, level: str = "INFO") -> None:
@@ -213,7 +219,10 @@ def log_function_call(func_name: str, **kwargs) -> None:
     # Sanitize kwargs
     safe_kwargs = {}
     for key, value in kwargs.items():
-        if any(sensitive in key.lower() for sensitive in ["key", "token", "password", "secret"]):
+        if any(
+            sensitive in key.lower()
+            for sensitive in ["key", "token", "password", "secret"]
+        ):
             safe_kwargs[key] = "***REDACTED***"
         else:
             safe_kwargs[key] = str(value)[:100]  # Truncate long values
@@ -235,7 +244,11 @@ def log_performance_metric(operation: str, duration: float, **metadata) -> None:
     """
     perf_logger = get_performance_logger()
 
-    metric_data = {"operation": operation, "duration_seconds": round(duration, 3), **metadata}
+    metric_data = {
+        "operation": operation,
+        "duration_seconds": round(duration, 3),
+        **metadata,
+    }
 
     perf_logger.info(f"Performance: {metric_data}")
 
@@ -246,7 +259,7 @@ def _initialize_default_logging():
     logger = logging.getLogger("layoutlens")
 
     # Only configure if no handlers exist
-    if not logger.handlers and not logger.parent.handlers:
+    if not logger.handlers and not (logger.parent and logger.parent.handlers):
         configure_from_env()
 
 

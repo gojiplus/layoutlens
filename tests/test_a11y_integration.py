@@ -21,7 +21,9 @@ from layoutlens.exceptions import ValidationError
 from layoutlens.integrations.browser_use import AgentValidator, ValidationPolicy
 from layoutlens.integrations.browser_use.validator import normalize_wcag_reference
 
-FIXTURE_DIR = Path(__file__).parent.parent / "benchmarks" / "test_data" / "accessibility"
+FIXTURE_DIR = (
+    Path(__file__).parent.parent / "benchmarks" / "test_data" / "accessibility"
+)
 VIOLATIONS_HTML = FIXTURE_DIR / "wcag_violations.html"
 
 
@@ -87,7 +89,10 @@ class TestCheckAccessibilityModes:
     async def test_axe_mode_deterministic_never_calls_llm(self):
         lens = LayoutLens()
         report = _report(
-            [_finding("image-alt", ["wcag2a", "wcag111"]), _finding("color-contrast", ["wcag2aa", "wcag143"])]
+            [
+                _finding("image-alt", ["wcag2a", "wcag111"]),
+                _finding("color-contrast", ["wcag2aa", "wcag143"]),
+            ]
         )
 
         with (
@@ -103,7 +108,8 @@ class TestCheckAccessibilityModes:
         mock_auditor_cls.assert_called_once_with(run_only=["wcag2a", "wcag2aa"])
 
         assert result.answer.lower().startswith("no")
-        assert "image-alt" in result.answer and "color-contrast" in result.answer
+        assert "image-alt" in result.answer
+        assert "color-contrast" in result.answer
         assert result.confidence == 1.0
         assert result.reasoning == report.summary()
         assert result.metadata["mode"] == "axe"
@@ -136,7 +142,9 @@ class TestCheckAccessibilityModes:
         page.screenshot = AsyncMock()
         sessions: list = []
         lens._call_vision_api = _fake_vision(
-            "Yes, this page looks accessible", 0.6, "The layout appears clean and usable."
+            "Yes, this page looks accessible",
+            0.6,
+            "The layout appears clean and usable.",
         )
 
         with (
@@ -145,7 +153,9 @@ class TestCheckAccessibilityModes:
         ):
             mock_auditor_cls.return_value.audit_page = AsyncMock(return_value=report)
             # The single-session path must never fall back to the two-session audit().
-            mock_auditor_cls.return_value.audit = AsyncMock(side_effect=AssertionError("audit() must not be used"))
+            mock_auditor_cls.return_value.audit = AsyncMock(
+                side_effect=AssertionError("audit() must not be used")
+            )
             result = await lens.check_accessibility("page.html", mode="hybrid")
 
         # Exactly one browser session was opened.
@@ -157,7 +167,10 @@ class TestCheckAccessibilityModes:
         # The LLM analyzed exactly the screenshot that was captured, with axe context injected.
         shot_path = page.screenshot.call_args.kwargs["path"]
         assert lens._call_vision_api.call_args.kwargs["image_path"] == shot_path
-        assert "Deterministic axe-core scan results" in lens._call_vision_api.call_args.kwargs["query"]
+        assert (
+            "Deterministic axe-core scan results"
+            in lens._call_vision_api.call_args.kwargs["query"]
+        )
 
         # Deterministic override wins.
         assert result.answer.lower().startswith("no")
@@ -175,7 +188,9 @@ class TestCheckAccessibilityModes:
         page = Mock()
         page.screenshot = AsyncMock()
         sessions: list = []
-        lens._call_vision_api = _fake_vision("Yes, fully accessible", 0.72, "Good contrast and structure.")
+        lens._call_vision_api = _fake_vision(
+            "Yes, fully accessible", 0.72, "Good contrast and structure."
+        )
 
         with (
             patch("layoutlens.api.core.open_page", _fake_open_page(page, sessions)),
@@ -198,13 +213,17 @@ class TestCheckAccessibilityModes:
         page = Mock()
         page.screenshot = AsyncMock()
         sessions: list = []
-        lens._call_vision_api = _fake_vision("Mostly accessible", 0.8, "Some minor issues.")
+        lens._call_vision_api = _fake_vision(
+            "Mostly accessible", 0.8, "Some minor issues."
+        )
 
         with (
             patch("layoutlens.api.core.open_page", _fake_open_page(page, sessions)),
             patch("layoutlens.api.core.AxeAuditor") as mock_auditor_cls,
         ):
-            mock_auditor_cls.return_value.audit_page = AsyncMock(side_effect=RuntimeError("axe boom"))
+            mock_auditor_cls.return_value.audit_page = AsyncMock(
+                side_effect=RuntimeError("axe boom")
+            )
             result = await lens.check_accessibility("page.html", mode="hybrid")
 
         # LLM result is returned, with the axe error recorded and no override applied.
@@ -214,7 +233,10 @@ class TestCheckAccessibilityModes:
         assert result.metadata["a11y_error"] == "axe boom"
         assert "a11y" not in result.metadata
         # The LLM query carried NO injected axe context (there was no report).
-        assert "Deterministic axe-core scan results" not in lens._call_vision_api.call_args.kwargs["query"]
+        assert (
+            "Deterministic axe-core scan results"
+            not in lens._call_vision_api.call_args.kwargs["query"]
+        )
 
     async def test_hybrid_cache_hit_returns_copy_without_re_wrapping(self):
         # CRITICAL regression: a memory-cache hit must return a defensive copy so
@@ -225,7 +247,9 @@ class TestCheckAccessibilityModes:
         page = Mock()
         page.screenshot = AsyncMock()
         sessions: list = []
-        lens._call_vision_api = _fake_vision("Yes, looks fine", 0.6, "Clean and usable layout.")
+        lens._call_vision_api = _fake_vision(
+            "Yes, looks fine", 0.6, "Clean and usable layout."
+        )
 
         with (
             patch("layoutlens.api.core.open_page", _fake_open_page(page, sessions)),
@@ -260,10 +284,16 @@ class TestCheckAccessibilityModes:
         lens = LayoutLens()
         lens.analyze = AsyncMock(
             return_value=AnalysisResult(
-                source="shot.png", query="q", answer="Looks ok", confidence=0.7, reasoning="fine"
+                source="shot.png",
+                query="q",
+                answer="Looks ok",
+                confidence=0.7,
+                reasoning="fine",
             )
         )
-        with patch("layoutlens.api.core.AxeAuditor", new=MagicMock()) as mock_auditor_cls:
+        with patch(
+            "layoutlens.api.core.AxeAuditor", new=MagicMock()
+        ) as mock_auditor_cls:
             result = await lens.check_accessibility("shot.png", mode="hybrid")
 
         lens.analyze.assert_awaited_once()
@@ -278,8 +308,12 @@ class TestCheckAccessibilityModes:
 
         with patch("layoutlens.api.core.AxeAuditor") as mock_auditor_cls:
             mock_auditor_cls.return_value.audit = AsyncMock(return_value=report)
-            a_only = await lens.audit_accessibility("page.html", compliance_level="A", mode="axe")
-            aaa = await lens.audit_accessibility("page.html", compliance_level="AAA", mode="axe")
+            a_only = await lens.audit_accessibility(
+                "page.html", compliance_level="A", mode="axe"
+            )
+            aaa = await lens.audit_accessibility(
+                "page.html", compliance_level="AAA", mode="axe"
+            )
 
         assert "WCAG A violation" in a_only.answer
         assert "A/AA" not in a_only.answer
@@ -297,7 +331,9 @@ class TestCheckAccessibilityModes:
         )
         lens.analyze = AsyncMock(return_value=llm_result)
 
-        with patch("layoutlens.api.core.AxeAuditor", new=MagicMock()) as mock_auditor_cls:
+        with patch(
+            "layoutlens.api.core.AxeAuditor", new=MagicMock()
+        ) as mock_auditor_cls:
             result = await lens.check_accessibility("page.html", mode="llm")
 
         mock_auditor_cls.assert_not_called()
@@ -305,7 +341,7 @@ class TestCheckAccessibilityModes:
         assert "a11y" not in result.metadata
 
     @pytest.mark.parametrize(
-        "level,expected",
+        ("level", "expected"),
         [
             ("A", ["wcag2a"]),
             ("AA", ["wcag2a", "wcag2aa"]),
@@ -321,7 +357,9 @@ class TestCheckAccessibilityModes:
             patch("layoutlens.api.core.acompletion", new=AsyncMock()) as mock_llm,
         ):
             mock_auditor_cls.return_value.audit = AsyncMock(return_value=report)
-            result = await lens.audit_accessibility("page.html", compliance_level=level, mode="axe")
+            result = await lens.audit_accessibility(
+                "page.html", compliance_level=level, mode="axe"
+            )
 
         mock_llm.assert_not_called()
         mock_auditor_cls.assert_called_once_with(run_only=expected)
@@ -339,7 +377,7 @@ class TestWcagNormalization:
     """normalize_wcag_reference maps free-text refs to axe tag form."""
 
     @pytest.mark.parametrize(
-        "reference,expected",
+        ("reference", "expected"),
         [
             ("WCAG 1.4.3", "wcag143"),
             ("wcag 1.4.3", "wcag143"),
@@ -367,7 +405,9 @@ class TestValidatorVerification:
     """validate_state cross-checks LLM findings against axe violations."""
 
     def _make_validator(self, tmp_path) -> AgentValidator:
-        policy = ValidationPolicy(include_screenshots=False, experts=["accessibility_expert"])
+        policy = ValidationPolicy(
+            include_screenshots=False, experts=["accessibility_expert"]
+        )
         return AgentValidator(policy=policy, output_dir=str(tmp_path))
 
     def _mock_page(self):
@@ -389,7 +429,9 @@ class TestValidatorVerification:
         )
         report = _report([_finding("color-contrast", ["wcag2aa", "wcag143"])])
 
-        with patch("layoutlens.integrations.browser_use.validator.AxeAuditor") as mock_auditor_cls:
+        with patch(
+            "layoutlens.integrations.browser_use.validator.AxeAuditor"
+        ) as mock_auditor_cls:
             mock_auditor_cls.return_value.audit_page = AsyncMock(return_value=report)
             step = await validator.validate_state(self._mock_page())
 
@@ -412,7 +454,9 @@ class TestValidatorVerification:
         # axe reports a different criterion (1.1.1), not 1.4.3.
         report = _report([_finding("image-alt", ["wcag2a", "wcag111"])])
 
-        with patch("layoutlens.integrations.browser_use.validator.AxeAuditor") as mock_auditor_cls:
+        with patch(
+            "layoutlens.integrations.browser_use.validator.AxeAuditor"
+        ) as mock_auditor_cls:
             mock_auditor_cls.return_value.audit_page = AsyncMock(return_value=report)
             step = await validator.validate_state(self._mock_page())
 
@@ -431,7 +475,9 @@ class TestValidatorVerification:
         )
         report = _report([_finding("image-alt", ["wcag2a", "wcag111"])])
 
-        with patch("layoutlens.integrations.browser_use.validator.AxeAuditor") as mock_auditor_cls:
+        with patch(
+            "layoutlens.integrations.browser_use.validator.AxeAuditor"
+        ) as mock_auditor_cls:
             mock_auditor_cls.return_value.audit_page = AsyncMock(return_value=report)
             step = await validator.validate_state(self._mock_page())
 
@@ -450,8 +496,12 @@ class TestValidatorVerification:
             )
         )
 
-        with patch("layoutlens.integrations.browser_use.validator.AxeAuditor") as mock_auditor_cls:
-            mock_auditor_cls.return_value.audit_page = AsyncMock(side_effect=RuntimeError("axe boom"))
+        with patch(
+            "layoutlens.integrations.browser_use.validator.AxeAuditor"
+        ) as mock_auditor_cls:
+            mock_auditor_cls.return_value.audit_page = AsyncMock(
+                side_effect=RuntimeError("axe boom")
+            )
             step = await validator.validate_state(self._mock_page())
 
         # WCAG reference present but no axe data to check against -> stays None.

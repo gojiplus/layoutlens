@@ -32,7 +32,9 @@ class TestCacheEntry:
             reasoning="Good design",
         )
 
-        entry = CacheEntry(key="test_key", result=result, timestamp=time.time(), ttl_seconds=300)
+        entry = CacheEntry(
+            key="test_key", result=result, timestamp=time.time(), ttl_seconds=300
+        )
 
         assert entry.key == "test_key"
         assert entry.result == result
@@ -96,7 +98,9 @@ class TestInMemoryCache:
             reasoning="Good design",
         )
 
-        entry = CacheEntry(key="test_key", result=result, timestamp=time.time(), ttl_seconds=3600)
+        entry = CacheEntry(
+            key="test_key", result=result, timestamp=time.time(), ttl_seconds=3600
+        )
 
         # Test set and get
         cache.set("test_key", entry)
@@ -184,7 +188,9 @@ class TestFileCache:
                 reasoning="Good design",
             )
 
-            entry = CacheEntry(key="test_key", result=result, timestamp=time.time(), ttl_seconds=3600)
+            entry = CacheEntry(
+                key="test_key", result=result, timestamp=time.time(), ttl_seconds=3600
+            )
 
             # Test set and get
             cache.set("test_key", entry)
@@ -265,10 +271,14 @@ class TestAnalysisCache:
         """Test comparison cache key generation."""
         cache = AnalysisCache()
 
-        key1 = cache.get_comparison_key(sources=["page1.html", "page2.html"], query="Which is better?")
+        key1 = cache.get_comparison_key(
+            sources=["page1.html", "page2.html"], query="Which is better?"
+        )
 
         # Order should not matter
-        key2 = cache.get_comparison_key(sources=["page2.html", "page1.html"], query="Which is better?")
+        key2 = cache.get_comparison_key(
+            sources=["page2.html", "page1.html"], query="Which is better?"
+        )
 
         assert key1 == key2
 
@@ -362,7 +372,10 @@ class TestLayoutLensCacheIntegration:
         with (
             patch.dict("os.environ", {"OPENAI_API_KEY": "test_key"}),
             patch("os.path.exists", return_value=True),
-            patch("layoutlens.api.core.LayoutLens._encode_image", return_value="fake-base64-data"),
+            patch(
+                "layoutlens.api.core.LayoutLens._encode_image",
+                return_value="fake-base64-data",
+            ),
         ):
             lens = LayoutLens(cache_enabled=True, cache_type="memory")
 
@@ -403,7 +416,10 @@ class TestLayoutLensCacheIntegration:
         with (
             patch.dict("os.environ", {"OPENAI_API_KEY": "test_key"}),
             patch("os.path.exists", return_value=True),
-            patch("layoutlens.api.core.LayoutLens._encode_image", return_value="fake-base64-data"),
+            patch(
+                "layoutlens.api.core.LayoutLens._encode_image",
+                return_value="fake-base64-data",
+            ),
         ):
             lens = LayoutLens(cache_enabled=False)
 
@@ -450,7 +466,11 @@ class TestCachePerformance:
 
         start_time = time.time()
         for i in range(1000):
-            cache.get_analysis_key(source=f"https://example{i}.com", query=f"Query {i}", viewport="desktop")
+            cache.get_analysis_key(
+                source=f"https://example.com/{i}",
+                query=f"Query {i}",
+                viewport="desktop",
+            )
 
         elapsed = time.time() - start_time
         assert elapsed < 1.0  # Should be very fast
@@ -467,7 +487,9 @@ class TestCachePerformance:
             reasoning="Good design",
         )
 
-        entries = [CacheEntry(f"key_{i}", result, time.time(), 3600) for i in range(100)]
+        entries = [
+            CacheEntry(f"key_{i}", result, time.time(), 3600) for i in range(100)
+        ]
 
         # Test write performance
         start_time = time.time()

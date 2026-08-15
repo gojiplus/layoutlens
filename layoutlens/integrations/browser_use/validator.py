@@ -1,5 +1,4 @@
-"""
-AgentValidator for Browser Use integration.
+"""AgentValidator for Browser Use integration.
 
 Provides hooks to validate agent actions in real-time using LayoutLens analysis.
 """
@@ -132,12 +131,18 @@ class AgentValidator:
 
         self._session: ValidationSession | None = None
         self._step_counter = 0
-        self._validation_semaphore = asyncio.Semaphore(self.policy.max_concurrent_validations)
+        self._validation_semaphore = asyncio.Semaphore(
+            self.policy.max_concurrent_validations
+        )
         self._pending_validations: list[asyncio.Task] = []
 
-        self.logger.info(f"AgentValidator initialized with experts: {self.policy.experts}")
+        self.logger.info(
+            f"AgentValidator initialized with experts: {self.policy.experts}"
+        )
 
-    def _create_session(self, start_url: str = "", agent_task: str = "") -> ValidationSession:
+    def _create_session(
+        self, start_url: str = "", agent_task: str = ""
+    ) -> ValidationSession:
         """Create a new validation session."""
         session_id = f"session_{uuid.uuid4().hex[:12]}"
         return ValidationSession(
@@ -156,10 +161,14 @@ class AgentValidator:
     def get_session(self) -> ValidationSession:
         """Get the current session, raising if none exists."""
         if self._session is None:
-            raise ValueError("No active validation session. Call start_session() first.")
+            raise ValueError(
+                "No active validation session. Call start_session() first."
+            )
         return self._session
 
-    def start_session(self, start_url: str = "", agent_task: str = "") -> ValidationSession:
+    def start_session(
+        self, start_url: str = "", agent_task: str = ""
+    ) -> ValidationSession:
         """Start a new validation session.
 
         Args:
@@ -187,7 +196,9 @@ class AgentValidator:
             raise ValueError("No active validation session to end.")
 
         if self._pending_validations:
-            self.logger.debug(f"Waiting for {len(self._pending_validations)} pending validations")
+            self.logger.debug(
+                f"Waiting for {len(self._pending_validations)} pending validations"
+            )
             await asyncio.gather(*self._pending_validations, return_exceptions=True)
 
         self._session.end_time = time.strftime("%Y-%m-%dT%H:%M:%S")
@@ -221,11 +232,15 @@ class AgentValidator:
         self._step_counter += 1
         step_number = self._step_counter
 
-        self.logger.debug(f"Validating step {step_number} ({trigger.value}): {page.url[:50]}...")
+        self.logger.debug(
+            f"Validating step {step_number} ({trigger.value}): {page.url[:50]}..."
+        )
 
         screenshot_path: str | None = None
         if self.policy.include_screenshots:
-            screenshot_path = str(self.output_dir / "screenshots" / f"step_{step_number:04d}.png")
+            screenshot_path = str(
+                self.output_dir / "screenshots" / f"step_{step_number:04d}.png"
+            )
             Path(screenshot_path).parent.mkdir(parents=True, exist_ok=True)
             await page.screenshot(path=screenshot_path, full_page=True)
 
@@ -235,7 +250,11 @@ class AgentValidator:
         axe_tags: set[str] = set()
         try:
             a11y_report = await AxeAuditor().audit_page(page)
-            axe_tags = {tag for violation in a11y_report.violations for tag in violation.wcag_refs}
+            axe_tags = {
+                tag
+                for violation in a11y_report.violations
+                for tag in violation.wcag_refs
+            }
         except Exception as e:
             self.logger.warning(f"axe-core cross-check failed: {e}")
 
@@ -285,7 +304,9 @@ class AgentValidator:
                     if tag is not None:
                         finding.verified = tag in axe_tags
 
-        filtered_findings = [f for f in findings if f.confidence >= self.policy.confidence_threshold]
+        filtered_findings = [
+            f for f in findings if f.confidence >= self.policy.confidence_threshold
+        ]
 
         execution_time = time.time() - start_time
 
@@ -325,7 +346,9 @@ class AgentValidator:
         """Analyze source using a specific expert persona."""
         async with self._validation_semaphore:
             try:
-                expert_enum = Expert(expert) if expert in [e.value for e in Expert] else None
+                expert_enum = (
+                    Expert(expert) if expert in [e.value for e in Expert] else None
+                )
                 if expert_enum:
                     return await self.lens.analyze_with_expert(
                         source,
@@ -406,7 +429,9 @@ class AgentValidator:
 
         import re
 
-        wcag_match = re.search(r"wcag\s*[\d.]+\s*(?:sc\s*)?[\d.]+|wcag\s+[a-z]+", reasoning, re.IGNORECASE)
+        wcag_match = re.search(
+            r"wcag\s*[\d.]+\s*(?:sc\s*)?[\d.]+|wcag\s+[a-z]+", reasoning, re.IGNORECASE
+        )
         wcag_ref = wcag_match.group(0) if wcag_match else None
 
         if result.confidence < 0.9 or detected_severity != ValidationSeverity.INFO:
@@ -460,7 +485,8 @@ class AgentValidator:
                 self.start_session()
 
             session = self._session
-            assert session is not None
+            if session is None:
+                raise RuntimeError("validation session failed to start")
 
             session.total_actions += 1
 
@@ -471,15 +497,16 @@ class AgentValidator:
                 should_validate = False
 
                 if (
-                    action_type == "click"
-                    and self.policy.capture_on_click
-                    or action_type in ("goto", "navigate")
-                    and self.policy.capture_on_navigation
-                    or action_type == "submit"
-                    and self.policy.capture_on_form_submit
+                    (action_type == "click" and self.policy.capture_on_click)
+                    or (
+                        action_type in ("goto", "navigate")
+                        and self.policy.capture_on_navigation
+                    )
+                    or (action_type == "submit" and self.policy.capture_on_form_submit)
                     or (
                         self.policy.capture_interval_steps > 0
-                        and session.total_actions % self.policy.capture_interval_steps == 0
+                        and session.total_actions % self.policy.capture_interval_steps
+                        == 0
                     )
                 ):
                     should_validate = True
@@ -489,7 +516,10 @@ class AgentValidator:
                         self.validate_state(
                             page,
                             trigger=ValidationTrigger.ON_STEP_START,
-                            action_context={"action": action_type, "step": session.total_actions},
+                            action_context={
+                                "action": action_type,
+                                "step": session.total_actions,
+                            },
                         )
                     )
                     self._pending_validations.append(task)

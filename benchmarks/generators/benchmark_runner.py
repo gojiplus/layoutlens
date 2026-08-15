@@ -25,7 +25,12 @@ def load_template(template_name: str = "base_template.html") -> str:
         return f.read()
 
 
-def generate_html(title: str, custom_styles: str, content: str, template_name: str = "base_template.html") -> str:
+def generate_html(
+    title: str,
+    custom_styles: str,
+    content: str,
+    template_name: str = "base_template.html",
+) -> str:
     """Generate HTML from template with provided content."""
     template = load_template(template_name)
     html = template.replace("{{TITLE}}", title)
@@ -151,11 +156,17 @@ def create_layout_alignment_tests():
 
     # Generate tests with different templates
     for test in tests:
-        template_file, template_type = get_template_for_test(test["name"], "layout_alignment")
+        template_file, template_type = get_template_for_test(
+            test["name"], "layout_alignment"
+        )
         filename = f"{test['name']}_{template_type.lower()}.html"
 
         with open(category_dir / filename, "w") as f:
-            f.write(generate_html(test["title"], test["styles"], test["content"], template_file))
+            f.write(
+                generate_html(
+                    test["title"], test["styles"], test["content"], template_file
+                )
+            )
 
     # Navigation misaligned (2% off)
     nav_misaligned_styles = """
@@ -201,7 +212,13 @@ def create_layout_alignment_tests():
     """
 
     with open(category_dir / "nav_misaligned.html", "w") as f:
-        f.write(generate_html("Misaligned Navigation Test", nav_misaligned_styles, nav_misaligned_content))
+        f.write(
+            generate_html(
+                "Misaligned Navigation Test",
+                nav_misaligned_styles,
+                nav_misaligned_content,
+            )
+        )
 
     # Flexbox centering (correct)
     flexbox_correct_styles = """
@@ -238,7 +255,13 @@ def create_layout_alignment_tests():
     """
 
     with open(category_dir / "flexbox_center_correct.html", "w") as f:
-        f.write(generate_html("Flexbox Centering Test (Correct)", flexbox_correct_styles, flexbox_correct_content))
+        f.write(
+            generate_html(
+                "Flexbox Centering Test (Correct)",
+                flexbox_correct_styles,
+                flexbox_correct_content,
+            )
+        )
 
     # Flexbox centering (broken)
     flexbox_broken_styles = """
@@ -275,7 +298,13 @@ def create_layout_alignment_tests():
     """
 
     with open(category_dir / "flexbox_center_broken.html", "w") as f:
-        f.write(generate_html("Flexbox Centering Test (Broken)", flexbox_broken_styles, flexbox_broken_content))
+        f.write(
+            generate_html(
+                "Flexbox Centering Test (Broken)",
+                flexbox_broken_styles,
+                flexbox_broken_content,
+            )
+        )
 
     # CSS Grid layout (correct)
     grid_correct_styles = """
@@ -359,7 +388,13 @@ def create_layout_alignment_tests():
     """
 
     with open(category_dir / "grid_layout_correct.html", "w") as f:
-        f.write(generate_html("CSS Grid Layout Test (Correct)", grid_correct_styles, grid_correct_content))
+        f.write(
+            generate_html(
+                "CSS Grid Layout Test (Correct)",
+                grid_correct_styles,
+                grid_correct_content,
+            )
+        )
 
     # CSS Grid layout (broken)
     grid_broken_styles = """
@@ -444,9 +479,15 @@ def create_layout_alignment_tests():
     """
 
     with open(category_dir / "grid_layout_broken.html", "w") as f:
-        f.write(generate_html("CSS Grid Layout Test (Broken)", grid_broken_styles, grid_broken_content))
+        f.write(
+            generate_html(
+                "CSS Grid Layout Test (Broken)", grid_broken_styles, grid_broken_content
+            )
+        )
 
-    print(f"✅ Generated {len(list(category_dir.glob('*.html')))} layout alignment test files")
+    print(
+        f"✅ Generated {len(list(category_dir.glob('*.html')))} layout alignment test files"
+    )
 
 
 def create_accessibility_tests():
@@ -572,7 +613,11 @@ def create_accessibility_tests():
     """
 
     with open(category_dir / "focus_management_good.html", "w") as f:
-        f.write(generate_html("Focus Management Test (Good)", focus_good_styles, focus_good_content))
+        f.write(
+            generate_html(
+                "Focus Management Test (Good)", focus_good_styles, focus_good_content
+            )
+        )
 
     # Focus management (broken)
     focus_broken_styles = focus_good_styles  # Same styles
@@ -596,9 +641,17 @@ def create_accessibility_tests():
     """
 
     with open(category_dir / "focus_management_broken.html", "w") as f:
-        f.write(generate_html("Focus Management Test (Broken)", focus_broken_styles, focus_broken_content))
+        f.write(
+            generate_html(
+                "Focus Management Test (Broken)",
+                focus_broken_styles,
+                focus_broken_content,
+            )
+        )
 
-    print(f"✅ Generated {len(list(category_dir.glob('*.html')))} accessibility test files")
+    print(
+        f"✅ Generated {len(list(category_dir.glob('*.html')))} accessibility test files"
+    )
 
 
 def create_responsive_tests():
@@ -667,7 +720,13 @@ def create_responsive_tests():
     """
 
     with open(category_dir / "container_queries_good.html", "w") as f:
-        f.write(generate_html("Container Queries Test", container_queries_styles, container_queries_content))
+        f.write(
+            generate_html(
+                "Container Queries Test",
+                container_queries_styles,
+                container_queries_content,
+            )
+        )
 
     # Viewport units (broken)
     viewport_broken_styles = """
@@ -721,7 +780,13 @@ def create_responsive_tests():
     """
 
     with open(category_dir / "viewport_units_broken.html", "w") as f:
-        f.write(generate_html("Viewport Units Test (Broken)", viewport_broken_styles, viewport_broken_content))
+        f.write(
+            generate_html(
+                "Viewport Units Test (Broken)",
+                viewport_broken_styles,
+                viewport_broken_content,
+            )
+        )
 
     # Fluid typography (good)
     fluid_typography_styles = """
@@ -777,9 +842,17 @@ def create_responsive_tests():
     """
 
     with open(category_dir / "fluid_typography_good.html", "w") as f:
-        f.write(generate_html("Fluid Typography Test", fluid_typography_styles, fluid_typography_content))
+        f.write(
+            generate_html(
+                "Fluid Typography Test",
+                fluid_typography_styles,
+                fluid_typography_content,
+            )
+        )
 
-    print(f"✅ Generated {len(list(category_dir.glob('*.html')))} responsive design test files")
+    print(
+        f"✅ Generated {len(list(category_dir.glob('*.html')))} responsive design test files"
+    )
 
 
 def create_ui_components_tests():
@@ -933,9 +1006,15 @@ def create_ui_components_tests():
     """
 
     with open(category_dir / "form_well_designed.html", "w") as f:
-        f.write(generate_html("Well-Designed Form Test", form_good_styles, form_good_content))
+        f.write(
+            generate_html(
+                "Well-Designed Form Test", form_good_styles, form_good_content
+            )
+        )
 
-    print(f"✅ Generated {len(list(category_dir.glob('*.html')))} UI component test files")
+    print(
+        f"✅ Generated {len(list(category_dir.glob('*.html')))} UI component test files"
+    )
 
 
 def ensure_directories():
@@ -989,7 +1068,12 @@ def main():
     create_ui_components_tests()
 
     # Count total files generated by category
-    categories = ["layout_alignment", "accessibility", "responsive_design", "ui_components"]
+    categories = [
+        "layout_alignment",
+        "accessibility",
+        "responsive_design",
+        "ui_components",
+    ]
     category_counts = {}
     total_files = 0
 
@@ -1000,7 +1084,9 @@ def main():
             total_files += count
 
     print("\n" + "=" * 60)
-    print(f"✨ Successfully generated {total_files} test files across {len(TEMPLATES)} templates!")
+    print(
+        f"✨ Successfully generated {total_files} test files across {len(TEMPLATES)} templates!"
+    )
     print("=" * 60)
 
     print("\n📊 Files by category:")

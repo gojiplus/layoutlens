@@ -39,7 +39,12 @@ _SCAFFOLDING_MARKERS = [
 
 
 def _mock_response(
-    content: str, *, prompt_tokens=11, completion_tokens=7, total_tokens=18, finish_reason="stop"
+    content: str,
+    *,
+    prompt_tokens=11,
+    completion_tokens=7,
+    total_tokens=18,
+    finish_reason="stop",
 ) -> MagicMock:
     response = MagicMock()
     response.choices[0].message.content = content
@@ -59,7 +64,9 @@ def png(tmp_path):
 
 @pytest.fixture
 def lens(tmp_path):
-    return LayoutLens(api_key="sk-test", model="gpt-4o-mini", output_dir=str(tmp_path / "out"))
+    return LayoutLens(
+        api_key="sk-test", model="gpt-4o-mini", output_dir=str(tmp_path / "out")
+    )
 
 
 # --- Verbatim passthrough -------------------------------------------------
@@ -70,7 +77,9 @@ async def test_prompt_sent_verbatim(lens, png):
     prompt = 'You are UIJudgeBench judge v3. Which layout is better, A or B? Reply {"answer": ...}.'
     resp = _mock_response('{"answer": "A", "confidence": 0.9, "rationale": "cleaner"}')
 
-    with patch("layoutlens.api.judge.acompletion", new=AsyncMock(return_value=resp)) as mock_llm:
+    with patch(
+        "layoutlens.api.judge.acompletion", new=AsyncMock(return_value=resp)
+    ) as mock_llm:
         await lens.judge(png, prompt)
 
     messages = mock_llm.await_args.kwargs["messages"]
@@ -95,7 +104,9 @@ async def test_prompt_sent_verbatim(lens, png):
 @pytest.mark.asyncio
 async def test_no_system_persona_message(lens, png):
     resp = _mock_response('{"answer": "yes", "confidence": 0.5}')
-    with patch("layoutlens.api.judge.acompletion", new=AsyncMock(return_value=resp)) as mock_llm:
+    with patch(
+        "layoutlens.api.judge.acompletion", new=AsyncMock(return_value=resp)
+    ) as mock_llm:
         await lens.judge(png, "Is it good?")
     messages = mock_llm.await_args.kwargs["messages"]
     assert all(m["role"] != "system" for m in messages)
@@ -106,7 +117,9 @@ async def test_jpeg_mime_from_extension(lens, tmp_path):
     jpg = tmp_path / "shot.jpg"
     jpg.write_bytes(_PNG_1x1)
     resp = _mock_response('{"answer": "yes", "confidence": 0.5}')
-    with patch("layoutlens.api.judge.acompletion", new=AsyncMock(return_value=resp)) as mock_llm:
+    with patch(
+        "layoutlens.api.judge.acompletion", new=AsyncMock(return_value=resp)
+    ) as mock_llm:
         await lens.judge(str(jpg), "Is it good?")
     content = mock_llm.await_args.kwargs["messages"][0]["content"]
     image_parts = [c for c in content if c["type"] == "image_url"]
@@ -118,9 +131,16 @@ async def test_jpeg_mime_from_extension(lens, tmp_path):
 
 @pytest.mark.asyncio
 async def test_judge_omits_temperature_for_sonnet5(tmp_path, png):
-    lens = LayoutLens(api_key="sk", model="claude-sonnet-5", provider="anthropic", output_dir=str(tmp_path / "o"))
+    lens = LayoutLens(
+        api_key="sk",
+        model="claude-sonnet-5",
+        provider="anthropic",
+        output_dir=str(tmp_path / "o"),
+    )
     resp = _mock_response('{"answer": "A", "confidence": 0.5}')
-    with patch("layoutlens.api.judge.acompletion", new=AsyncMock(return_value=resp)) as mock_llm:
+    with patch(
+        "layoutlens.api.judge.acompletion", new=AsyncMock(return_value=resp)
+    ) as mock_llm:
         await lens.judge(png, "prompt")
     assert "temperature" not in mock_llm.await_args.kwargs
 
@@ -128,7 +148,9 @@ async def test_judge_omits_temperature_for_sonnet5(tmp_path, png):
 @pytest.mark.asyncio
 async def test_judge_includes_temperature_for_gpt4o(lens, png):
     resp = _mock_response('{"answer": "A", "confidence": 0.5}')
-    with patch("layoutlens.api.judge.acompletion", new=AsyncMock(return_value=resp)) as mock_llm:
+    with patch(
+        "layoutlens.api.judge.acompletion", new=AsyncMock(return_value=resp)
+    ) as mock_llm:
         await lens.judge(png, "prompt")
     assert mock_llm.await_args.kwargs["temperature"] == 0.0
 
@@ -136,7 +158,9 @@ async def test_judge_includes_temperature_for_gpt4o(lens, png):
 @pytest.mark.asyncio
 async def test_judge_max_tokens_from_kwarg(lens, png):
     resp = _mock_response('{"answer": "A", "confidence": 0.5}')
-    with patch("layoutlens.api.judge.acompletion", new=AsyncMock(return_value=resp)) as mock_llm:
+    with patch(
+        "layoutlens.api.judge.acompletion", new=AsyncMock(return_value=resp)
+    ) as mock_llm:
         await lens.judge(png, "prompt", max_tokens=1234)
     assert mock_llm.await_args.kwargs["max_tokens"] == 1234
 
@@ -148,7 +172,9 @@ async def test_judge_max_tokens_from_kwarg(lens, png):
 async def test_judge_auto_max_tokens_non_reasoning(lens, png):
     """AUTO default resolves to 300 for a non-reasoning model (gpt-4o-mini)."""
     resp = _mock_response('{"answer": "A", "confidence": 0.5}')
-    with patch("layoutlens.api.judge.acompletion", new=AsyncMock(return_value=resp)) as mock_llm:
+    with patch(
+        "layoutlens.api.judge.acompletion", new=AsyncMock(return_value=resp)
+    ) as mock_llm:
         await lens.judge(png, "prompt")
     assert mock_llm.await_args.kwargs["max_tokens"] == 300
 
@@ -163,7 +189,9 @@ async def test_judge_auto_max_tokens_reasoning(tmp_path, png):
         output_dir=str(tmp_path / "o"),
     )
     resp = _mock_response('{"answer": "A", "confidence": 0.5}')
-    with patch("layoutlens.api.judge.acompletion", new=AsyncMock(return_value=resp)) as mock_llm:
+    with patch(
+        "layoutlens.api.judge.acompletion", new=AsyncMock(return_value=resp)
+    ) as mock_llm:
         await lens.judge(png, "prompt")
     assert mock_llm.await_args.kwargs["max_tokens"] == 8000
 
@@ -200,7 +228,9 @@ async def test_api_base_reaches_acompletion(tmp_path, png):
         output_dir=str(tmp_path / "o"),
     )
     resp = _mock_response('{"answer": "yes", "confidence": 0.5}')
-    with patch("layoutlens.api.judge.acompletion", new=AsyncMock(return_value=resp)) as mock_llm:
+    with patch(
+        "layoutlens.api.judge.acompletion", new=AsyncMock(return_value=resp)
+    ) as mock_llm:
         await lens.judge(png, "prompt")
     assert mock_llm.await_args.kwargs["api_base"] == "http://localhost:11434"
 
@@ -208,7 +238,9 @@ async def test_api_base_reaches_acompletion(tmp_path, png):
 @pytest.mark.asyncio
 async def test_api_base_absent_by_default(lens, png):
     resp = _mock_response('{"answer": "yes", "confidence": 0.5}')
-    with patch("layoutlens.api.judge.acompletion", new=AsyncMock(return_value=resp)) as mock_llm:
+    with patch(
+        "layoutlens.api.judge.acompletion", new=AsyncMock(return_value=resp)
+    ) as mock_llm:
         await lens.judge(png, "prompt")
     assert "api_base" not in mock_llm.await_args.kwargs
 
@@ -219,11 +251,18 @@ async def test_api_base_absent_by_default(lens, png):
 @pytest.mark.asyncio
 async def test_usage_split_recorded(lens, png):
     resp = _mock_response(
-        '{"answer": "yes", "confidence": 0.5}', prompt_tokens=100, completion_tokens=20, total_tokens=120
+        '{"answer": "yes", "confidence": 0.5}',
+        prompt_tokens=100,
+        completion_tokens=20,
+        total_tokens=120,
     )
     with patch("layoutlens.api.judge.acompletion", new=AsyncMock(return_value=resp)):
         result = await lens.judge(png, "prompt")
-    assert result.usage == {"prompt_tokens": 100, "completion_tokens": 20, "total_tokens": 120}
+    assert result.usage == {
+        "prompt_tokens": 100,
+        "completion_tokens": 20,
+        "total_tokens": 120,
+    }
 
 
 @pytest.mark.asyncio
@@ -233,7 +272,11 @@ async def test_usage_defaults_to_zero_when_absent(lens, png):
     resp.usage = None
     with patch("layoutlens.api.judge.acompletion", new=AsyncMock(return_value=resp)):
         result = await lens.judge(png, "prompt")
-    assert result.usage == {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+    assert result.usage == {
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0,
+    }
 
 
 # --- Cache bypass ---------------------------------------------------------
@@ -243,7 +286,9 @@ async def test_usage_defaults_to_zero_when_absent(lens, png):
 async def test_judge_bypasses_cache(lens, png):
     """Two identical judge calls must both hit the model (no caching)."""
     resp = _mock_response('{"answer": "A", "confidence": 0.9}')
-    with patch("layoutlens.api.judge.acompletion", new=AsyncMock(return_value=resp)) as mock_llm:
+    with patch(
+        "layoutlens.api.judge.acompletion", new=AsyncMock(return_value=resp)
+    ) as mock_llm:
         await lens.judge(png, "same prompt")
         await lens.judge(png, "same prompt")
     assert mock_llm.await_count == 2
@@ -255,19 +300,29 @@ async def test_judge_bypasses_cache(lens, png):
 @pytest.mark.asyncio
 async def test_missing_image_raises_validation_error(lens, tmp_path):
     missing = str(tmp_path / "nope.png")
-    with patch("layoutlens.api.judge.acompletion", new=AsyncMock()) as mock_llm, pytest.raises(ValidationError):
+    with (
+        patch("layoutlens.api.judge.acompletion", new=AsyncMock()) as mock_llm,
+        pytest.raises(ValidationError),
+    ):
         await lens.judge(missing, "prompt")
     mock_llm.assert_not_awaited()
 
 
 @pytest.mark.asyncio
-async def test_missing_image_raises_validation_error_even_without_api_key(tmp_path, monkeypatch):
+async def test_missing_image_raises_validation_error_even_without_api_key(
+    tmp_path, monkeypatch
+):
     """Image existence is validated BEFORE the API-key check (per brief)."""
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    lens = LayoutLens(api_key=None, model="gpt-4o-mini", output_dir=str(tmp_path / "out"))
+    lens = LayoutLens(
+        api_key=None, model="gpt-4o-mini", output_dir=str(tmp_path / "out")
+    )
     assert lens.api_key is None
     missing = str(tmp_path / "nope.png")
-    with patch("layoutlens.api.judge.acompletion", new=AsyncMock()) as mock_llm, pytest.raises(ValidationError):
+    with (
+        patch("layoutlens.api.judge.acompletion", new=AsyncMock()) as mock_llm,
+        pytest.raises(ValidationError),
+    ):
         await lens.judge(missing, "prompt")
     mock_llm.assert_not_awaited()
 
@@ -277,7 +332,9 @@ async def test_missing_image_raises_validation_error_even_without_api_key(tmp_pa
 
 @pytest.mark.asyncio
 async def test_result_fields_populated(lens, png):
-    resp = _mock_response('{"answer": "A", "confidence": 0.9, "rationale": "cleaner nav"}')
+    resp = _mock_response(
+        '{"answer": "A", "confidence": 0.9, "rationale": "cleaner nav"}'
+    )
     with patch("layoutlens.api.judge.acompletion", new=AsyncMock(return_value=resp)):
         result = await lens.judge(png, "prompt")
     assert isinstance(result, JudgeResult)
@@ -294,13 +351,15 @@ async def test_result_fields_populated(lens, png):
 
 
 def test_parse_strict_json():
-    answer, conf, rationale, mode = parse_judge_response('{"answer": "B", "confidence": 0.8, "rationale": "x"}')
+    answer, conf, rationale, mode = parse_judge_response(
+        '{"answer": "B", "confidence": 0.8, "rationale": "x"}'
+    )
     assert (answer, conf, rationale, mode) == ("B", 0.8, "x", "json")
 
 
 def test_parse_fenced_json():
     raw = '```json\n{"answer": "A", "confidence": 0.7}\n```'
-    answer, conf, rationale, mode = parse_judge_response(raw)
+    answer, conf, _rationale, mode = parse_judge_response(raw)
     assert answer == "A"
     assert conf == 0.7
     assert mode == "json"
@@ -308,7 +367,7 @@ def test_parse_fenced_json():
 
 def test_parse_json_with_surrounding_prose():
     raw = 'Here is my verdict.\n{"answer": "A", "confidence": 0.6}\nThanks!'
-    answer, conf, rationale, mode = parse_judge_response(raw)
+    answer, conf, _rationale, mode = parse_judge_response(raw)
     assert answer == "A"
     assert conf == 0.6
     assert mode == "json"
@@ -317,14 +376,14 @@ def test_parse_json_with_surrounding_prose():
 def test_parse_picks_answer_object_among_multiple():
     # Reviewer repro: a stray leading object must not swallow the real verdict.
     raw = 'prefix {"x":1} more {"answer":"A"} end'
-    answer, conf, rationale, mode = parse_judge_response(raw)
+    answer, _conf, _rationale, mode = parse_judge_response(raw)
     assert answer == "A"
     assert mode == "json"
 
 
 def test_parse_nested_brace_prose():
     raw = 'Notes {a set {1,2}} then {"answer":"B","confidence":0.4} done'
-    answer, conf, rationale, mode = parse_judge_response(raw)
+    answer, conf, _rationale, mode = parse_judge_response(raw)
     assert answer == "B"
     assert conf == 0.4
     assert mode == "json"
@@ -333,33 +392,41 @@ def test_parse_nested_brace_prose():
 def test_parse_json_value_containing_braces():
     # Braces inside a JSON string value must not confuse brace counting.
     raw = '{"answer": "A", "rationale": "use {curly} braces { unbalanced"}'
-    answer, conf, rationale, mode = parse_judge_response(raw)
+    answer, _conf, rationale, mode = parse_judge_response(raw)
     assert answer == "A"
     assert rationale == "use {curly} braces { unbalanced"
     assert mode == "json"
 
 
 def test_parse_reasoning_alias():
-    answer, conf, rationale, mode = parse_judge_response('{"answer": "A", "confidence": 0.5, "reasoning": "why"}')
+    _answer, _conf, rationale, mode = parse_judge_response(
+        '{"answer": "A", "confidence": 0.5, "reasoning": "why"}'
+    )
     assert rationale == "why"
     assert mode == "json"
 
 
 def test_parse_yes_no_fallback():
-    answer, conf, rationale, mode = parse_judge_response("Yes, the contrast is sufficient.")
+    answer, conf, _rationale, mode = parse_judge_response(
+        "Yes, the contrast is sufficient."
+    )
     assert answer == "yes"
     assert mode == "fallback"
     assert conf == 0.0
 
 
 def test_parse_no_fallback():
-    answer, conf, rationale, mode = parse_judge_response("No — the button is too small.")
+    answer, _conf, _rationale, mode = parse_judge_response(
+        "No — the button is too small."
+    )
     assert answer == "no"
     assert mode == "fallback"
 
 
 def test_parse_garbage_is_unknown():
-    answer, conf, rationale, mode = parse_judge_response("The weather is pleasant today.")
+    answer, conf, rationale, mode = parse_judge_response(
+        "The weather is pleasant today."
+    )
     assert answer == "unknown"
     assert mode == "none"
     assert conf == 0.0

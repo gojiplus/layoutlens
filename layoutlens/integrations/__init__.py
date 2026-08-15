@@ -1,5 +1,4 @@
-"""
-LayoutLens integrations for external tools and frameworks.
+"""LayoutLens integrations for external tools and frameworks.
 
 Available integrations:
 - browser_use: Browser agent validation integration

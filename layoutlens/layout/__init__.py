@@ -24,16 +24,16 @@ from .styles import element_geometry, read_computed_styles
 from .types import LayoutFinding, LayoutReport
 
 __all__ = [
-    "LayoutScorer",
-    "LayoutReport",
+    "AA_LARGE_TEXT",
+    "AA_NORMAL_TEXT",
     "LayoutFinding",
+    "LayoutReport",
+    "LayoutScorer",
     "check_contrast",
     "contrast_ratio",
-    "relative_luminance",
-    "parse_css_color",
-    "is_large_text",
-    "read_computed_styles",
     "element_geometry",
-    "AA_NORMAL_TEXT",
-    "AA_LARGE_TEXT",
+    "is_large_text",
+    "parse_css_color",
+    "read_computed_styles",
+    "relative_luminance",
 ]

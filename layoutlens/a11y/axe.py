@@ -98,14 +98,22 @@ class AxeAuditor:
         if self.run_only:
             options["runOnly"] = {"type": "tag", "values": self.run_only}
         if self.disabled_rules:
-            options["rules"] = {rule_id: {"enabled": False} for rule_id in self.disabled_rules}
+            options["rules"] = {
+                rule_id: {"enabled": False} for rule_id in self.disabled_rules
+            }
         return options
 
     @staticmethod
-    def _build_report(results: dict[str, Any], source: str, viewport: str) -> A11yReport:
+    def _build_report(
+        results: dict[str, Any], source: str, viewport: str
+    ) -> A11yReport:
         """Map a raw ``axe.run`` results dict into an :class:`A11yReport`."""
-        violations = [_finding_from_rule(rule) for rule in results.get("violations", [])]
-        incomplete = [_finding_from_rule(rule) for rule in results.get("incomplete", [])]
+        violations = [
+            _finding_from_rule(rule) for rule in results.get("violations", [])
+        ]
+        incomplete = [
+            _finding_from_rule(rule) for rule in results.get("incomplete", [])
+        ]
         passes_count = len(results.get("passes", []))
         engine_version = results.get("testEngine", {}).get("version") or AXE_VERSION
 
@@ -118,7 +126,9 @@ class AxeAuditor:
             passes_count=passes_count,
         )
 
-    async def audit_page(self, page: Page, source: str | None = None, viewport: str = "desktop") -> A11yReport:
+    async def audit_page(
+        self, page: Page, source: str | None = None, viewport: str = "desktop"
+    ) -> A11yReport:
         """Inject axe-core into an already-loaded page and run the audit.
 
         Args:
@@ -140,7 +150,7 @@ class AxeAuditor:
                 "(opts) => axe.run(document, opts)",
                 self._axe_options(),
             )
-        except Exception as exc:  # noqa: BLE001 - re-wrapped into a domain error
+        except Exception as exc:
             raise AnalysisError(
                 f"axe-core execution failed: {exc}",
                 source=source_label,
@@ -148,7 +158,9 @@ class AxeAuditor:
 
         return self._build_report(results, source_label, viewport)
 
-    async def audit(self, source: str | Path, viewport: ViewportType = "desktop") -> A11yReport:
+    async def audit(
+        self, source: str | Path, viewport: ViewportType = "desktop"
+    ) -> A11yReport:
         """Audit a URL or local HTML file, owning the browser lifecycle.
 
         Args:
@@ -161,6 +173,10 @@ class AxeAuditor:
         Raises:
             AnalysisError: If axe injection or execution fails.
         """
-        viewport_name = viewport.value if isinstance(viewport, Viewport) else str(viewport)
+        viewport_name = (
+            viewport.value if isinstance(viewport, Viewport) else str(viewport)
+        )
         async with open_page(source, viewport) as page:
-            return await self.audit_page(page, source=str(source), viewport=viewport_name)
+            return await self.audit_page(
+                page, source=str(source), viewport=viewport_name
+            )

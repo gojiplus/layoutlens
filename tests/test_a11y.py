@@ -14,7 +14,9 @@ import pytest
 
 from layoutlens.a11y import AXE_VERSION, A11yFinding, A11yReport, AxeAuditor
 
-FIXTURE_DIR = Path(__file__).parent.parent / "benchmarks" / "test_data" / "accessibility"
+FIXTURE_DIR = (
+    Path(__file__).parent.parent / "benchmarks" / "test_data" / "accessibility"
+)
 VIOLATIONS_HTML = FIXTURE_DIR / "wcag_violations.html"
 COMPLIANT_HTML = FIXTURE_DIR / "wcag_compliant.html"
 
@@ -55,7 +57,10 @@ def _fake_axe_results() -> dict:
                 "helpUrl": "https://dequeuniversity.com/rules/axe/4.10/aria-valid-attr-value",
                 "tags": ["cat.aria", "wcag2a", "wcag412"],
                 "nodes": [
-                    {"target": ["div[aria-labelledby]"], "html": "<div aria-labelledby='x'></div>"},
+                    {
+                        "target": ["div[aria-labelledby]"],
+                        "html": "<div aria-labelledby='x'></div>",
+                    },
                 ],
             },
         ],
@@ -114,7 +119,12 @@ class TestAxeMapping:
         assert report.ok is False
 
         clean = AxeAuditor._build_report(
-            {"testEngine": {"version": "4.10.3"}, "violations": [], "incomplete": [], "passes": []},
+            {
+                "testEngine": {"version": "4.10.3"},
+                "violations": [],
+                "incomplete": [],
+                "passes": [],
+            },
             "clean.html",
             "desktop",
         )
@@ -202,7 +212,9 @@ class TestAxeBrowser:
 
         # The compliant fixture is genuinely clean under axe wcag2a+wcag2aa
         # (the submit button's contrast was fixed to exceed 4.5:1 in Task 5).
-        assert report.ok is True, f"unexpected violations: {[f.rule_id for f in report.violations]}"
+        assert report.ok is True, (
+            f"unexpected violations: {[f.rule_id for f in report.violations]}"
+        )
         assert report.violations == []
 
     def test_open_page_serves_local_html(self):

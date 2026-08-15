@@ -21,7 +21,9 @@ async def basic_expert_usage():
 
     # Use accessibility expert for WCAG compliance
     result = await lens.audit_accessibility(
-        source="https://example.com", compliance_level="AA", standards=["WCAG_2.1", "Section_508"]
+        source="https://example.com",
+        compliance_level="AA",
+        standards=["WCAG_2.1", "Section_508"],
     )
 
     print(f"Accessibility Audit: {result.answer[:200]}...")
@@ -87,7 +89,9 @@ async def domain_specific_workflows():
 
     # E-commerce product page audit
     ecommerce_result = await lens.audit_ecommerce(
-        source="https://stripe.com/pricing", page_type="product_page", business_model="b2b"
+        source="https://stripe.com/pricing",
+        page_type="product_page",
+        business_model="b2b",
     )
 
     print(f"E-commerce Audit: {ecommerce_result.answer[:200]}...")
@@ -96,7 +100,9 @@ async def domain_specific_workflows():
 
     # Mobile UX analysis
     mobile_result = await lens.analyze_mobile_ux(
-        source="https://example.com", device_types=["smartphone"], performance_focus=True
+        source="https://example.com",
+        device_types=["smartphone"],
+        performance_focus=True,
     )
 
     print(f"Mobile UX Analysis: {mobile_result.answer[:200]}...")
@@ -120,7 +126,10 @@ async def custom_expert_analysis():
         user_context={
             "target_audience": "software_developers",
             "technical_constraints": ["time_pressure", "context_switching"],
-            "business_goals": ["increase_tool_adoption", "improve_developer_experience"],
+            "business_goals": [
+                "increase_tool_adoption",
+                "improve_developer_experience",
+            ],
         },
     )
 
@@ -141,7 +150,11 @@ async def expert_comparison():
         sources=["https://tailwindcss.com", "https://getbootstrap.com"],
         query="Which framework site better converts developers to try the tool?",
         expert_persona="conversion_expert",
-        focus_areas=["developer_onboarding", "clear_value_proposition", "getting_started_flow"],
+        focus_areas=[
+            "developer_onboarding",
+            "clear_value_proposition",
+            "getting_started_flow",
+        ],
     )
 
     print(f"Framework Comparison: {result.answer[:300]}...")
@@ -161,7 +174,9 @@ async def structured_json_output():
     instructions.output_style = "checklist_format"
 
     result = await lens.analyze(
-        source="https://example.com", query="Provide a WCAG AA compliance checklist", instructions=instructions
+        source="https://example.com",
+        query="Provide a WCAG AA compliance checklist",
+        instructions=instructions,
     )
 
     # Export to clean JSON
@@ -179,7 +194,12 @@ async def prompt_testing_demo():
     print("🧪 Prompt Testing & Optimization")
     print("-" * 40)
 
-    from layoutlens.prompts import compare_expert_prompts, get_expert, list_available_experts, test_prompt
+    from layoutlens.prompts import (
+        compare_expert_prompts,
+        get_expert,
+        list_available_experts,
+        test_prompt,
+    )
 
     # List available experts
     experts = list_available_experts()
@@ -198,7 +218,9 @@ async def prompt_testing_demo():
 
     # Run prompt tests (this is synchronous prompt evaluation)
     try:
-        test_results = test_prompt(template, test_queries[:1])  # Just test one to avoid complexity
+        test_results = test_prompt(
+            template, test_queries[:1]
+        )  # Just test one to avoid complexity
         print(f"Prompt test results: {len(test_results)} tests completed")
         if test_results:
             result = test_results[0]
@@ -233,7 +255,9 @@ async def advanced_instruction_patterns():
     # Get conversion perspective
     conversion_instructions = Instructions.for_conversion_optimization()
     conversion_result = await lens.analyze(
-        source="https://example.com", query="What are the main conversion issues?", instructions=conversion_instructions
+        source="https://example.com",
+        query="What are the main conversion issues?",
+        instructions=conversion_instructions,
     )
     print(f"  Conversion Expert: {conversion_result.answer[:150]}...")
 
@@ -281,7 +305,9 @@ async def main():
 
     except Exception as e:
         print(f"❌ Demo failed: {e}")
-        print("Note: Some examples require network access and may fail in test environments")
+        print(
+            "Note: Some examples require network access and may fail in test environments"
+        )
 
     print("✅ Expert prompt system demonstration completed!")
     print()

@@ -70,7 +70,7 @@ def list_available_experts() -> list[str]:
 def test_prompt(
     prompt_template: PromptTemplate,
     test_queries: list[str],
-    instructions_variants: list[Instructions | None] = None,
+    instructions_variants: list[Instructions | None] | None = None,
     evaluation_criteria: dict[str, Any] | None = None,
 ) -> list[PromptTestResult]:
     """Test a prompt template against multiple queries and instruction variants.
@@ -97,7 +97,9 @@ def test_prompt(
                 response_time = time.time() - start_time
 
                 # Evaluate prompt quality (simplified heuristic evaluation)
-                quality_score = _evaluate_prompt_quality(system_prompt, user_prompt, query)
+                quality_score = _evaluate_prompt_quality(
+                    system_prompt, user_prompt, query
+                )
 
                 result = PromptTestResult(
                     prompt_variant=f"variant_{i}",
@@ -109,7 +111,9 @@ def test_prompt(
                     specificity_score=quality_score["specificity"],
                     raw_response=f"System: {system_prompt[:200]}...\nUser: {user_prompt[:200]}...",
                     metadata={
-                        "instructions_used": instructions.__class__.__name__ if instructions else None,
+                        "instructions_used": instructions.__class__.__name__
+                        if instructions
+                        else None,
                         "prompt_length": len(system_prompt) + len(user_prompt),
                         "detailed_scores": quality_score,
                     },
@@ -126,7 +130,7 @@ def test_prompt(
                     confidence_score=0.0,
                     actionability_score=0.0,
                     specificity_score=0.0,
-                    raw_response=f"Error: {str(e)}",
+                    raw_response=f"Error: {e!s}",
                     metadata={"error": str(e)},
                 )
                 results.append(result)
@@ -137,7 +141,7 @@ def test_prompt(
 def optimize_prompt(
     base_prompt: PromptTemplate,
     sample_queries: list[str],
-    optimization_goals: list[str] = None,
+    optimization_goals: list[str] | None = None,
     expert_domain: str | None = None,
 ) -> PromptOptimizationReport:
     """Optimize a prompt based on sample queries and optimization goals.
@@ -151,7 +155,10 @@ def optimize_prompt(
     Returns:
         Optimization report with recommendations
     """
-    optimization_goals = optimization_goals or ["improve_specificity", "increase_actionability"]
+    optimization_goals = optimization_goals or [
+        "improve_specificity",
+        "increase_actionability",
+    ]
 
     # Analyze current prompt performance
     current_results = test_prompt(base_prompt, sample_queries)
@@ -164,12 +171,16 @@ def optimize_prompt(
     # Check specificity
     if current_metrics["avg_specificity"] < 0.7:
         improvement_areas.append("specificity")
-        recommendations.append("Add more specific evaluation criteria and concrete examples")
+        recommendations.append(
+            "Add more specific evaluation criteria and concrete examples"
+        )
 
     # Check actionability
     if current_metrics["avg_actionability"] < 0.7:
         improvement_areas.append("actionability")
-        recommendations.append("Include implementation steps and priority levels in prompt")
+        recommendations.append(
+            "Include implementation steps and priority levels in prompt"
+        )
 
     # Check prompt length efficiency
     if current_metrics["avg_prompt_length"] > 2000:
@@ -185,11 +196,18 @@ def optimize_prompt(
         domain_results = test_prompt(domain_template, sample_queries)
         domain_metrics = _aggregate_test_metrics(domain_results)
 
-        if domain_metrics["avg_response_quality"] > current_metrics["avg_response_quality"]:
-            recommendations.append(f"Consider adopting {expert_domain} expert patterns for domain knowledge")
+        if (
+            domain_metrics["avg_response_quality"]
+            > current_metrics["avg_response_quality"]
+        ):
+            recommendations.append(
+                f"Consider adopting {expert_domain} expert patterns for domain knowledge"
+            )
 
     # Generate optimized prompt (simplified approach)
-    optimized_prompt = _apply_optimization_recommendations(base_prompt, recommendations, improvement_areas)
+    optimized_prompt = _apply_optimization_recommendations(
+        base_prompt, recommendations, improvement_areas
+    )
 
     # Calculate confidence in optimization
     confidence = min(0.9, len(recommendations) * 0.2 + 0.1)  # Simple heuristic
@@ -224,28 +242,49 @@ def validate_prompt(
         "requires_json_format": True,
     }
 
-    validation_results = {"is_valid": True, "issues": [], "warnings": [], "recommendations": [], "scores": {}}
+    validation_results = {
+        "is_valid": True,
+        "issues": [],
+        "warnings": [],
+        "recommendations": [],
+        "scores": {},
+    }
 
     system_prompt = prompt_template.system_prompt
     # user_template = prompt_template.user_prompt_template  # Unused variable
 
     # Length validation
     if len(system_prompt) < validation_criteria.get("min_system_prompt_length", 100):
-        validation_results["issues"].append("System prompt too short - may lack necessary context")
+        validation_results["issues"].append(
+            "System prompt too short - may lack necessary context"
+        )
         validation_results["is_valid"] = False
 
     if len(system_prompt) > validation_criteria.get("max_system_prompt_length", 3000):
-        validation_results["warnings"].append("System prompt very long - consider reducing for efficiency")
+        validation_results["warnings"].append(
+            "System prompt very long - consider reducing for efficiency"
+        )
 
     # Content validation
-    if validation_criteria.get("requires_confidence_guidance", True) and "confidence" not in system_prompt.lower():
-        validation_results["issues"].append("Missing confidence guidance in system prompt")
+    if (
+        validation_criteria.get("requires_confidence_guidance", True)
+        and "confidence" not in system_prompt.lower()
+    ):
+        validation_results["issues"].append(
+            "Missing confidence guidance in system prompt"
+        )
         validation_results["is_valid"] = False
 
-    if validation_criteria.get("requires_evaluation_criteria", True) and not prompt_template.evaluation_criteria:
+    if (
+        validation_criteria.get("requires_evaluation_criteria", True)
+        and not prompt_template.evaluation_criteria
+    ):
         validation_results["warnings"].append("No evaluation criteria specified")
 
-    if validation_criteria.get("requires_json_format", True) and "json" not in system_prompt.lower():
+    if (
+        validation_criteria.get("requires_json_format", True)
+        and "json" not in system_prompt.lower()
+    ):
         validation_results["issues"].append("Missing JSON format specification")
         validation_results["is_valid"] = False
 
@@ -258,22 +297,33 @@ def validate_prompt(
 
     # Generate recommendations
     if validation_results["scores"]["clarity_score"] < 0.7:
-        validation_results["recommendations"].append("Improve prompt clarity with more structured language")
+        validation_results["recommendations"].append(
+            "Improve prompt clarity with more structured language"
+        )
 
     if validation_results["scores"]["completeness_score"] < 0.8:
-        validation_results["recommendations"].append("Add missing prompt components (criteria, calibration)")
+        validation_results["recommendations"].append(
+            "Add missing prompt components (criteria, calibration)"
+        )
 
     return validation_results
 
 
-def _evaluate_prompt_quality(system_prompt: str, user_prompt: str, query: str) -> dict[str, float]:
+def _evaluate_prompt_quality(
+    system_prompt: str, user_prompt: str, query: str
+) -> dict[str, float]:
     """Evaluate prompt quality using heuristic analysis."""
     scores = {}
 
     # Overall prompt quality (simplified heuristic)
     total_length = len(system_prompt) + len(user_prompt)
-    has_structure = any(keyword in system_prompt.lower() for keyword in ["criteria", "framework", "evaluate"])
-    has_guidance = "confidence" in system_prompt.lower() and "json" in system_prompt.lower()
+    has_structure = any(
+        keyword in system_prompt.lower()
+        for keyword in ["criteria", "framework", "evaluate"]
+    )
+    has_guidance = (
+        "confidence" in system_prompt.lower() and "json" in system_prompt.lower()
+    )
 
     scores["overall"] = min(
         1.0,
@@ -283,7 +333,9 @@ def _evaluate_prompt_quality(system_prompt: str, user_prompt: str, query: str) -
     )
 
     # Confidence guidance score
-    scores["confidence_guidance"] = 1.0 if "confidence" in system_prompt.lower() else 0.3
+    scores["confidence_guidance"] = (
+        1.0 if "confidence" in system_prompt.lower() else 0.3
+    )
 
     # Actionability score (looks for action words and implementation guidance)
     action_words = ["implement", "recommend", "improve", "fix", "optimize", "specific"]
@@ -291,7 +343,14 @@ def _evaluate_prompt_quality(system_prompt: str, user_prompt: str, query: str) -
     scores["actionability"] = min(1.0, action_count * 0.2)
 
     # Specificity score (looks for specific criteria and examples)
-    specific_words = ["specific", "criteria", "standard", "guideline", "example", "measure"]
+    specific_words = [
+        "specific",
+        "criteria",
+        "standard",
+        "guideline",
+        "example",
+        "measure",
+    ]
     specific_count = sum(1 for word in specific_words if word in system_prompt.lower())
     scores["specificity"] = min(1.0, specific_count * 0.15)
 
@@ -309,19 +368,24 @@ def _aggregate_test_metrics(results: list[PromptTestResult]) -> dict[str, float]
         "avg_actionability": sum(r.actionability_score for r in results) / len(results),
         "avg_specificity": sum(r.specificity_score for r in results) / len(results),
         "avg_response_time": sum(r.response_time for r in results) / len(results),
-        "avg_prompt_length": sum(r.metadata.get("prompt_length", 0) for r in results) / len(results),
+        "avg_prompt_length": sum(r.metadata.get("prompt_length", 0) for r in results)
+        / len(results),
     }
 
 
 def _apply_optimization_recommendations(
-    base_prompt: PromptTemplate, recommendations: list[str], improvement_areas: list[str]
+    base_prompt: PromptTemplate,
+    recommendations: list[str],
+    improvement_areas: list[str],
 ) -> PromptTemplate:
     """Apply optimization recommendations to create improved prompt."""
     # Simplified optimization - in practice this would be more sophisticated
     optimized_system = base_prompt.system_prompt
 
     if "specificity" in improvement_areas:
-        optimized_system += "\n\nProvide specific, measurable recommendations with concrete examples."
+        optimized_system += (
+            "\n\nProvide specific, measurable recommendations with concrete examples."
+        )
 
     if "actionability" in improvement_areas:
         optimized_system += "\n\nInclude implementation steps and priority levels for each recommendation."
@@ -341,7 +405,9 @@ def _calculate_clarity_score(system_prompt: str) -> float:
     """Calculate clarity score for a system prompt."""
     # Simple heuristic based on structure and clarity indicators
     clarity_indicators = ["clear", "specific", "structured", "framework", "criteria"]
-    indicator_count = sum(1 for indicator in clarity_indicators if indicator in system_prompt.lower())
+    indicator_count = sum(
+        1 for indicator in clarity_indicators if indicator in system_prompt.lower()
+    )
     return min(1.0, indicator_count * 0.2)
 
 
@@ -359,8 +425,18 @@ def _calculate_completeness_score(prompt_template: PromptTemplate) -> float:
 
 def _calculate_specificity_score(system_prompt: str) -> float:
     """Calculate specificity score for a system prompt."""
-    specific_elements = ["criteria", "standard", "guideline", "example", "specific", "measure", "evaluate"]
-    element_count = sum(1 for element in specific_elements if element in system_prompt.lower())
+    specific_elements = [
+        "criteria",
+        "standard",
+        "guideline",
+        "example",
+        "specific",
+        "measure",
+        "evaluate",
+    ]
+    element_count = sum(
+        1 for element in specific_elements if element in system_prompt.lower()
+    )
     return min(1.0, element_count * 0.12)
 
 
@@ -382,7 +458,7 @@ def quick_conversion_test(test_queries: list[str]) -> list[PromptTestResult]:
 
 
 def compare_expert_prompts(
-    test_queries: list[str], expert_names: list[str] = None
+    test_queries: list[str], expert_names: list[str] | None = None
 ) -> dict[str, list[PromptTestResult]]:
     """Compare performance of different expert prompts on the same queries."""
     expert_names = expert_names or list(EXPERT_REGISTRY.keys())

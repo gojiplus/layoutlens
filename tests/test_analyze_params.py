@@ -22,7 +22,9 @@ _PNG_1x1 = base64.b64decode(
 
 def _resp() -> MagicMock:
     response = MagicMock()
-    response.choices[0].message.content = '{"answer": "Yes", "confidence": 0.8, "reasoning": "ok"}'
+    response.choices[
+        0
+    ].message.content = '{"answer": "Yes", "confidence": 0.8, "reasoning": "ok"}'
     response.usage.total_tokens = 42
     response.usage.prompt_tokens = 30
     response.usage.completion_tokens = 12
@@ -39,23 +41,39 @@ def png(tmp_path):
 @pytest.mark.asyncio
 async def test_analyze_default_temperature_is_point_one(tmp_path, png):
     lens = LayoutLens(api_key="sk", model="gpt-4o-mini", output_dir=str(tmp_path / "o"))
-    with patch("layoutlens.api.core.acompletion", new=AsyncMock(return_value=_resp())) as mock_llm:
+    with patch(
+        "layoutlens.api.core.acompletion", new=AsyncMock(return_value=_resp())
+    ) as mock_llm:
         await lens.analyze(png, "Is it good?")
     assert mock_llm.await_args.kwargs["temperature"] == 0.1
 
 
 @pytest.mark.asyncio
 async def test_analyze_temperature_override(tmp_path, png):
-    lens = LayoutLens(api_key="sk", model="gpt-4o-mini", temperature=0.0, output_dir=str(tmp_path / "o"))
-    with patch("layoutlens.api.core.acompletion", new=AsyncMock(return_value=_resp())) as mock_llm:
+    lens = LayoutLens(
+        api_key="sk",
+        model="gpt-4o-mini",
+        temperature=0.0,
+        output_dir=str(tmp_path / "o"),
+    )
+    with patch(
+        "layoutlens.api.core.acompletion", new=AsyncMock(return_value=_resp())
+    ) as mock_llm:
         await lens.analyze(png, "Is it good?")
     assert mock_llm.await_args.kwargs["temperature"] == 0.0
 
 
 @pytest.mark.asyncio
 async def test_analyze_omits_temperature_for_sonnet5(tmp_path, png):
-    lens = LayoutLens(api_key="sk", model="claude-sonnet-5", provider="anthropic", output_dir=str(tmp_path / "o"))
-    with patch("layoutlens.api.core.acompletion", new=AsyncMock(return_value=_resp())) as mock_llm:
+    lens = LayoutLens(
+        api_key="sk",
+        model="claude-sonnet-5",
+        provider="anthropic",
+        output_dir=str(tmp_path / "o"),
+    )
+    with patch(
+        "layoutlens.api.core.acompletion", new=AsyncMock(return_value=_resp())
+    ) as mock_llm:
         await lens.analyze(png, "Is it good?")
     assert "temperature" not in mock_llm.await_args.kwargs
 
@@ -69,7 +87,9 @@ async def test_analyze_api_base_reaches_acompletion(tmp_path, png):
         api_base="http://localhost:11434",
         output_dir=str(tmp_path / "o"),
     )
-    with patch("layoutlens.api.core.acompletion", new=AsyncMock(return_value=_resp())) as mock_llm:
+    with patch(
+        "layoutlens.api.core.acompletion", new=AsyncMock(return_value=_resp())
+    ) as mock_llm:
         await lens.analyze(png, "Is it good?")
     assert mock_llm.await_args.kwargs["api_base"] == "http://localhost:11434"
 

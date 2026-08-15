@@ -39,7 +39,9 @@ class TestContrastMath:
         assert round(contrast_ratio((255, 255, 255), (255, 255, 255)), 2) == 1.0
 
     def test_symmetric(self):
-        assert contrast_ratio((0, 0, 0), (255, 255, 255)) == contrast_ratio((255, 255, 255), (0, 0, 0))
+        assert contrast_ratio((0, 0, 0), (255, 255, 255)) == contrast_ratio(
+            (255, 255, 255), (0, 0, 0)
+        )
 
     def test_published_pair(self):
         # #767676 on white is the canonical 4.54:1 boundary pair.
@@ -55,7 +57,7 @@ class TestContrastMath:
         assert parse_css_color("#767676") == (118, 118, 118)
         assert parse_css_color("rgb(118, 118, 118)") == (118, 118, 118)
         assert parse_css_color("rgba(118, 118, 118, 0.5)") == (118, 118, 118)
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="unrecognised CSS colour"):
             parse_css_color("not-a-color")
 
     def test_is_large_text(self):
@@ -75,9 +77,30 @@ class TestLayoutReport:
         assert "No layout defects" in empty.summary()
 
         findings = [
-            LayoutFinding("contrast", "#a", [0, 0, 10, 10], {"contrast_ratio": 2.0}, {"min_ratio": 4.5}, "low"),
-            LayoutFinding("contrast", "#b", [0, 0, 10, 10], {"contrast_ratio": 3.0}, {"min_ratio": 4.5}, "low"),
-            LayoutFinding("overlap", "#c", [0, 0, 10, 10], {"intersection_px2": 500}, {}, "overlap"),
+            LayoutFinding(
+                "contrast",
+                "#a",
+                [0, 0, 10, 10],
+                {"contrast_ratio": 2.0},
+                {"min_ratio": 4.5},
+                "low",
+            ),
+            LayoutFinding(
+                "contrast",
+                "#b",
+                [0, 0, 10, 10],
+                {"contrast_ratio": 3.0},
+                {"min_ratio": 4.5},
+                "low",
+            ),
+            LayoutFinding(
+                "overlap",
+                "#c",
+                [0, 0, 10, 10],
+                {"intersection_px2": 500},
+                {},
+                "overlap",
+            ),
         ]
         report = LayoutReport(source="p.html", viewport="desktop", findings=findings)
         assert report.ok is False
@@ -186,7 +209,9 @@ class TestLayoutBrowser:
             '<div id="wide" style="width:3000px;height:20px;background:green"></div>',
         )
         report = _scan(path)
-        protrusions = [f for f in report.findings if f.defect_class == "viewport-protrusion"]
+        protrusions = [
+            f for f in report.findings if f.defect_class == "viewport-protrusion"
+        ]
         assert any(f.selector == "#wide" for f in protrusions), report.summary()
         wide = next(f for f in protrusions if f.selector == "#wide")
         assert wide.measured["overflow_px"] > 0
@@ -229,7 +254,9 @@ class TestLayoutBrowser:
 
         async def _run():
             async with open_page(path) as page:
-                styles = await read_computed_styles(page, "#hd", ["text-align", "font-weight"])
+                styles = await read_computed_styles(
+                    page, "#hd", ["text-align", "font-weight"]
+                )
                 geom = await element_geometry(page, "#hd")
                 missing = await read_computed_styles(page, "#nope", ["color"])
                 return styles, geom, missing
@@ -237,5 +264,6 @@ class TestLayoutBrowser:
         styles, geom, missing = asyncio.run(_run())
         assert styles["text-align"] == "center"
         assert styles["font-weight"] == "700"
-        assert geom is not None and len(geom) == 4
+        assert geom is not None
+        assert len(geom) == 4
         assert missing is None

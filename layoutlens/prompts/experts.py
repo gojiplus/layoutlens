@@ -8,14 +8,17 @@ class AccessibilityExpert(ExpertPrompt):
 
     @property
     def name(self) -> str:
+        """Registry name for this expert persona."""
         return "accessibility_expert"
 
     @property
     def description(self) -> str:
+        """One-line summary of the expert's specialty."""
         return "WCAG 2.1 accessibility expert specializing in inclusive design and disability compliance"
 
     @property
     def domain_knowledge(self) -> list[str]:
+        """Knowledge areas this expert grounds its analysis in."""
         return [
             "WCAG 2.1 Guidelines (A, AA, AAA levels)",
             "Section 508 compliance",
@@ -30,6 +33,7 @@ class AccessibilityExpert(ExpertPrompt):
         ]
 
     def get_template(self) -> PromptTemplate:
+        """Build the persona's system/user prompt template."""
         system_prompt = """You are a WCAG 2.1 accessibility expert with 10+ years of experience auditing websites for compliance and inclusive design.
 
 Your expertise includes:
@@ -107,14 +111,17 @@ class ConversionExpert(ExpertPrompt):
 
     @property
     def name(self) -> str:
+        """Registry name for this expert persona."""
         return "conversion_expert"
 
     @property
     def description(self) -> str:
+        """One-line summary of the expert's specialty."""
         return "CRO specialist with expertise in user psychology and conversion optimization"
 
     @property
     def domain_knowledge(self) -> list[str]:
+        """Knowledge areas this expert grounds its analysis in."""
         return [
             "Conversion rate optimization principles",
             "User psychology and behavioral economics",
@@ -129,6 +136,7 @@ class ConversionExpert(ExpertPrompt):
         ]
 
     def get_template(self) -> PromptTemplate:
+        """Build the persona's system/user prompt template."""
         system_prompt = """You are a conversion rate optimization expert with deep expertise in user psychology, behavioral economics, and data-driven design optimization.
 
 Your specialization includes:
@@ -212,14 +220,17 @@ class MobileExpert(ExpertPrompt):
 
     @property
     def name(self) -> str:
+        """Registry name for this expert persona."""
         return "mobile_expert"
 
     @property
     def description(self) -> str:
+        """One-line summary of the expert's specialty."""
         return "Mobile UX specialist focused on touch interfaces, responsive design, and mobile performance"
 
     @property
     def domain_knowledge(self) -> list[str]:
+        """Knowledge areas this expert grounds its analysis in."""
         return [
             "Mobile-first design principles",
             "Touch interface design and ergonomics",
@@ -234,6 +245,7 @@ class MobileExpert(ExpertPrompt):
         ]
 
     def get_template(self) -> PromptTemplate:
+        """Build the persona's system/user prompt template."""
         system_prompt = """You are a mobile UX expert specializing in touch-first interfaces, responsive design, and mobile performance optimization.
 
 Your expertise covers:
@@ -320,14 +332,17 @@ class EcommerceExpert(ExpertPrompt):
 
     @property
     def name(self) -> str:
+        """Registry name for this expert persona."""
         return "ecommerce_expert"
 
     @property
     def description(self) -> str:
+        """One-line summary of the expert's specialty."""
         return "E-commerce specialist with expertise in online retail UX and conversion optimization"
 
     @property
     def domain_knowledge(self) -> list[str]:
+        """Knowledge areas this expert grounds its analysis in."""
         return [
             "E-commerce conversion optimization",
             "Product page design best practices",
@@ -342,6 +357,7 @@ class EcommerceExpert(ExpertPrompt):
         ]
 
     def get_template(self) -> PromptTemplate:
+        """Build the persona's system/user prompt template."""
         system_prompt = """You are an e-commerce UX expert with extensive experience optimizing online retail experiences for conversion and customer satisfaction.
 
 Your specialization includes:
@@ -432,14 +448,17 @@ class HealthcareExpert(ExpertPrompt):
 
     @property
     def name(self) -> str:
+        """Registry name for this expert persona."""
         return "healthcare_expert"
 
     @property
     def description(self) -> str:
+        """One-line summary of the expert's specialty."""
         return "Healthcare UX specialist with expertise in medical interfaces, HIPAA compliance, and patient trust"
 
     @property
     def domain_knowledge(self) -> list[str]:
+        """Knowledge areas this expert grounds its analysis in."""
         return [
             "HIPAA compliance and privacy design",
             "Medical information accessibility",
@@ -454,6 +473,7 @@ class HealthcareExpert(ExpertPrompt):
         ]
 
     def get_template(self) -> PromptTemplate:
+        """Build the persona's system/user prompt template."""
         system_prompt = """You are a healthcare UX expert specializing in medical interfaces, HIPAA compliance, patient privacy, and healthcare trust design.
 
 Your expertise includes:
@@ -545,14 +565,17 @@ class FinanceExpert(ExpertPrompt):
 
     @property
     def name(self) -> str:
+        """Registry name for this expert persona."""
         return "finance_expert"
 
     @property
     def description(self) -> str:
+        """One-line summary of the expert's specialty."""
         return "Financial services UX specialist with expertise in fintech, security design, and regulatory compliance"
 
     @property
     def domain_knowledge(self) -> list[str]:
+        """Knowledge areas this expert grounds its analysis in."""
         return [
             "Financial regulatory compliance (PCI DSS, SOX, etc.)",
             "Fintech UX design and digital banking",
@@ -567,6 +590,7 @@ class FinanceExpert(ExpertPrompt):
         ]
 
     def get_template(self) -> PromptTemplate:
+        """Build the persona's system/user prompt template."""
         system_prompt = """You are a financial services UX expert with deep experience in fintech design, regulatory compliance, security communication, and financial trust building.
 
 Your expertise encompasses:

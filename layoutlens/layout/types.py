@@ -96,5 +96,7 @@ class LayoutReport:
         lines = [header, "Findings:"]
         for defect_class, findings in grouped.items():
             first = findings[0]
-            lines.append(f"- {defect_class}: {len(findings)} - first: {first.selector} ({first.description})")
+            lines.append(
+                f"- {defect_class}: {len(findings)} - first: {first.selector} ({first.description})"
+            )
         return "\n".join(lines)

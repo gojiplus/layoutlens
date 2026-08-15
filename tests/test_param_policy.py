@@ -51,7 +51,7 @@ _REGISTRY_CASES = [
 ]
 
 
-@pytest.mark.parametrize("model,temp_present", _REGISTRY_CASES)
+@pytest.mark.parametrize(("model", "temp_present"), _REGISTRY_CASES)
 def test_registry_temperature_inclusion(model, temp_present):
     params = completion_params(model, temperature=0.0, max_tokens=300)
     assert params["max_tokens"] == 300
@@ -60,7 +60,7 @@ def test_registry_temperature_inclusion(model, temp_present):
         assert params["temperature"] == 0.0
 
 
-@pytest.mark.parametrize("model,temp_present", _REGISTRY_CASES)
+@pytest.mark.parametrize(("model", "temp_present"), _REGISTRY_CASES)
 def test_model_omits_temperature_matches_registry(model, temp_present):
     assert model_omits_temperature(model) is (not temp_present)
 
@@ -113,13 +113,13 @@ _REASONING_CASES = [
 ]
 
 
-@pytest.mark.parametrize("model,expected", _REASONING_CASES)
+@pytest.mark.parametrize(("model", "expected"), _REASONING_CASES)
 def test_is_reasoning_model(model, expected):
     assert is_reasoning_model(model) is expected
 
 
 @pytest.mark.parametrize(
-    "model,expected",
+    ("model", "expected"),
     [
         ("gpt-4o-mini", 300),
         ("gpt-4o", 300),
