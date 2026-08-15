@@ -14,14 +14,7 @@ from .experts import (
     HealthcareExpert,
     MobileExpert,
 )
-from .utils import (
-    compare_expert_prompts,
-    get_expert,
-    list_available_experts,
-    optimize_prompt,
-    test_prompt,
-    validate_prompt,
-)
+from .utils import get_expert, list_available_experts
 
 __all__ = [
     # Expert personas
@@ -38,11 +31,6 @@ __all__ = [
     "PromptTemplate",
     "UserContext",
     "build_custom_prompt",
-    "compare_expert_prompts",
     "get_expert",
     "list_available_experts",
-    "optimize_prompt",
-    # Utilities
-    "test_prompt",
-    "validate_prompt",
 ]

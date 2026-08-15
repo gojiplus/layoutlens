@@ -24,7 +24,7 @@ LayoutLens lets you test UIs the way humans see them - using natural language an
 result = await lens.analyze("https://example.com", "Is the navigation user-friendly?")
 
 # Expert-powered analysis
-result = await lens.audit_accessibility("https://example.com", compliance_level="AA")
+result = await lens.check_accessibility("https://example.com", compliance_level="AA")
 # Returns: "WCAG AA compliant with 4.7:1 contrast ratio. Focus indicators visible..."
 ```
 
@@ -112,7 +112,7 @@ print(
 
 ### The three modes
 - **`mode="axe"`** — deterministic axe-core only. No API key, no LLM call. `confidence` is always `1.0`.
-- **`mode="hybrid"`** (default for `check_accessibility`/`audit_accessibility`) — runs axe-core *and* the LLM
+- **`mode="hybrid"`** (default for `check_accessibility`/`check_accessibility`) — runs axe-core *and* the LLM
   vision analysis, injecting the axe findings into the LLM's prompt as grounding context. If axe finds any
   violation, the final verdict is deterministically forced to "no" (confidence `1.0`), regardless of what the
   LLM says — axe overrides the model, not the other way around. If axe finds nothing, the LLM's own
@@ -186,9 +186,9 @@ result = await lens.analyze(
 ```
 
 ### 2. Compare Layouts
-Perfect for A/B testing and redesign validation. `compare()` accepts URLs or
-already-captured screenshot images directly; for local HTML files, capture
-screenshots first with `lens.capture(...)`:
+Perfect for A/B testing and redesign validation. `compare()` accepts URLs,
+local HTML files, or screenshot images — every source is rendered and every
+screenshot is sent to the model:
 ```python
 result = await lens.compare(
     ["https://old-design.example.com", "https://new-design.example.com"],
@@ -201,7 +201,7 @@ print(f"Winner: {result.answer}")
 Domain expert knowledge with one line of code:
 ```python
 # Professional accessibility audit (WCAG expert)
-result = await lens.audit_accessibility("product-page.html", compliance_level="AA")
+result = await lens.check_accessibility("product-page.html", compliance_level="AA")
 
 # Conversion rate optimization (CRO expert)
 result = await lens.optimize_conversions(
@@ -288,8 +288,7 @@ result = await lens.analyze_with_expert(
     },
 )
 
-# Expert comparison analysis (compare/compare_with_expert take URLs or
-# already-captured screenshots -- see the "Compare Layouts" note above)
+# Expert comparison analysis (URLs, local HTML files, or screenshots)
 result = await lens.compare_with_expert(
     sources=["https://old.example.com", "https://new.example.com"],
     query="Which design converts better?",
@@ -398,8 +397,7 @@ layoutlens https://example.com "Is this accessible?"
 # Analyze local files
 layoutlens page.html "Is the design professional?"
 
-# Compare two designs (compare works with URLs or existing screenshot images;
-# for local HTML files, capture screenshots first — see "Compare Layouts" above)
+# Compare two designs (URLs, local HTML files, or screenshot images)
 layoutlens https://old.example.com https://new.example.com --compare
 
 # Analyze with different viewport

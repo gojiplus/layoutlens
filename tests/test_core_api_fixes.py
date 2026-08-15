@@ -99,8 +99,15 @@ async def test_compare_routes_local_html_through_capture(tmp_path):
 
     # Both HTML sources were rendered to screenshots.
     assert lens._serve_html_and_capture.await_count == 2
-    # The comparative vision call received a real screenshot path, not the HTML file.
-    comparative_image = lens._call_vision_api.await_args.kwargs["image_path"]
-    assert comparative_image == shots[str(a)]
-    assert comparative_image.endswith(".png")
-    assert comparative_image != str(a)
+    # The comparative vision call received EVERY screenshot, in order — not
+    # just the first with the rest pasted in as filenames.
+    comparative_images = lens._call_vision_api.await_args.kwargs["image_path"]
+    assert comparative_images == [shots[str(a)], shots[str(b)]]
+    # Each per-source analysis ran on the captured screenshot, not the raw HTML
+    # (which would re-capture it a second time).
+    analyzed = [c.args[0] for c in lens.analyze.await_args_list]
+    assert analyzed == [shots[str(a)], shots[str(b)]]
+    # The legend maps Image N to the original sources.
+    query_sent = lens._call_vision_api.await_args.kwargs["query"]
+    assert f"Image 1: {a}" in query_sent
+    assert f"Image 2: {b}" in query_sent

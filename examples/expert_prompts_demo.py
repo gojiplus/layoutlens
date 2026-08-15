@@ -20,7 +20,7 @@ async def basic_expert_usage():
     lens = LayoutLens()
 
     # Use accessibility expert for WCAG compliance
-    result = await lens.audit_accessibility(
+    result = await lens.check_accessibility(
         source="https://example.com",
         compliance_level="AA",
         standards=["WCAG_2.1", "Section_508"],
@@ -189,46 +189,20 @@ async def structured_json_output():
     print()
 
 
-async def prompt_testing_demo():
-    """Demonstrate prompt testing and optimization."""
-    print("🧪 Prompt Testing & Optimization")
+async def prompt_registry_demo():
+    """Show the expert registry and what a persona's template looks like."""
+    print("🧪 Expert Registry")
     print("-" * 40)
 
-    from layoutlens.prompts import (
-        compare_expert_prompts,
-        get_expert,
-        list_available_experts,
-        test_prompt,
-    )
+    from layoutlens.prompts import get_expert, list_available_experts
 
-    # List available experts
     experts = list_available_experts()
     print(f"Available experts: {', '.join(experts)}")
-    print()
-
-    # Test accessibility expert prompts
-    test_queries = [
-        "Is this page accessible for screen readers?",
-        "Does this design meet WCAG AA standards?",
-        "Are the color contrasts sufficient?",
-    ]
 
     accessibility_expert = get_expert("accessibility_expert")
-    template = accessibility_expert.get_template()
-
-    # Run prompt tests (this is synchronous prompt evaluation)
-    try:
-        test_results = test_prompt(
-            template, test_queries[:1]
-        )  # Just test one to avoid complexity
-        print(f"Prompt test results: {len(test_results)} tests completed")
-        if test_results:
-            result = test_results[0]
-            print(f"  Quality Score: {result.response_quality:.2f}")
-            print(f"  Specificity: {result.specificity_score:.2f}")
-            print(f"  Actionability: {result.actionability_score:.2f}")
-    except Exception as e:
-        print(f"Prompt testing demo skipped: {e}")
+    if accessibility_expert is not None:
+        template = accessibility_expert.get_template()
+        print(f"System prompt preview: {template.system_prompt[:160]}...")
 
     print()
 
@@ -300,7 +274,7 @@ async def main():
         await custom_expert_analysis()
         await expert_comparison()
         await structured_json_output()
-        await prompt_testing_demo()
+        await prompt_registry_demo()
         await advanced_instruction_patterns()
 
     except Exception as e:

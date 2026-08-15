@@ -1,16 +1,21 @@
 """Test suite functionality for LayoutLens."""
 
-import asyncio
+from __future__ import annotations
+
 import json
 import re
 import time
 from dataclasses import dataclass, field
-from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any
 
-from ..api.core import AnalysisResult, BatchResult, LayoutLens
+import yaml
+
+from ..api.core import AnalysisResult
 from ..exceptions import ValidationError
+
+if TYPE_CHECKING:
+    from ..api.core import LayoutLens
 
 
 def _parse_yes_no(text: str) -> str | None:
@@ -128,7 +133,7 @@ class UITestSuite:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "UITestSuite":
+    def from_dict(cls, data: dict[str, Any]) -> UITestSuite:
         """Create test suite from dictionary.
 
         Raises:
@@ -171,11 +176,54 @@ class UITestSuite:
             json.dump(self.to_dict(), f, indent=2)
 
     @classmethod
-    def load(cls, filepath: Path) -> "UITestSuite":
-        """Load test suite from JSON file."""
+    def load(cls, filepath: Path) -> UITestSuite:
+        """Load a test suite from a JSON or YAML file (by extension)."""
+        filepath = Path(filepath)
+        if filepath.suffix.lower() in {".yaml", ".yml"}:
+            return cls.from_yaml(filepath)
         with open(filepath) as f:
             data = json.load(f)
         return cls.from_dict(data)
+
+    @classmethod
+    def from_yaml(cls, filepath: str | Path) -> UITestSuite:
+        """Load a test suite from a YAML file."""
+        with open(filepath) as f:
+            data = yaml.safe_load(f)
+        return cls.from_dict(data)
+
+    @classmethod
+    def from_specs(
+        cls, name: str, description: str, test_cases: list[dict[str, Any]]
+    ) -> UITestSuite:
+        """Create a test suite from test-case spec dicts.
+
+        Each spec follows the same shape as a YAML test case, including a
+        required ``expected_results`` (see the ``UITestCase`` docstring for
+        schema) — validated identically to, and via the same helper as,
+        :meth:`from_dict`.
+
+        Raises:
+            ValidationError: If any spec is missing ``expected_results``.
+        """
+        cases = []
+        for tc_spec in test_cases:
+            case_name = tc_spec.get("name", "<unnamed test case>")
+            expected_results = _require_expected_results(
+                case_name, tc_spec.get("expected_results")
+            )
+            cases.append(
+                UITestCase(
+                    name=case_name,
+                    html_path=tc_spec["html_path"],
+                    queries=tc_spec["queries"],
+                    viewports=tc_spec.get("viewports", ["desktop"]),
+                    metadata=tc_spec.get("metadata", {}),
+                    expected_results=expected_results,
+                    expected_confidence=tc_spec.get("expected_confidence", 0.7),
+                )
+            )
+        return cls(name=name, description=description, test_cases=cases)
 
 
 @dataclass
@@ -314,144 +362,70 @@ def _evaluate_case_assertions(
     }
 
 
-def extend_layoutlens_with_test_suite():
-    """Extend LayoutLens class with test suite functionality."""
+async def run_suite_case(
+    lens: LayoutLens, suite: UITestSuite, test_case: UITestCase
+) -> UITestResult:
+    """Run one test case (every query × viewport) and grade its assertions.
 
-    async def run_test_suite(
-        self, suite: UITestSuite, parallel: bool = False, max_workers: int = 4
-    ) -> list[UITestResult]:
-        """Run a test suite and return results.
+    Called by :meth:`LayoutLens.run_test_suite`; lives here so all suite
+    grading logic stays next to ``_evaluate_case_assertions``.
+    """
+    start_time = time.time()
+    test_results = []
+    passed = 0
+    failed = 0
 
-        Args:
-            self: The ``LayoutLens`` instance this method is attached to
-            suite: The test suite to run
-            parallel: Whether to run tests in parallel
-            max_workers: Maximum number of parallel workers
+    for viewport in test_case.viewports:
+        for query in test_case.queries:
+            try:
+                result = await lens.analyze(
+                    source=test_case.html_path,
+                    query=query,
+                    viewport=viewport,
+                    context=test_case.metadata,
+                )
 
-        Returns:
-            List of UITestResult objects
-        """
-        results = []
+                # Assert against the case's expected_results / expected_confidence
+                # rather than trusting the model's self-reported confidence alone.
+                assertion_detail = _evaluate_case_assertions(test_case, result)
+                result.metadata["assertion_detail"] = assertion_detail
 
-        for test_case in suite.test_cases:
-            start_time = time.time()
-            test_results = []
-            passed = 0
-            failed = 0
+                if assertion_detail["passed"]:
+                    passed += 1
+                else:
+                    failed += 1
 
-            # Run analysis for each query and viewport combination
-            for viewport in test_case.viewports:
-                for query in test_case.queries:
-                    try:
-                        # Use the existing analyze method
-                        result = await self.analyze(
-                            source=test_case.html_path,
-                            query=query,
-                            viewport=viewport,
-                            context=test_case.metadata,
-                        )
+                test_results.append(result)
 
-                        # Assert against the case's expected_results / expected_confidence
-                        # rather than trusting the model's self-reported confidence alone.
-                        assertion_detail = _evaluate_case_assertions(test_case, result)
-                        result.metadata["assertion_detail"] = assertion_detail
+            except Exception as e:
+                failed += 1
+                test_results.append(
+                    AnalysisResult(
+                        source=test_case.html_path,
+                        query=query,
+                        answer=f"Test failed: {e!s}",
+                        confidence=0.0,
+                        reasoning="Test execution failed",
+                        metadata={
+                            "error": str(e),
+                            "assertion_detail": {
+                                "passed": False,
+                                "checks": [],
+                                "failure_reasons": [
+                                    f"Analysis raised an exception: {e}"
+                                ],
+                            },
+                        },
+                    )
+                )
 
-                        if assertion_detail["passed"]:
-                            passed += 1
-                        else:
-                            failed += 1
-
-                        test_results.append(result)
-
-                    except Exception as e:
-                        # Failed test
-                        failed += 1
-                        # Create a failed result
-                        test_results.append(
-                            AnalysisResult(
-                                source=test_case.html_path,
-                                query=query,
-                                answer=f"Test failed: {e!s}",
-                                confidence=0.0,
-                                reasoning="Test execution failed",
-                                metadata={
-                                    "error": str(e),
-                                    "assertion_detail": {
-                                        "passed": False,
-                                        "checks": [],
-                                        "failure_reasons": [
-                                            f"Analysis raised an exception: {e}"
-                                        ],
-                                    },
-                                },
-                            )
-                        )
-
-            duration = time.time() - start_time
-
-            # Create test result
-            test_result = UITestResult(
-                suite_name=suite.name,
-                test_case_name=test_case.name,
-                total_tests=len(test_case.queries) * len(test_case.viewports),
-                passed_tests=passed,
-                failed_tests=failed,
-                results=test_results,
-                duration_seconds=duration,
-                metadata=test_case.metadata,
-            )
-
-            results.append(test_result)
-
-        return results
-
-    def create_test_suite(
-        self, name: str, description: str, test_cases: list[dict[str, Any]]
-    ) -> UITestSuite:
-        """Create a test suite from specifications.
-
-        Each spec in ``test_cases`` follows the same shape as a YAML test
-        case, including a required ``expected_results`` (see the
-        ``UITestCase`` docstring for schema) — validated identically to, and
-        via the same helper as, ``UITestSuite.from_dict``.
-
-        Args:
-            self: The ``LayoutLens`` instance this method is attached to
-            name: Name of the test suite
-            description: Description of the test suite
-            test_cases: List of test case specifications, each requiring
-                "name", "html_path", "queries", and "expected_results".
-
-        Returns:
-            UITestSuite object
-
-        Raises:
-            ValidationError: If any spec is missing ``expected_results``.
-        """
-        cases = []
-        for tc_spec in test_cases:
-            case_name = tc_spec.get("name", "<unnamed test case>")
-            expected_results = _require_expected_results(
-                case_name, tc_spec.get("expected_results")
-            )
-            test_case = UITestCase(
-                name=case_name,
-                html_path=tc_spec["html_path"],
-                queries=tc_spec["queries"],
-                viewports=tc_spec.get("viewports", ["desktop"]),
-                metadata=tc_spec.get("metadata", {}),
-                expected_results=expected_results,
-                expected_confidence=tc_spec.get("expected_confidence", 0.7),
-            )
-            cases.append(test_case)
-
-        return UITestSuite(name=name, description=description, test_cases=cases)
-
-    # Add methods to LayoutLens class. Deliberate monkey-patching, invisible
-    # to the type checker by design.
-    LayoutLens.run_test_suite = run_test_suite  # pyright: ignore[reportAttributeAccessIssue]
-    LayoutLens.create_test_suite = create_test_suite  # pyright: ignore[reportAttributeAccessIssue]
-
-
-# Auto-extend when module is imported
-extend_layoutlens_with_test_suite()
+    return UITestResult(
+        suite_name=suite.name,
+        test_case_name=test_case.name,
+        total_tests=len(test_case.queries) * len(test_case.viewports),
+        passed_tests=passed,
+        failed_tests=failed,
+        results=test_results,
+        duration_seconds=time.time() - start_time,
+        metadata=test_case.metadata,
+    )

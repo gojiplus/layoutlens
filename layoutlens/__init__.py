@@ -14,19 +14,12 @@ from .api.judge import JudgeResult
 from .api.test_suite import UITestCase, UITestResult, UITestSuite
 from .cache import AnalysisCache, create_cache
 from .capture import Capture
-from .config import Config
 from .exceptions import (
     AnalysisError,
-    APIError,
     AuthenticationError,
     ConfigurationError,
     LayoutFileNotFoundError,
     LayoutLensError,
-    NetworkError,
-    RateLimitError,
-    ScreenshotError,
-    TestSuiteError,
-    TimeoutError,
     ValidationError,
 )
 
@@ -48,6 +41,9 @@ from .logger import (
     get_logger,
     setup_logging,
 )
+
+# Expert persona system
+from .prompts import Instructions, UserContext, get_expert, list_available_experts
 from .types import (
     CacheType,
     CacheTypeType,
@@ -63,7 +59,6 @@ __all__ = [
     "AXE_VERSION",
     "A11yFinding",
     "A11yReport",
-    "APIError",
     # Cache
     "AnalysisCache",
     "AnalysisError",
@@ -80,10 +75,11 @@ __all__ = [
     # Types and Enums
     "ComplianceLevel",
     "ComplianceLevelType",
-    "Config",
     "ConfigurationError",
     "Expert",
     "ExpertType",
+    # Expert persona system
+    "Instructions",
     "JudgeResult",
     "LayoutFileNotFoundError",
     "LayoutFinding",
@@ -93,14 +89,10 @@ __all__ = [
     "LayoutReport",
     # Deterministic layout/geometry scorers
     "LayoutScorer",
-    "NetworkError",
-    "RateLimitError",
-    "ScreenshotError",
-    "TestSuiteError",
-    "TimeoutError",
     "UITestCase",
     "UITestResult",
     "UITestSuite",
+    "UserContext",
     "ValidationError",
     "Viewport",
     "ViewportType",
@@ -112,31 +104,21 @@ __all__ = [
     "contrast_ratio",
     "create_cache",
     "element_geometry",
+    "get_expert",
     "get_logger",
+    "list_available_experts",
     "read_computed_styles",
     # Logging
     "setup_logging",
 ]
 
-# Import version dynamically from pyproject.toml
+# Version comes from git tags via hatchling + uv-dynamic-versioning; installed
+# metadata is the only source of truth.
 import importlib.metadata
 
 try:
     __version__ = importlib.metadata.version("layoutlens")
 except importlib.metadata.PackageNotFoundError:
-    # Fallback for development/editable installs - read from pyproject.toml
-    try:
-        import tomllib
-        from pathlib import Path
-
-        pyproject_path = Path(__file__).parent.parent / "pyproject.toml"
-        if pyproject_path.exists():
-            with open(pyproject_path, "rb") as f:
-                data = tomllib.load(f)
-                __version__ = data["project"]["version"]
-        else:
-            __version__ = "1.2.0-dev"
-    except Exception:
-        __version__ = "1.2.0-dev"
+    __version__ = "0.0.0+unknown"
 
 __author__ = "LayoutLens Team"

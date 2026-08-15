@@ -45,9 +45,8 @@ async def website_analysis():
 async def compare_designs():
     """Compare two versions of a page.
 
-    compare() accepts URLs or already-captured screenshot images directly.
-    For local HTML files, capture screenshots first with capture() -- passing
-    raw .html paths to compare() skips screenshot rendering and fails.
+    compare() accepts URLs, local HTML files, or screenshot images; every
+    source is rendered and every screenshot goes to the model.
     """
 
     tester = LayoutLens()
@@ -110,7 +109,7 @@ async def mobile_check():
     tester = LayoutLens()
 
     # Check if page is mobile-friendly
-    result = await tester.check_mobile_friendly(
+    result = await tester.analyze_mobile_ux(
         source="benchmarks/test_data/responsive_design/mobile_friendly.html"
     )
 

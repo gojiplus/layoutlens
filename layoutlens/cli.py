@@ -3,7 +3,6 @@
 
 import argparse
 import asyncio
-import json
 import os
 import sys
 from pathlib import Path
@@ -56,6 +55,40 @@ async def _run_a11y(sources, args) -> int:
     return 0
 
 
+async def _run_suite(args) -> int:
+    """Load a YAML/JSON test suite, run it, and print per-case results."""
+    from .api.test_suite import UITestSuite
+
+    try:
+        suite = UITestSuite.load(Path(args.suite))
+    except (OSError, KeyError, LayoutLensError) as e:
+        print(f"Error loading suite {args.suite}: {e}", file=sys.stderr)
+        return 1
+
+    try:
+        lens = LayoutLens(
+            api_key=args.api_key or os.getenv("OPENAI_API_KEY"), model=args.model
+        )
+        results = await lens.run_test_suite(suite)
+    except LayoutLensError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+    if args.output == "json":
+        for r in results:
+            print(r.to_json())
+    else:
+        print()
+        for r in results:
+            status = "✅" if r.failed_tests == 0 else "❌"
+            print(
+                f"{status} {r.test_case_name}: {r.passed_tests}/{r.total_tests} passed"
+            )
+        print()
+
+    return 0 if all(r.failed_tests == 0 for r in results) else 1
+
+
 async def main():
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(
@@ -106,8 +139,24 @@ Examples:
         help="Run a WCAG accessibility check instead of a generic query. "
         "'axe' is deterministic and needs no API key; 'hybrid' also runs LLM vision; 'llm' is vision-only.",
     )
+    parser.add_argument(
+        "--suite",
+        help="Run a YAML/JSON test suite file instead of ad-hoc sources. "
+        "Exit code is 1 if any case fails.",
+    )
 
     args = parser.parse_args()
+
+    # Suite mode: sources/query/compare/a11y do not apply.
+    if args.suite:
+        if args.sources or args.query or args.compare or args.a11y:
+            print(
+                "Error: --suite runs a self-contained test suite and cannot be "
+                "combined with sources, --query, --compare, or --a11y",
+                file=sys.stderr,
+            )
+            return 1
+        return await _run_suite(args)
 
     # Handle no arguments
     if not args.sources:

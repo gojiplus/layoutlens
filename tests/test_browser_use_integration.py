@@ -1,9 +1,4 @@
-"""
-Tests for Browser Use integration module.
-
-These tests validate the AgentValidator, SessionRecorder, SessionReplayer,
-and ValidationReportGenerator classes.
-"""
+"""Tests for the Browser Use integration (types, reports, post-run validation)."""
 
 import json
 import tempfile
@@ -13,10 +8,6 @@ from unittest.mock import patch
 import pytest
 
 from layoutlens.integrations.browser_use import (
-    AgentValidator,
-    SessionComparison,
-    SessionRecording,
-    SessionReplayer,
     SessionState,
     ValidationFinding,
     ValidationPolicy,
@@ -179,120 +170,6 @@ class TestValidationSession:
         assert session.findings_by_severity.get("high") == 3
 
 
-class TestSessionRecording:
-    """Tests for SessionRecording dataclass."""
-
-    def test_save_and_load(self):
-        """Test saving and loading a recording."""
-        session = ValidationSession(
-            session_id="test_session",
-            state=SessionState.COMPLETED,
-            start_url="https://example.com",
-        )
-
-        recording = SessionRecording(
-            recording_id="test_recording",
-            session=session,
-            screenshots={1: "/path/to/screenshot.png"},
-            action_log=[{"step": 1, "action": "click"}],
-        )
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            save_path = Path(tmpdir) / "recording.json"
-            recording.save(save_path)
-
-            assert save_path.exists()
-
-            loaded = SessionRecording.load(save_path)
-            assert loaded.recording_id == "test_recording"
-            assert loaded.session.session_id == "test_session"
-            assert loaded.screenshots.get("1") == "/path/to/screenshot.png"
-
-
-class TestAgentValidator:
-    """Tests for AgentValidator class."""
-
-    def test_init_with_defaults(self):
-        """Test initializing with default values."""
-        with patch("layoutlens.integrations.browser_use.validator.LayoutLens"):
-            validator = AgentValidator()
-
-            assert validator.policy.experts == ["accessibility_expert"]
-            assert validator._session is None
-
-    def test_init_with_custom_experts(self):
-        """Test initializing with custom experts."""
-        with patch("layoutlens.integrations.browser_use.validator.LayoutLens"):
-            validator = AgentValidator(
-                experts=["mobile_expert", "conversion_expert"],
-            )
-
-            assert validator.policy.experts == ["mobile_expert", "conversion_expert"]
-
-    def test_start_session(self):
-        """Test starting a validation session."""
-        with patch("layoutlens.integrations.browser_use.validator.LayoutLens"):
-            validator = AgentValidator()
-            session = validator.start_session(
-                start_url="https://example.com",
-                agent_task="Test task",
-            )
-
-            assert session.start_url == "https://example.com"
-            assert session.agent_task == "Test task"
-            assert session.state == SessionState.RUNNING
-            assert validator._session is session
-
-    @pytest.mark.asyncio
-    async def test_end_session(self):
-        """Test ending a validation session."""
-        with patch("layoutlens.integrations.browser_use.validator.LayoutLens"):
-            validator = AgentValidator()
-            validator.start_session()
-
-            session = await validator.end_session()
-
-            assert session.state == SessionState.COMPLETED
-            assert session.end_time != ""
-
-    def test_get_hooks(self):
-        """Test getting Browser Use hooks."""
-        with patch("layoutlens.integrations.browser_use.validator.LayoutLens"):
-            validator = AgentValidator()
-            hooks = validator.get_hooks()
-
-            assert "on_step_start" in hooks
-            assert "on_step_end" in hooks
-            assert callable(hooks["on_step_start"])
-            assert callable(hooks["on_step_end"])
-
-
-class TestSessionReplayer:
-    """Tests for SessionReplayer class."""
-
-    def test_init(self):
-        """Test initializing replayer."""
-        with patch("layoutlens.integrations.browser_use.session.LayoutLens"):
-            replayer = SessionReplayer()
-
-            assert replayer.policy.experts == ["accessibility_expert"]
-
-    @pytest.mark.asyncio
-    async def test_extract_findings(self):
-        """Test finding extraction from reasoning."""
-        with patch("layoutlens.integrations.browser_use.session.LayoutLens"):
-            replayer = SessionReplayer()
-
-            findings = replayer._extract_findings(
-                "This has critical accessibility issues with color contrast",
-                "accessibility_expert",
-                0.8,
-            )
-
-            assert len(findings) == 1
-            assert findings[0].severity == ValidationSeverity.CRITICAL
-
-
 class TestValidationReportGenerator:
     """Tests for ValidationReportGenerator class."""
 
@@ -359,31 +236,6 @@ class TestValidationReportGenerator:
             assert "Test accessibility issue" in content
             assert "HIGH" in content
 
-    def test_generate_comparison_report(self):
-        """Test generating comparison report."""
-        comparison = SessionComparison(
-            baseline_id="baseline_123",
-            current_id="current_456",
-            new_findings=[
-                ValidationFinding("New issue", ValidationSeverity.HIGH, "expert", 0.8),
-            ],
-            resolved_findings=[],
-            persistent_findings=[],
-            regression_score=5.0,
-            summary="Regression detected: 1 new issues",
-        )
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            generator = ValidationReportGenerator(output_dir=tmpdir)
-            report_path = generator.generate_comparison_report(comparison)
-
-            assert report_path.exists()
-
-            content = report_path.read_text()
-            assert "baseline_123" in content
-            assert "current_456" in content
-            assert "New issue" in content
-
     def test_generate_timeline_data(self):
         """Test generating timeline visualization data."""
         step = ValidationStepResult(
@@ -409,76 +261,120 @@ class TestValidationReportGenerator:
             assert timeline["events"][0]["confidence"] == 0.85
 
 
-class TestIntegrationWorkflow:
-    """Integration tests for complete workflows."""
+class _StubHistory:
+    """Duck-typed stand-in for browser-use's AgentHistoryList."""
+
+    def __init__(self, urls, shots):
+        self._urls = urls
+        self._shots = shots
+
+    def urls(self):
+        return self._urls
+
+    def screenshot_paths(self, n_last=None, return_none_if_not_screenshot=True):
+        return self._shots
+
+
+class TestValidateAgentRun:
+    """Post-run validation against a recorded history."""
 
     @pytest.mark.asyncio
-    async def test_validator_session_lifecycle(self):
-        """Test complete validator session lifecycle."""
-        with patch("layoutlens.integrations.browser_use.validator.LayoutLens"):
-            validator = AgentValidator(
-                experts=["accessibility_expert"],
-                policy=ValidationPolicy(
-                    capture_on_click=False,
-                    capture_on_navigation=False,
-                ),
+    async def test_deterministic_checks_per_unique_url(self, monkeypatch):
+        from layoutlens import LayoutLens
+        from layoutlens.a11y.types import A11yFinding, A11yReport
+        from layoutlens.integrations.browser_use import validate_agent_run
+        from layoutlens.layout.types import LayoutReport
+
+        violation = A11yFinding(
+            rule_id="color-contrast",
+            impact="serious",
+            wcag_refs=["wcag143"],
+            description="low contrast",
+            help_url="",
+            nodes=[{"target": ["#low"]}],
+        )
+
+        async def fake_audit(self, source, viewport="desktop"):
+            return A11yReport(
+                source=str(source),
+                viewport=viewport,
+                engine_version="test",
+                violations=[violation],
+                incomplete=[],
+                passes_count=10,
             )
 
-            session = validator.start_session(
-                start_url="https://example.com",
-                agent_task="Test task",
+        async def fake_scan(self, source, viewport="desktop"):
+            return LayoutReport(source=str(source), viewport=viewport, findings=[])
+
+        monkeypatch.setattr(
+            "layoutlens.integrations.browser_use.validator.AxeAuditor.audit",
+            fake_audit,
+        )
+        monkeypatch.setattr(
+            "layoutlens.integrations.browser_use.validator.LayoutScorer.scan",
+            fake_scan,
+        )
+
+        # Three steps, one repeated URL, one about:blank -> 2 unique URLs.
+        history = _StubHistory(
+            urls=[
+                "about:blank",
+                "https://example.com",
+                "https://example.com",
+                "https://example.com/checkout",
+            ],
+            shots=[None, "a.png", "b.png", "c.png"],
+        )
+
+        session = await validate_agent_run(LayoutLens(), history)
+
+        assert session.state == SessionState.COMPLETED
+        assert len(session.steps) == 2
+        assert [s.url for s in session.steps] == [
+            "https://example.com",
+            "https://example.com/checkout",
+        ]
+        first = session.steps[0]
+        assert first.confidence == 1.0
+        assert len(first.findings) == 1
+        assert first.findings[0].severity == ValidationSeverity.HIGH
+        assert first.findings[0].verified is True
+        assert "color-contrast" in first.findings[0].issue
+
+    @pytest.mark.asyncio
+    async def test_requires_history_or_dir(self):
+        from layoutlens import LayoutLens
+        from layoutlens.integrations.browser_use import validate_agent_run
+
+        with pytest.raises(ValueError, match="history or a screenshot_dir"):
+            await validate_agent_run(LayoutLens())
+
+    @pytest.mark.asyncio
+    async def test_screenshot_dir_with_queries(self, tmp_path, monkeypatch):
+        from layoutlens import LayoutLens
+        from layoutlens.integrations.browser_use import validate_agent_run
+
+        (tmp_path / "step1.png").write_bytes(b"fake")
+
+        async def fake_analyze(source, query, viewport="desktop"):
+            from layoutlens.api.core import AnalysisResult
+
+            return AnalysisResult(
+                source=str(source),
+                query=query,
+                answer="Yes",
+                confidence=0.9,
+                reasoning="looks fine",
             )
-            assert session.state == SessionState.RUNNING
 
-            completed_session = await validator.end_session()
-            assert completed_session.state == SessionState.COMPLETED
-            assert completed_session.session_id == session.session_id
+        lens = LayoutLens()
+        monkeypatch.setattr(lens, "analyze", fake_analyze)
 
-    def test_session_recording_roundtrip(self):
-        """Test saving and loading session recording."""
-        finding = ValidationFinding(
-            issue="Test issue",
-            severity=ValidationSeverity.MEDIUM,
-            expert="accessibility_expert",
-            confidence=0.75,
+        session = await validate_agent_run(
+            lens, screenshot_dir=tmp_path, queries=["Is the page readable?"]
         )
 
-        step = ValidationStepResult(
-            step_number=1,
-            trigger=ValidationTrigger.ON_CLICK,
-            url="https://example.com/page",
-            findings=[finding],
-            confidence=0.75,
-        )
-
-        session = ValidationSession(
-            session_id="roundtrip_test",
-            state=SessionState.COMPLETED,
-            steps=[step],
-            start_url="https://example.com",
-            agent_task="Test roundtrip",
-        )
-
-        recording = SessionRecording(
-            recording_id="roundtrip_recording",
-            session=session,
-            screenshots={1: "/path/screenshot.png"},
-            action_log=[{"step": 1, "action": "click", "target": "#button"}],
-        )
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            save_path = Path(tmpdir) / "roundtrip.json"
-            recording.save(save_path)
-
-            loaded = SessionRecording.load(save_path)
-
-            assert loaded.recording_id == recording.recording_id
-            assert loaded.session.session_id == session.session_id
-            assert loaded.session.state == SessionState.COMPLETED
-            assert len(loaded.session.steps) == 1
-            assert loaded.session.steps[0].trigger == ValidationTrigger.ON_CLICK
-            assert len(loaded.session.steps[0].findings) == 1
-            assert (
-                loaded.session.steps[0].findings[0].severity
-                == ValidationSeverity.MEDIUM
-            )
+        assert len(session.steps) == 1
+        assert session.steps[0].answer == "Yes"
+        assert session.steps[0].metadata["query"] == "Is the page readable?"

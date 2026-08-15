@@ -18,16 +18,30 @@ import socketserver
 import threading
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
 
 from playwright.async_api import Page, async_playwright
 
-from .config import ViewportConfig
 from .logger import get_logger
 from .types import Viewport, ViewportType
 
 logger = get_logger("browser")
+
+
+@dataclass
+class ViewportConfig:
+    """Viewport configuration for a capture/audit session."""
+
+    name: str
+    width: int
+    height: int
+    device_scale_factor: float = 1.0
+    is_mobile: bool = False
+    has_touch: bool = False
+    user_agent: str | None = None
+
 
 # Canonical viewport definitions. This is the single source of truth reused by
 # both the capture engine and the accessibility auditor.

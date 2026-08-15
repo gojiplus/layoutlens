@@ -88,8 +88,7 @@ result = await lens.analyze(
 ### Compare Designs
 
 ```python
-# Compare two live pages (compare() takes URLs or already-captured
-# screenshots directly; for local HTML files, call capture() first)
+# Compare two pages (URLs, local HTML files, or screenshot images)
 result = await lens.compare(
     ["https://old-design.com", "https://new-design.com"],
     "Which design is more user-friendly?",
@@ -100,7 +99,7 @@ result = await lens.compare(
 
 ### Mobile-Friendly Check
 ```python
-result = await lens.check_mobile_friendly("https://your-site.com")
+result = await lens.analyze_mobile_ux("https://your-site.com")
 ```
 
 ### Accessibility Check
@@ -112,7 +111,7 @@ result = await lens.check_accessibility(
 
 ### Conversion Optimization
 ```python
-result = await lens.check_conversion_optimization("https://your-site.com")
+result = await lens.optimize_conversions("https://your-site.com")
 ```
 
 ## 🤖 CI Integration
@@ -266,11 +265,6 @@ playwright install chromium
 **Screenshot capture fails:**
 - Check the URL is accessible
 - Try with `wait_time` parameter for slow-loading pages
-
-**"You uploaded an unsupported image" error from `compare()`:**
-`compare()` expects URLs or already-captured screenshot paths. Passing a raw
-local `.html` path skips screenshot rendering — call `await lens.capture(...)`
-first and pass the resulting screenshot paths to `compare()`.
 
 ### Getting Help
 

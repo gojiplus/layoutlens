@@ -6,7 +6,7 @@ import json
 import pickle  # nosec B403 - Used only for internal caching, not user input
 import time
 from abc import ABC, abstractmethod
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -252,8 +252,16 @@ class AnalysisCache:
         query: str,
         viewport: str = "desktop",
         context: dict[str, Any] | None = None,
+        model: str = "",
+        instructions_fingerprint: str = "",
     ) -> str:
-        """Generate a cache key for an analysis request."""
+        """Generate a cache key for an analysis request.
+
+        ``model`` (a provider/model/api_base fingerprint) and
+        ``instructions_fingerprint`` are part of the key so answers from one
+        model or expert persona are never served for another — a real bug when
+        the file cache persists across benchmark runs with different models.
+        """
         # Include screenshot content hash for files
         source_hash = self._get_source_hash(source)
 
@@ -264,32 +272,11 @@ class AnalysisCache:
             "query": query.strip().lower(),
             "viewport": viewport,
             "context": context or {},
+            "model": model,
+            "instructions": instructions_fingerprint,
         }
 
         # Create stable hash
-        content_str = json.dumps(content, sort_keys=True)
-        return hashlib.sha256(content_str.encode()).hexdigest()[:16]
-
-    def get_comparison_key(
-        self,
-        sources: list,
-        query: str = "Are these layouts consistent?",
-        viewport: str = "desktop",
-        context: dict[str, Any] | None = None,
-    ) -> str:
-        """Generate a cache key for a comparison request."""
-        # Sort sources for consistent hashing
-        sorted_sources = sorted(str(s) for s in sources)
-        source_hashes = [self._get_source_hash(s) for s in sorted_sources]
-
-        content = {
-            "sources": sorted_sources,
-            "source_hashes": source_hashes,
-            "query": query.strip().lower(),
-            "viewport": viewport,
-            "context": context or {},
-        }
-
         content_str = json.dumps(content, sort_keys=True)
         return hashlib.sha256(content_str.encode()).hexdigest()[:16]
 

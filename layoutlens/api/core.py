@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import hashlib
 import json
 import os
 import re
@@ -20,10 +21,10 @@ from urllib.parse import urlparse
 if TYPE_CHECKING:
     from .batch import BatchRequest
     from .judge import JudgeResult
+    from .test_suite import UITestResult, UITestSuite
 
 # Import LiteLLM directly
 try:
-    import litellm
     from litellm import acompletion
 except ImportError as e:
     raise ImportError("litellm is required. Install with: pip install litellm") from e
@@ -42,13 +43,10 @@ from ..capture import Capture
 
 # Import custom exceptions
 from ..exceptions import (
-    AnalysisError,
     AuthenticationError,
     LayoutFileNotFoundError,
     LayoutLensError,
-    ScreenshotError,
     ValidationError,
-    wrap_exception,
 )
 
 # Import logging
@@ -62,7 +60,6 @@ from ..prompts import Instructions, get_expert
 
 # Import types
 from ..types import (
-    CacheType,
     ComplianceLevel,
     ComplianceLevelType,
     Expert,
@@ -330,6 +327,31 @@ class LayoutLens:
         with open(image_path, "rb") as image_file:
             return base64.b64encode(image_file.read()).decode("utf-8")
 
+    def _model_fingerprint(self) -> str:
+        """Identify the model configuration for cache keying."""
+        return f"{self.provider}:{self.model}@{self.api_base or ''}"
+
+    @staticmethod
+    def _instructions_fingerprint(instructions: Instructions | None) -> str:
+        """Stable short hash of an Instructions object for cache keying."""
+        if instructions is None:
+            return ""
+        payload = json.dumps(asdict(instructions), sort_keys=True, default=str)
+        return hashlib.sha256(payload.encode()).hexdigest()[:12]
+
+    def _image_content_part(self, image_path: str | Path) -> dict[str, Any]:
+        """Build one image_url content part with a suffix-appropriate MIME type."""
+        mime = (
+            "image/jpeg"
+            if Path(image_path).suffix.lower() in {".jpg", ".jpeg"}
+            else "image/png"
+        )
+        image_b64 = self._encode_image(image_path)
+        return {
+            "type": "image_url",
+            "image_url": {"url": f"data:{mime};base64,{image_b64}"},
+        }
+
     def _format_query_prompt(
         self,
         query: str,
@@ -384,19 +406,24 @@ Focus on:
 
     def _parse_structured_response(self, content: str) -> tuple[str, float, str]:
         """Parse structured response and return answer, confidence, and reasoning."""
-        # Try to extract JSON from response first
-        json_match = re.search(r'\{[^{}]*"answer"[^{}]*\}', content)
+        # Balanced-object JSON extraction shared with the judge path: tolerates
+        # code fences, surrounding prose, and nested objects — the old regex
+        # here rejected any nested braces, silently degrading answers to the
+        # text fallback. Imported locally because judge imports this module.
+        from .judge import _extract_json_object
 
-        if json_match:
+        parsed = _extract_json_object(content)
+        if parsed is not None and "answer" in parsed:
+            reasoning = parsed.get("reasoning") or parsed.get("rationale") or ""
             try:
-                parsed = json.loads(json_match.group())
-                return (
-                    parsed.get("answer", content),
-                    float(parsed.get("confidence", 0.5)),
-                    parsed.get("reasoning", "Analysis completed"),
-                )
-            except (json.JSONDecodeError, ValueError):
-                pass
+                confidence = float(parsed.get("confidence", 0.5))
+            except (TypeError, ValueError):
+                confidence = 0.5
+            return (
+                str(parsed["answer"]),
+                min(max(confidence, 0.0), 1.0),
+                str(reasoning) or "Analysis completed",
+            )
 
         # Fallback: parse confidence from text patterns
         confidence = 0.5
@@ -425,22 +452,20 @@ Focus on:
 
     async def _call_vision_api(
         self,
-        image_path: str,
+        image_path: str | list[str],
         query: str,
         context: dict[str, Any] | None = None,
         instructions: Instructions | None = None,
     ) -> dict[str, Any]:
-        """Call LiteLLM vision API directly."""
+        """Call LiteLLM vision API with one image, or several (comparisons)."""
         # Enforce the API-key requirement at the first point of LLM use. Raised
         # (not swallowed) so it propagates through analyze as an AuthenticationError.
         self._ensure_api_key()
 
-        # Encode image
+        paths = [image_path] if isinstance(image_path, str) else list(image_path)
         try:
-            image_b64 = self._encode_image(image_path)
-            self.logger.debug(
-                f"Image encoded successfully: {len(image_b64)} characters"
-            )
+            image_parts = [self._image_content_part(p) for p in paths]
+            self.logger.debug(f"Encoded {len(image_parts)} image(s)")
         except Exception as e:
             self.logger.error(f"Image encoding failed: {e}")
             return {
@@ -465,15 +490,7 @@ Focus on:
                 "messages": [
                     {
                         "role": "user",
-                        "content": [
-                            {"type": "text", "text": prompt},
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/png;base64,{image_b64}"
-                                },
-                            },
-                        ],
+                        "content": [{"type": "text", "text": prompt}, *image_parts],
                     }
                 ],
                 "timeout": 30.0,
@@ -640,6 +657,10 @@ Focus on:
                     query=query,
                     viewport=viewport_value,
                     context=context,
+                    model=self._model_fingerprint(),
+                    instructions_fingerprint=self._instructions_fingerprint(
+                        instructions
+                    ),
                 )
                 # ``AnalysisCache.get`` returns a defensive deep copy, so mutating
                 # the result here (and by downstream callers such as the hybrid
@@ -767,7 +788,11 @@ Focus on:
             query = queries[query_idx]
 
             if isinstance(result, Exception):
-                # Create error result for unexpected exceptions
+                # A single source+query call propagates typed errors to the
+                # caller; batch runs isolate them per item instead, so one bad
+                # source never sinks the rest.
+                if is_single_result and isinstance(result, LayoutLensError):
+                    raise result
                 self.logger.warning(f"Unexpected error for {source}: {result}")
                 error_result = AnalysisResult(
                     source=str(source),
@@ -880,19 +905,25 @@ Focus on:
 
                 screenshot_paths.append(screenshot_path)
 
-                # Individual analysis
+                # Individual analysis on the screenshot we just captured, so
+                # each source is rendered exactly once. Restore the original
+                # source name afterwards for the caller's benefit.
                 individual_result = await self.analyze(
-                    source, query, viewport_value, context
+                    screenshot_path, query, viewport_value, context
                 )
+                individual_result.source = str(source)
                 individual_results.append(individual_result)
 
-            # Comparative analysis using first screenshot with comparison query
+            # Comparative analysis: every screenshot goes to the model, in
+            # order, with a legend mapping "Image N" to its source.
             self.logger.debug("Starting comparative analysis")
             if len(screenshot_paths) >= 2:
-                # Use the first screenshot as the base image and enhance query for comparison
-                comparison_query = f"{query}\n\nImages to compare: {', '.join(Path(p).name for p in screenshot_paths)}"
+                legend = "\n".join(
+                    f"Image {i + 1}: {s}" for i, s in enumerate(map(str, sources))
+                )
+                comparison_query = f"{query}\n\nYou are given {len(screenshot_paths)} images:\n{legend}"
                 comparison_response = await self._call_vision_api(
-                    image_path=screenshot_paths[0],
+                    image_path=screenshot_paths,
                     query=comparison_query,
                     context=context,
                     instructions=instructions,
@@ -1389,6 +1420,8 @@ Focus on:
             query=query,
             viewport=viewport_value,
             context={"a11y_mode": mode},
+            model=self._model_fingerprint(),
+            instructions_fingerprint=self._instructions_fingerprint(instructions),
         )
         # ``AnalysisCache.get`` already hands back a defensive deep copy.
         cached = self.cache.get(cache_key)
@@ -1550,84 +1583,9 @@ Focus on:
         )
 
     # Developer convenience methods
+    # Expert-Based Analysis Methods
+
     async def check_accessibility(
-        self,
-        source: str | Path,
-        viewport: ViewportType = "desktop",
-        mode: Literal["hybrid", "axe", "llm"] = "hybrid",
-    ) -> AnalysisResult:
-        """Accessibility check with deterministic axe-core, LLM vision, or both.
-
-        Args:
-            source: URL or file path to analyze.
-            viewport: Viewport for capture/audit.
-            mode: ``"hybrid"`` (default) runs deterministic axe-core WCAG A/AA
-                checks and LLM vision analysis, forcing a "no" verdict when axe
-                finds any violation. ``"axe"`` runs axe-core only (no API key
-                required, no LLM call). ``"llm"`` runs the legacy vision-only
-                analysis.
-
-        Returns:
-            AnalysisResult. In axe/hybrid modes ``metadata["a11y"]`` holds the
-            full axe report, ``metadata["mode"]`` the mode, and
-            ``metadata["engine"]`` the axe-core version.
-        """
-        viewport_value = (
-            viewport.value if isinstance(viewport, Viewport) else str(viewport)
-        )
-        query = """
-        Analyze this page for accessibility issues. Check:
-        1. Color contrast and readability
-        2. Button and link sizing for touch targets
-        3. Visual hierarchy and heading structure
-        4. Form labels and input clarity
-        5. Overall usability for users with disabilities
-
-        Provide specific feedback on what works well and what needs improvement.
-        """
-
-        if mode == "llm":
-            result = await self.analyze(source, query, viewport_value)
-            result.metadata["mode"] = mode
-            return result
-
-        return await self._run_a11y_check(
-            source, query, viewport_value, ["wcag2a", "wcag2aa"], mode
-        )
-
-    async def check_mobile_friendly(self, source: str | Path) -> AnalysisResult:
-        """Quick mobile responsiveness check."""
-        query = """
-        Evaluate this page for mobile usability:
-        1. Are touch targets large enough (minimum 44px)?
-        2. Is text readable without zooming?
-        3. Is navigation accessible on small screens?
-        4. Does content fit properly without horizontal scrolling?
-        5. Are forms easy to use on mobile?
-
-        Rate the mobile experience and suggest improvements.
-        """
-        return await self.analyze(source, query, "mobile")
-
-    async def check_conversion_optimization(
-        self, source: str | Path, viewport: ViewportType = "desktop"
-    ) -> AnalysisResult:
-        """Check for conversion-focused design elements."""
-        query = """
-        Analyze this page for conversion optimization:
-        1. Is the primary call-to-action prominent and clear?
-        2. Is the value proposition immediately obvious?
-        3. Are there any friction points in the user flow?
-        4. Does the design build trust and credibility?
-        5. Is the page focused or too cluttered?
-
-        Provide specific recommendations to improve conversions.
-        """
-        return await self.analyze(source, query, viewport)
-
-    # Enhanced Expert-Based Analysis Methods
-
-    async def audit_accessibility(
         self,
         source: str | Path,
         standards: list[str] | None = None,
@@ -1635,7 +1593,7 @@ Focus on:
         viewport: ViewportType = "desktop",
         mode: Literal["hybrid", "axe", "llm"] = "hybrid",
     ) -> AnalysisResult:
-        """Professional accessibility audit using WCAG expert knowledge.
+        """Accessibility audit: deterministic axe-core, LLM vision, or both.
 
         Args:
             source: URL or file path to analyze
@@ -1877,6 +1835,39 @@ Focus on:
         )
 
     # Cache management methods
+    async def run_test_suite(
+        self, suite: UITestSuite, parallel: bool = False, max_workers: int = 4
+    ) -> list[UITestResult]:
+        """Run a test suite and return one result per test case.
+
+        Args:
+            suite: The test suite to run.
+            parallel: Run test cases concurrently instead of serially.
+            max_workers: Maximum concurrent test cases when ``parallel``.
+
+        Returns:
+            List of ``UITestResult`` objects, in suite order.
+        """
+        from .test_suite import run_suite_case
+
+        if parallel:
+            semaphore = asyncio.Semaphore(max_workers)
+
+            async def guarded(tc) -> UITestResult:
+                async with semaphore:
+                    return await run_suite_case(self, suite, tc)
+
+            return list(await asyncio.gather(*(guarded(tc) for tc in suite.test_cases)))
+        return [await run_suite_case(self, suite, tc) for tc in suite.test_cases]
+
+    def create_test_suite(
+        self, name: str, description: str, test_cases: list[dict[str, Any]]
+    ) -> UITestSuite:
+        """Create a test suite from spec dicts (see ``UITestSuite.from_specs``)."""
+        from .test_suite import UITestSuite
+
+        return UITestSuite.from_specs(name, description, test_cases)
+
     def get_cache_stats(self) -> dict[str, Any]:
         """Get cache performance statistics."""
         return self.cache.stats()

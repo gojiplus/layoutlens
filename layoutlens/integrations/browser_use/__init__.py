@@ -1,25 +1,18 @@
 """Browser Use integration for LayoutLens.
 
-Provides hooks and utilities for validating browser agent actions
-using LayoutLens visual analysis.
+Post-run validation of browser-use agent sessions at the stable seam — the
+``AgentHistoryList`` returned by ``Agent.run()`` — plus report generation.
 
 Examples:
-    >>> from layoutlens.integrations.browser_use import AgentValidator, ValidationPolicy
-    >>> validator = AgentValidator(
-    ...     experts=["accessibility_expert", "mobile_expert"],
-    ...     policy=ValidationPolicy(capture_on_click=True)
-    ... )
-    >>> hooks = validator.get_hooks()
-    >>> await agent.run(**hooks)
-    >>> session = validator.get_session()
+    >>> from layoutlens import LayoutLens
+    >>> from layoutlens.integrations.browser_use import validate_agent_run
+    >>> history = await agent.run()
+    >>> session = await validate_agent_run(LayoutLens(), history)
     >>> print(f"Found {session.total_findings} issues")
 """
 
 from .reports import ValidationReportGenerator
-from .session import SessionRecorder, SessionReplayer
 from .types import (
-    SessionComparison,
-    SessionRecording,
     SessionState,
     ValidationFinding,
     ValidationPolicy,
@@ -28,14 +21,9 @@ from .types import (
     ValidationStepResult,
     ValidationTrigger,
 )
-from .validator import AgentValidator
+from .validator import validate_agent_run
 
 __all__ = [
-    "AgentValidator",
-    "SessionComparison",
-    "SessionRecorder",
-    "SessionRecording",
-    "SessionReplayer",
     "SessionState",
     "ValidationFinding",
     "ValidationPolicy",
@@ -44,4 +32,5 @@ __all__ = [
     "ValidationSeverity",
     "ValidationStepResult",
     "ValidationTrigger",
+    "validate_agent_run",
 ]
