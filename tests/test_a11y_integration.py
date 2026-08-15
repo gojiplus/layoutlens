@@ -365,6 +365,30 @@ class TestCheckAccessibilityModes:
         assert result.metadata["mode"] == "axe"
 
 
+def _chromium_available() -> bool:
+    """Return True if a headless chromium can be launched."""
+    from playwright.async_api import async_playwright
+
+    async def _check() -> bool:
+        try:
+            async with async_playwright() as p:
+                browser = await p.chromium.launch(headless=True)
+                await browser.close()
+            return True
+        except Exception:
+            return False
+
+    return asyncio.run(_check())
+
+
+requires_chromium = pytest.mark.skipif(
+    not _chromium_available(),
+    reason="chromium is not available for Playwright",
+)
+
+
+@pytest.mark.browser
+@requires_chromium
 class TestCheckAccessibilityBrowser:
     """End-to-end axe mode with a real browser and no API key."""
 

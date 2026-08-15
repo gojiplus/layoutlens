@@ -56,8 +56,11 @@ dev = [
     "pre-commit>=3.0.0",
     "rich>=14.2.0",
     "pyright>=1.1.390",
-    "pydoclint>=0.5",
     "pytest-asyncio>=0.21.0",
+    # pydoclint is deliberately absent: its docstring-parser-fork dependency
+    # installs the same `docstring_parser` module path as the plain
+    # docstring-parser wheel other deps pull in, and whichever loses the race
+    # crashes. Run it out-of-env: `uvx pydoclint layoutlens/`.
 ]
 test = [
     "pytest>=7.0.0",
@@ -88,6 +91,13 @@ browser-use = [
 
 [project.scripts]
 layoutlens = "layoutlens.cli:cli"
+
+[tool.uv]
+# browser-use 0.13.x hard-pins aiohttp==3.13.4, which has known CVEs
+# (PYSEC-2026-2xxx family; fixed in 3.14). The pin is lockstep caution, not a
+# known incompatibility, so force the patched line. Drop this once browser-use
+# ships with aiohttp>=3.14.
+override-dependencies = ["aiohttp>=3.14.3"]
 
 [tool.pytest.ini_options]
 minversion = "7.0"
