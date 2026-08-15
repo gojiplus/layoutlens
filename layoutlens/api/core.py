@@ -49,6 +49,9 @@ from ..exceptions import (
     ValidationError,
 )
 
+# Import deterministic layout scorers
+from ..layout import LayoutReport, LayoutScorer
+
 # Import logging
 from ..logger import get_logger, log_function_call, log_performance_metric
 
@@ -115,6 +118,29 @@ def _read_usage(response: Any) -> dict[str, int]:
     }
 
 
+def _estimate_cost(
+    model: str, prompt_tokens: int, completion_tokens: int
+) -> float | None:
+    """Estimate USD cost from token counts via litellm's price registry.
+
+    Returns None when the model is unknown to litellm (e.g. local models),
+    rather than reporting a fake $0.
+    """
+    if not (prompt_tokens or completion_tokens):
+        return 0.0
+    try:
+        from litellm import cost_per_token
+
+        prompt_cost, completion_cost = cost_per_token(
+            model=model,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+        )
+        return round(prompt_cost + completion_cost, 6)
+    except Exception:
+        return None
+
+
 @dataclass(slots=True)
 class AnalysisResult:
     """Result from analyzing a single URL or screenshot."""
@@ -164,6 +190,10 @@ class BatchResult:
     successful_queries: int
     average_confidence: float
     total_execution_time: float
+    total_prompt_tokens: int = 0
+    total_completion_tokens: int = 0
+    total_tokens: int = 0
+    estimated_cost_usd: float | None = None
     timestamp: str = field(default_factory=lambda: time.strftime("%Y-%m-%d %H:%M:%S"))
 
     def to_json(self) -> str:
@@ -823,12 +853,26 @@ Focus on:
                 else 0.0
             )
 
+            prompt_tokens = sum(
+                r.metadata.get("prompt_tokens", 0) for r in processed_results
+            )
+            completion_tokens = sum(
+                r.metadata.get("completion_tokens", 0) for r in processed_results
+            )
             return BatchResult(
                 results=processed_results,
                 total_queries=len(processed_results),
                 successful_queries=len(successful_results),
                 average_confidence=average_confidence,
                 total_execution_time=total_execution_time,
+                total_prompt_tokens=prompt_tokens,
+                total_completion_tokens=completion_tokens,
+                total_tokens=sum(
+                    r.metadata.get("tokens_used", 0) for r in processed_results
+                ),
+                estimated_cost_usd=_estimate_cost(
+                    self.model, prompt_tokens, completion_tokens
+                ),
             )
 
     async def compare(
@@ -1649,6 +1693,213 @@ Focus on:
         return await self._run_a11y_check(
             source, query, viewport_value, run_only, mode, instructions=instructions
         )
+
+    # Deterministic layout checks (geometry/contrast), mirroring the a11y stack
+
+    @staticmethod
+    def _layout_answer(report: LayoutReport) -> str:
+        """Phrase a natural-language yes/no answer from a layout report."""
+        if report.findings:
+            classes = ", ".join(sorted({f.defect_class for f in report.findings}))
+            return (
+                f"No — deterministic layout scan found {len(report.findings)} "
+                f"defect(s): {classes}"
+            )
+        return "Yes — deterministic layout scan found no defects"
+
+    @staticmethod
+    def _inject_layout_context(query: str, report: LayoutReport) -> str:
+        """Append a deterministic layout-scan context block to an LLM query."""
+        return (
+            f"{query}\n\n"
+            f"Deterministic layout/geometry scan results for this page:\n{report.summary()}\n"
+            "Assess additional visual layout issues that geometric rules cannot catch."
+        )
+
+    def _apply_layout_override(
+        self, result: AnalysisResult, report: LayoutReport, mode: str
+    ) -> AnalysisResult:
+        """Apply the deterministic override to a hybrid layout result.
+
+        If the scorer measured any defect, the final answer is forced to "no"
+        with full confidence — the measurements are receipts, not opinions.
+        Otherwise the LLM's own answer/confidence stand. The layout report is
+        always attached under ``metadata["layout"]``.
+        """
+        if report.findings:
+            result.answer = self._layout_answer(report)
+            result.confidence = 1.0
+            result.reasoning = (
+                f"{report.summary()}\n\nLLM assessment:\n{result.reasoning}"
+            )
+        result.metadata["layout"] = asdict(report)
+        result.metadata["mode"] = mode
+        result.metadata["engine"] = "layoutlens-layout"
+        return result
+
+    async def check_layout(
+        self,
+        source: str | Path,
+        viewport: ViewportType = "desktop",
+        mode: Literal["hybrid", "deterministic", "llm"] = "hybrid",
+        scorer: LayoutScorer | None = None,
+    ) -> AnalysisResult:
+        """Layout check: deterministic geometry/contrast scan, LLM vision, or both.
+
+        The deterministic scan measures contrast, sibling overlap, clipped
+        content, viewport protrusion, page-level horizontal overflow, truncated
+        text, and undersized tap targets — directly off the rendered page, with
+        no LLM and no API key.
+
+        Args:
+            source: URL or HTML file to check (images have no DOM to measure —
+                use ``mode="llm"`` for pre-rendered screenshots).
+            viewport: Viewport for the scan/capture.
+            mode: ``"hybrid"`` (default) runs the deterministic scan AND LLM
+                vision, forcing a "no" verdict when the scan measures any
+                defect. ``"deterministic"`` runs the scan only — keyless.
+                ``"llm"`` is vision-only.
+            scorer: Optional pre-configured :class:`LayoutScorer` (custom
+                thresholds).
+
+        Returns:
+            AnalysisResult. In deterministic/hybrid modes ``metadata["layout"]``
+            holds the full layout report with per-finding measurements.
+
+        Raises:
+            ValidationError: In ``deterministic`` mode when ``source`` is an
+                image, which has no DOM to measure.
+        """
+        viewport_value = (
+            viewport.value if isinstance(viewport, Viewport) else str(viewport)
+        )
+        scorer = scorer or LayoutScorer()
+        query = (
+            "Are there layout defects on this page — overlapping or clipped "
+            "content, elements extending past the viewport, truncated text, "
+            "low-contrast text, or touch targets that are too small?"
+        )
+
+        if self._is_image_file(source):
+            if mode == "deterministic":
+                raise ValidationError(
+                    f"deterministic mode cannot measure an image source ({source}) — "
+                    "it has no DOM. Provide a URL or HTML file, or use mode='llm'.",
+                    field="source",
+                    value=str(source),
+                )
+            self.logger.warning(
+                f"Image source {source} has no DOM; falling back to llm-only for layout check."
+            )
+            result = await self.analyze(source, query, viewport=viewport_value)
+            result.metadata["mode"] = "llm"
+            result.metadata["layout_skipped"] = "image source"
+            return result
+
+        if mode == "llm":
+            result = await self.analyze(source, query, viewport=viewport_value)
+            result.metadata["mode"] = mode
+            return result
+
+        if mode == "deterministic":
+            report = await scorer.scan(source, viewport=viewport_value)
+            return AnalysisResult(
+                source=str(source),
+                query=query,
+                answer=self._layout_answer(report),
+                confidence=1.0,
+                reasoning=report.summary(),
+                viewport=viewport_value,
+                metadata={
+                    "layout": asdict(report),
+                    "mode": mode,
+                    "engine": "layoutlens-layout",
+                    "provider": self.provider,
+                    "model": self.model,
+                },
+            )
+
+        return await self._hybrid_layout(source, query, viewport_value, mode, scorer)
+
+    async def _hybrid_layout(
+        self,
+        source: str | Path,
+        query: str,
+        viewport_value: str,
+        mode: str,
+        scorer: LayoutScorer,
+    ) -> AnalysisResult:
+        """One browser session for the screenshot + layout scan, then the LLM.
+
+        Mirrors :meth:`_hybrid_a11y`: a single :func:`open_page` session yields
+        the exact page the screenshot is taken from AND the DOM the scorer
+        measures, so pixels and measurements can never diverge. If the scan
+        fails, the check degrades gracefully to LLM-only with a
+        ``layout_error`` note.
+        """
+        cache_key = self.cache.get_analysis_key(
+            source=str(source),
+            query=query,
+            viewport=viewport_value,
+            context={"layout_mode": mode},
+            model=self._model_fingerprint(),
+        )
+        cached = self.cache.get(cache_key)
+        if cached and isinstance(cached, AnalysisResult):
+            cached.metadata["cache_hit"] = True
+            return cached
+
+        start_time = time.time()
+        capture_engine = Capture(output_dir=self.output_dir / "screenshots")
+        screenshot_path = capture_engine.output_dir / capture_engine._generate_filename(
+            str(source), viewport_value
+        )
+
+        report: LayoutReport | None = None
+        layout_error: str | None = None
+        async with open_page(source, viewport_value) as page:
+            await page.screenshot(path=str(screenshot_path), full_page=True)
+            try:
+                report = await scorer.scan_page(
+                    page, source=str(source), viewport=viewport_value
+                )
+            except Exception as e:
+                layout_error = str(e)
+                self.logger.warning(
+                    f"layout scan failed in hybrid mode; proceeding LLM-only: {e}"
+                )
+
+        llm_query = (
+            self._inject_layout_context(query, report) if report is not None else query
+        )
+        vision_response = await self._call_vision_api(
+            image_path=str(screenshot_path), query=llm_query
+        )
+
+        result = AnalysisResult(
+            source=str(source),
+            query=query,
+            answer=str(vision_response["answer"]),
+            confidence=float(vision_response["confidence"]),
+            reasoning=str(vision_response["reasoning"]),
+            screenshot_path=str(screenshot_path),
+            viewport=viewport_value,
+            execution_time=time.time() - start_time,
+            metadata={
+                **vision_response["metadata"],
+                "provider": self.provider,
+                "model": self.model,
+            },
+        )
+
+        if report is not None:
+            result = self._apply_layout_override(result, report, mode)
+        else:
+            result.metadata["mode"] = mode
+            result.metadata["layout_error"] = layout_error
+
+        self.cache.set(cache_key, result)
+        return result
 
     async def optimize_conversions(
         self,

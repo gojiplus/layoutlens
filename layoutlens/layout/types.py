@@ -21,6 +21,8 @@ OVERLAP = "overlap"
 CLIPPING = "clipping"
 PROTRUSION = "viewport-protrusion"
 TARGET_SIZE = "target-size"
+PAGE_OVERFLOW = "page-overflow"
+TRUNCATION = "truncation"
 
 
 @dataclass(slots=True)

@@ -216,6 +216,50 @@ class TestLayoutBrowser:
         wide = next(f for f in protrusions if f.selector == "#wide")
         assert wide.measured["overflow_px"] > 0
 
+    def test_left_edge_protrusion(self, tmp_path):
+        path = _write(
+            tmp_path,
+            "protrude_left",
+            '<div id="off" style="position:absolute;left:-120px;width:200px;height:20px;background:red"></div>',
+        )
+        report = _scan(path)
+        protrusions = [
+            f for f in report.findings if f.defect_class == "viewport-protrusion"
+        ]
+        assert any(f.selector == "#off" for f in protrusions), report.summary()
+        off = next(f for f in protrusions if f.selector == "#off")
+        assert off.measured["edge"] == "left"
+        assert off.measured["overflow_px"] >= 119
+
+    def test_page_overflow_defect(self, tmp_path):
+        path = _write(
+            tmp_path,
+            "pageflow",
+            '<div style="width:3000px;height:20px;background:green"></div>',
+        )
+        report = _scan(path)
+        page_flows = [f for f in report.findings if f.defect_class == "page-overflow"]
+        assert page_flows, report.summary()
+        assert page_flows[0].selector == "html"
+        assert page_flows[0].measured["overflow_px"] > 0
+
+    def test_truncation_defect(self, tmp_path):
+        path = _write(
+            tmp_path,
+            "truncate",
+            '<p id="cut" style="width:80px;white-space:nowrap;overflow:hidden;'
+            'text-overflow:ellipsis">This sentence is much too long to fit</p>'
+            '<p id="fits" style="width:400px;white-space:nowrap;overflow:hidden;'
+            'text-overflow:ellipsis">Short</p>',
+        )
+        report = _scan(path)
+        truncated = [f for f in report.findings if f.defect_class == "truncation"]
+        assert any(f.selector == "#cut" for f in truncated), report.summary()
+        assert not any(f.selector == "#fits" for f in truncated)
+        cut = next(f for f in truncated if f.selector == "#cut")
+        assert cut.measured["hidden_px"] > 0
+        assert "This sentence" in cut.measured["text_preview"]
+
     def test_target_size_defect(self, tmp_path):
         path = _write(
             tmp_path,
