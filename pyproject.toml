@@ -57,6 +57,7 @@ dev = [
     "rich>=14.2.0",
     "pyright>=1.1.390",
     "pydoclint>=0.5",
+    "pytest-asyncio>=0.21.0",
 ]
 test = [
     "pytest>=7.0.0",
@@ -65,8 +66,6 @@ test = [
     "pytest-xdist>=3.0.0",
     "pytest-asyncio>=0.21.0",
     "coverage[toml]>=7.0.0",
-]
-interactive = [
 ]
 docs = [
     "sphinx>=7.0",
@@ -77,7 +76,7 @@ docs = [
     "py-canon @ git+https://github.com/gojiplus/py-canon@v1",
 ]
 browser-use = [
-    "browser-use>=0.1.0",
+    "browser-use>=0.13,<0.14",
 ]
 
 [project.urls]
@@ -102,6 +101,7 @@ addopts = [
     "--strict-markers",
     "--strict-config",
 ]
+asyncio_default_fixture_loop_scope = "function"
 markers = [
     "unit: Unit tests",
     "integration: Integration tests",
@@ -147,7 +147,7 @@ target-version = "py311"
 [tool.ruff.lint]
 external = ["DOC"]
 select = ["E", "W", "F", "I", "B", "C4", "UP", "N", "D", "S", "SIM", "T20", "PT", "RUF"]
-ignore = ["D203", "D213", "E203", "E501", "F401", "F541"]
+ignore = ["D203", "D213", "E203", "E501", "F541"]
 # × in viewport-size strings and ℹ in UI labels are intentional typography.
 allowed-confusables = ["×", "ℹ"]
 
@@ -155,12 +155,12 @@ allowed-confusables = ["×", "ℹ"]
 convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101", "D", "T20"]
+"**/__init__.py" = ["F401"]
+"tests/**" = ["S101", "D", "T20", "F401"]
 "docs/**" = ["D"]
 # Demo scripts and benchmark harnesses talk to a terminal; printing is their job.
 "examples/**" = ["T20", "D", "S", "F841"]
 "benchmarks/**" = ["T20", "D", "S"]
-"streamlit/**" = ["T20", "D", "S", "F841"]
 "layoutlens/cli.py" = ["T20"]
 # test_prompt/test_queries are library API names, not pytest items.
 "layoutlens/prompts/utils.py" = ["PT"]

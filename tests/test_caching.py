@@ -267,20 +267,21 @@ class TestAnalysisCache:
 
         assert key1 != key3
 
-    def test_comparison_key_generation(self):
-        """Test comparison cache key generation."""
+    def test_key_separates_models_and_instructions(self):
+        """Answers from one model/persona must never be served for another."""
         cache = AnalysisCache()
 
-        key1 = cache.get_comparison_key(
-            sources=["page1.html", "page2.html"], query="Which is better?"
-        )
+        def key(model: str, fingerprint: str = "") -> str:
+            return cache.get_analysis_key(
+                source="https://example.com",
+                query="Is this accessible?",
+                viewport="desktop",
+                model=model,
+                instructions_fingerprint=fingerprint,
+            )
 
-        # Order should not matter
-        key2 = cache.get_comparison_key(
-            sources=["page2.html", "page1.html"], query="Which is better?"
-        )
-
-        assert key1 == key2
+        assert key("openai:gpt-4o-mini@") != key("openai:gpt-5@")
+        assert key("openai:gpt-4o-mini@", "abc") != key("openai:gpt-4o-mini@", "def")
 
     def test_cache_operations(self):
         """Test cache get/set operations."""

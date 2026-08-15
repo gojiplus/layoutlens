@@ -43,9 +43,8 @@ async def advanced_analysis_with_context():
 async def comprehensive_comparison_workflow():
     """Demonstrate advanced comparison scenarios.
 
-    compare() accepts URLs or already-captured screenshot images directly.
-    For local HTML files, capture screenshots first with capture() -- passing
-    raw .html paths to compare() skips screenshot rendering and fails.
+    compare() accepts URLs, local HTML files, or screenshot images; every
+    source is rendered and every screenshot goes to the model.
     """
 
     tester = LayoutLens(output_dir="comparison_analysis")
@@ -114,7 +113,7 @@ async def specialized_checks_workflow():
 
     # Mobile experience evaluation
     print("\n=== Mobile-Friendly Analysis ===")
-    mobile_result = await tester.check_mobile_friendly(
+    mobile_result = await tester.analyze_mobile_ux(
         source="benchmarks/test_data/responsive_design/mobile_friendly.html"
     )
     print(f"Mobile-friendly: {mobile_result.answer}")
@@ -122,9 +121,7 @@ async def specialized_checks_workflow():
 
     # Conversion optimization check
     print("\n=== Conversion Optimization Analysis ===")
-    conversion_result = await tester.check_conversion_optimization(
-        source="https://example.com"
-    )
+    conversion_result = await tester.optimize_conversions(source="https://example.com")
     print(f"Conversion optimization: {conversion_result.answer}")
     print(f"Confidence: {conversion_result.confidence:.1%}")
 

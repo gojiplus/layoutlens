@@ -12,7 +12,7 @@ vision-capable LLM (through LiteLLM; `gpt-4o-mini` by default). It also ships
 a fully deterministic, keyless WCAG 2.1 A/AA accessibility engine built on a
 vendored axe-core bundle.
 
-## Package Structure (real, as of v1.9.0)
+## Package Structure (real, as of v2.0.0)
 
 ```
 layoutlens/
@@ -21,7 +21,7 @@ layoutlens/
 │   ├── core.py                    # LayoutLens class (analyze/compare/capture/checks)
 │   ├── judge.py                   # judge() + JudgeResult (verbatim-prompt vision judge)
 │   ├── batch.py                   # judge_batch() + BatchRequest (multi-provider batch)
-│   └── test_suite.py              # UITestCase/UITestSuite/UITestResult + run_test_suite
+│   └── test_suite.py              # UITestCase/UITestSuite/UITestResult + run_suite_case
 ├── a11y/
 │   ├── axe.py                     # AxeAuditor, AXE_VERSION
 │   ├── types.py                   # A11yFinding, A11yReport
@@ -34,20 +34,22 @@ layoutlens/
 │                                  #   (math ported from UIJudgeBench's render-verifier)
 ├── prompts/                       # Expert persona system (Instructions, get_expert, ...)
 ├── integrations/
-│   └── browser_use/               # AgentValidator, SessionRecorder/Replayer, reports
-├── browser.py                     # Shared Playwright page lifecycle (open_page)
+│   └── browser_use/               # validate_agent_run (post-run validation) + reports
+├── browser.py                     # Playwright page lifecycle (open_page) + ViewportConfig
 ├── capture.py                     # Capture: screenshot capture for URLs/HTML files
 ├── cli.py                         # The entire CLI (one file, one command)
-├── config.py                      # Config / layoutlens.yaml handling
 ├── cache.py                       # AnalysisCache (memory/file backends)
 ├── logger.py                      # Structured logging setup
 ├── exceptions.py                  # Custom exception hierarchy
 └── types.py                       # Enums (Viewport, Expert, ComplianceLevel, ...) + TypedDicts
 ```
 
-There is **no** `vision/`, `providers/`, `cli_commands.py`, `cli_interactive.py`,
-or `integrations/github.py` — those belonged to an earlier architecture and no
-longer exist. Don't reintroduce them or write docs that assume they exist.
+There is **no** `vision/`, `providers/`, `config.py`, `streamlit/`,
+`cli_commands.py`, or `integrations/github.py` — those belonged to earlier
+architectures and no longer exist. Don't reintroduce them or write docs that
+assume they exist. `check_mobile_friendly`/`check_conversion_optimization`/
+`audit_accessibility` were removed in v2.0.0 (use `analyze_mobile_ux`/
+`optimize_conversions`/`check_accessibility`).
 
 ## CLI
 
@@ -55,7 +57,7 @@ The CLI is a single flat command — there are no subcommands (`test`, `batch`,
 `interactive`, `generate`, `validate` do not exist):
 
 ```bash
-layoutlens SOURCES... [--query TEXT] [--compare] \
+layoutlens SOURCES... [--query TEXT] [--compare] [--suite FILE] \
   [--viewport {desktop,mobile,tablet}] [--a11y {hybrid,axe,llm}] \
   [--output {text,json}] [--api-key KEY] [--model MODEL]
 ```
@@ -66,10 +68,11 @@ layoutlens SOURCES... [--query TEXT] [--compare] \
   free-form query; it is an error to combine `--a11y` with `--query`.
   `--a11y axe` is fully deterministic and needs no API key.
 - `--compare` compares the first two sources; `compare()` (CLI and Python)
-  expects URLs or already-captured screenshots — passing a raw local `.html`
-  path skips screenshot rendering and fails with an "unsupported image" error
-  from the vision API. Capture first (`lens.capture(...)`) when comparing
-  local HTML files.
+  accepts URLs, local HTML files, or screenshot images. Every source is
+  rendered once and every screenshot is sent to the vision model, with an
+  "Image N" legend mapping images to sources.
+- `--suite FILE` runs a YAML/JSON test suite (exit code 1 if any case fails);
+  it cannot be combined with sources, `--query`, `--compare`, or `--a11y`.
 
 Run `layoutlens --help` for the authoritative flag reference.
 
@@ -111,7 +114,7 @@ result = await lens.analyze(source, query, viewport="desktop", max_concurrent=5)
 
 ## Faithful Judge Interface (v1.8.0)
 
-`LayoutLens.judge(image_path, prompt, *, max_tokens=300) -> JudgeResult` is the
+`LayoutLens.judge(image_path, prompt, *, max_tokens=AUTO) -> JudgeResult` is the
 reference-judge surface for external eval harnesses (UIJudgeBench). Unlike
 `analyze`, it sends the prompt **verbatim**: no system persona, no
 `_format_query_prompt` scaffolding, no appended JSON contract. One user message
@@ -128,8 +131,8 @@ is persona/instructions-free. A missing image raises `ValidationError`.
   first match wins. **Claude Sonnet 5 / Opus 4.6-4.8 return HTTP 400 on any
   non-default sampling param, so those patterns omit `temperature`.** Wired into
   both `_call_vision_api` and `judge()`.
-- **`api_base`** — `LayoutLens(..., api_base=...)` and `LLMConfig.api_base`
-  forward `api_base` to every `acompletion` call (Ollama/vLLM/OpenAI-compatible).
+- **`api_base`** — `LayoutLens(..., api_base=...)` forwards `api_base` to
+  every `acompletion` call (Ollama/vLLM/OpenAI-compatible).
 - **Usage split** — `_read_usage` records prompt/completion/total tokens in
   analysis metadata and `JudgeResult.usage` (0 when the provider omits them).
 
@@ -146,7 +149,8 @@ from layoutlens import AxeAuditor
 report = await AxeAuditor(run_only=["wcag2a", "wcag2aa"]).audit(source, viewport)
 ```
 
-`check_accessibility` / `audit_accessibility` on `LayoutLens` take a `mode`:
+`check_accessibility` on `LayoutLens` takes a `mode` (plus `compliance_level`
+and optional `standards`/`instructions`):
 - `"axe"` — deterministic axe-core only, no API key, `confidence` always `1.0`.
 - `"hybrid"` (default) — axe-core + LLM vision; axe findings are injected into
   the LLM prompt as grounding context, and **if axe finds any violation the
@@ -164,8 +168,11 @@ still matches.
 
 ## Test Suites (YAML/JSON)
 
-`UITestSuite.from_dict(...)` / `UITestSuite.load(...)` (JSON) load a suite;
-there is no CLI for suites — `await lens.run_test_suite(suite)` is Python-only.
+`UITestSuite.load(...)` loads a suite from JSON **or YAML** (by extension;
+`from_yaml`/`from_dict`/`from_specs` also exist). Run with
+`await lens.run_test_suite(suite, parallel=..., max_workers=...)` (real methods
+on `LayoutLens` as of v2.0.0 — no more monkey-patching), or from the CLI with
+`layoutlens --suite FILE`.
 
 **Breaking change (v1.7.0):** every test case must declare `expected_results`
 (`answer: "yes"|"no"` and/or `contains: [...]`) — a case with neither raises

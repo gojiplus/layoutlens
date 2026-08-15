@@ -115,7 +115,7 @@ class TestProviderApiKeySelection:
     async def test_missing_key_error_surfaces_through_analyze(
         self, monkeypatch, tmp_path
     ):
-        """analyze() must surface the deferred key error in its result (not a bare success)."""
+        """analyze() must surface the deferred key error, never a bare success."""
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
 
         lens = LayoutLens(provider="openai", model="test-model")
@@ -123,6 +123,5 @@ class TestProviderApiKeySelection:
         image = tmp_path / "shot.png"
         image.write_bytes(b"not-a-real-png")
 
-        result = await lens.analyze(str(image), "Is it accessible?")
-        assert result.confidence == 0.0
-        assert "OPENAI_API_KEY" in result.reasoning
+        with pytest.raises(AuthenticationError, match="OPENAI_API_KEY"):
+            await lens.analyze(str(image), "Is it accessible?")

@@ -6,10 +6,7 @@ This script generates HTML test files for benchmarking LayoutLens's UI analysis 
 It creates paired good/bad examples for various UI testing categories.
 """
 
-import json
-import os
 from pathlib import Path
-from typing import Any
 
 # Get the benchmarks directory path
 BENCHMARKS_DIR = Path(__file__).parent.parent

@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
-from .context import EvaluationCriteria, Instructions, UserContext
+from .context import Instructions
 
 
 @dataclass

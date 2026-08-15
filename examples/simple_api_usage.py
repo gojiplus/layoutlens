@@ -44,7 +44,7 @@ async def mobile_analysis():
         lens = LayoutLens(api_key=os.getenv("OPENAI_API_KEY"))
 
         # Check mobile usability
-        result = await lens.check_mobile_friendly("https://example.com")
+        result = await lens.analyze_mobile_ux("https://example.com")
 
         print(f"Mobile Analysis: {result.answer[:100]}...")
         print(f"Confidence: {result.confidence:.1%}")
@@ -167,7 +167,7 @@ async def conversion_optimization():
         lens = LayoutLens()
 
         # Check for conversion optimization
-        result = await lens.check_conversion_optimization("https://stripe.com")
+        result = await lens.optimize_conversions("https://stripe.com")
 
         print(f"Conversion Analysis: {result.answer[:100]}...")
         print(f"Confidence: {result.confidence:.1%}")

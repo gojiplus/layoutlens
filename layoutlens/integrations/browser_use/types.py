@@ -8,7 +8,6 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from pathlib import Path
 from typing import Any
 
 
@@ -214,131 +213,7 @@ class ValidationSession:
         return sum(step.confidence for step in self.steps) / len(self.steps)
 
 
-@dataclass(slots=True)
-class SessionRecording:
-    """Recording of an agent session for replay.
-
-    Attributes:
-        recording_id: Unique identifier for this recording.
-        session: The validation session data.
-        screenshots: Mapping of step numbers to screenshot paths.
-        action_log: Log of all agent actions.
-        page_states: HTML/DOM states at each step.
-        created_at: When recording was created.
-        output_dir: Directory containing recording artifacts.
-        metadata: Additional recording context.
-    """
-
-    recording_id: str
-    session: ValidationSession
-    screenshots: dict[int, str] = field(default_factory=dict)
-    action_log: list[dict[str, Any]] = field(default_factory=list)
-    page_states: dict[int, str] = field(default_factory=dict)
-    created_at: str = field(default_factory=lambda: time.strftime("%Y-%m-%dT%H:%M:%S"))
-    output_dir: str = ""
-    metadata: dict[str, Any] = field(default_factory=dict)
-
-    def save(self, path: str | Path) -> None:
-        """Save recording to JSON file."""
-        import json
-        from dataclasses import asdict
-
-        path = Path(path)
-        path.parent.mkdir(parents=True, exist_ok=True)
-
-        data = asdict(self)
-        data["session"]["state"] = self.session.state.value
-        data["session"]["policy"]["experts"] = self.session.policy.experts
-        for step in data["session"]["steps"]:
-            step["trigger"] = (
-                step["trigger"].value
-                if isinstance(step["trigger"], ValidationTrigger)
-                else step["trigger"]
-            )
-            for finding in step["findings"]:
-                finding["severity"] = (
-                    finding["severity"].value
-                    if isinstance(finding["severity"], ValidationSeverity)
-                    else finding["severity"]
-                )
-
-        with open(path, "w") as f:
-            json.dump(data, f, indent=2, default=str)
-
-    @classmethod
-    def load(cls, path: str | Path) -> SessionRecording:
-        """Load recording from JSON file."""
-        import json
-
-        with open(path) as f:
-            data = json.load(f)
-
-        data["session"]["state"] = SessionState(data["session"]["state"])
-
-        steps = []
-        for step_data in data["session"]["steps"]:
-            step_data["trigger"] = ValidationTrigger(step_data["trigger"])
-            findings = []
-            for finding_data in step_data["findings"]:
-                finding_data["severity"] = ValidationSeverity(finding_data["severity"])
-                findings.append(ValidationFinding(**finding_data))
-            step_data["findings"] = findings
-            steps.append(ValidationStepResult(**step_data))
-
-        session = ValidationSession(
-            session_id=data["session"]["session_id"],
-            start_time=data["session"]["start_time"],
-            end_time=data["session"]["end_time"],
-            state=data["session"]["state"],
-            policy=ValidationPolicy(**data["session"]["policy"]),
-            steps=steps,
-            start_url=data["session"]["start_url"],
-            agent_task=data["session"]["agent_task"],
-            total_actions=data["session"]["total_actions"],
-            validated_actions=data["session"]["validated_actions"],
-            metadata=data["session"]["metadata"],
-        )
-
-        return cls(
-            recording_id=data["recording_id"],
-            session=session,
-            screenshots=data.get("screenshots", {}),
-            action_log=data.get("action_log", []),
-            page_states=data.get("page_states", {}),
-            created_at=data.get("created_at", ""),
-            output_dir=data.get("output_dir", ""),
-            metadata=data.get("metadata", {}),
-        )
-
-
-@dataclass(slots=True)
-class SessionComparison:
-    """Comparison between two validation sessions (e.g., baseline vs current).
-
-    Attributes:
-        baseline_id: ID of baseline session.
-        current_id: ID of current session.
-        new_findings: Findings in current but not baseline.
-        resolved_findings: Findings in baseline but not current.
-        persistent_findings: Findings in both sessions.
-        regression_score: Score indicating regression (0=same, positive=worse).
-        summary: Human-readable comparison summary.
-        metadata: Additional comparison context.
-    """
-
-    baseline_id: str
-    current_id: str
-    new_findings: list[ValidationFinding] = field(default_factory=list)
-    resolved_findings: list[ValidationFinding] = field(default_factory=list)
-    persistent_findings: list[ValidationFinding] = field(default_factory=list)
-    regression_score: float = 0.0
-    summary: str = ""
-    metadata: dict[str, Any] = field(default_factory=dict)
-
-
 __all__ = [
-    "SessionComparison",
-    "SessionRecording",
     "SessionState",
     "ValidationFinding",
     "ValidationPolicy",

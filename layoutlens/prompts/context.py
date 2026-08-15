@@ -222,6 +222,55 @@ class Instructions:
             depth_level="detailed",
         )
 
+    @classmethod
+    def for_healthcare(cls, patient_facing: bool = True) -> Instructions:
+        """Create instructions for healthcare UI analysis."""
+        return cls(
+            expert_persona="healthcare_expert",
+            focus_areas=[
+                "patient_privacy",
+                "accessibility",
+                "health_literacy",
+                "trust_signals",
+            ],
+            evaluation_criteria=(
+                "Evaluate for patient-facing clarity, HIPAA-conscious design,"
+                " and accessibility for users with varied health literacy"
+                if patient_facing
+                else "Evaluate clinician-facing workflows for efficiency and safety"
+            ),
+            user_context=UserContext(
+                industry="healthcare",
+                target_audience="patients" if patient_facing else "clinicians",
+            ),
+            output_style="actionable_recommendations",
+            depth_level="comprehensive",
+        )
+
+    @classmethod
+    def for_finance(cls, regulated: bool = True) -> Instructions:
+        """Create instructions for financial-services UI analysis."""
+        return cls(
+            expert_persona="finance_expert",
+            focus_areas=[
+                "trust_signals",
+                "security_cues",
+                "disclosure_clarity",
+                "error_prevention",
+            ],
+            evaluation_criteria=(
+                "Evaluate for regulatory disclosure clarity, security"
+                " communication, and error prevention in financial flows"
+                if regulated
+                else "Evaluate financial UX for clarity and trust"
+            ),
+            user_context=UserContext(
+                industry="finance", target_audience="account_holders"
+            ),
+            output_style="actionable_recommendations",
+            depth_level="comprehensive",
+        )
+
     def merge_with_context(self, additional_context: dict[str, Any]) -> Instructions:
         """Merge with additional context while preserving existing instructions."""
         # Create a copy of current instructions

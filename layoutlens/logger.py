@@ -7,9 +7,7 @@ different environments, log levels, and output formats.
 import logging
 import logging.handlers
 import os
-import re
 from pathlib import Path
-from typing import Any
 
 # Default log format with structured information
 DEFAULT_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

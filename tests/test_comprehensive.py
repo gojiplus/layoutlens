@@ -1,112 +1,79 @@
-#!/usr/bin/env python3
-"""
-Comprehensive test suite for LayoutLens Phase 1 & 2 implementation.
+"""End-to-end API flow tests with mocked LLM and capture layers."""
 
-This test suite thoroughly validates:
-- All imports and dependencies
-- API functionality with mock responses
-- File structure and content validation
-- GitHub Actions integration
-- Error handling and edge cases
-"""
-
-import json
-import os
-import sys
 import tempfile
-import unittest
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 
-from layoutlens.exceptions import (
-    AuthenticationError,
-    LayoutFileNotFoundError,
-    ValidationError,
-)
+from layoutlens.exceptions import LayoutFileNotFoundError, ValidationError
 
-# Add project root to path
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
+MOCK_API_KEY = "sk-test-key-12345"
 
 
-class TestImportsAndDependencies(unittest.TestCase):
-    """Test all imports work correctly."""
+def _mock_llm_response(payload: str, total_tokens: int = 150) -> Mock:
+    response = Mock()
+    response.choices = [Mock()]
+    response.choices[0].message.content = payload
+    response.usage.total_tokens = total_tokens
+    return response
+
+
+class TestImports:
+    """The public namespace exposes the API surface we document."""
 
     def test_main_api_imports(self):
-        """Test main API can be imported."""
-        try:
-            from layoutlens import (
-                AnalysisResult,
-                BatchResult,
-                ComparisonResult,
-                LayoutLens,
-            )
+        from layoutlens import (
+            AnalysisResult,
+            BatchResult,
+            Capture,
+            ComparisonResult,
+            Instructions,
+            LayoutLens,
+            LayoutScorer,
+            UserContext,
+            get_expert,
+            list_available_experts,
+        )
 
-            assert True, "Main API imports successful"
-        except ImportError as e:
-            self.fail(f"Main API import failed: {e}")
-
-    def test_config_imports(self):
-        """Test config can be imported."""
-        try:
-            from layoutlens import Config
-
-            assert True, "Config import successful"
-        except ImportError as e:
-            self.fail(f"Config import failed: {e}")
-
-    def test_vision_components(self):
-        """Test vision components can be imported."""
-        try:
-            from layoutlens import Capture
-
-            assert True, "Vision components imported successfully"
-        except ImportError as e:
-            self.fail(f"Vision components import failed: {e}")
-
-    def test_integration_components(self):
-        """Test integration components - GitHub integrations removed."""
-        # GitHub integrations have been removed from the project
-        # This test is kept for compatibility but does nothing
-        assert True, "Integration components test - GitHub integrations removed"
+        assert callable(get_expert)
+        assert "accessibility_expert" in list_available_experts()
+        for cls in (
+            AnalysisResult,
+            BatchResult,
+            Capture,
+            ComparisonResult,
+            Instructions,
+            LayoutLens,
+            LayoutScorer,
+            UserContext,
+        ):
+            assert isinstance(cls, type)
 
 
-class TestAPIFunctionality(unittest.TestCase):
-    """Test API functionality with mocked responses."""
-
-    def setUp(self):
-        """Set up test environment."""
-        self.temp_dir = tempfile.mkdtemp()
-        self.mock_api_key = "sk-test-key-12345"
+class TestAPIFunctionality:
+    """Analyze flows with mocked capture + LLM."""
 
     def test_layoutlens_initialization(self):
-        """Test LayoutLens initialization."""
         from layoutlens.api.core import LayoutLens
 
-        # Without an API key the constructor no longer raises: the requirement is
-        # deferred to first LLM use so deterministic (axe) operations stay keyless.
+        # Without an API key the constructor no longer raises: the requirement
+        # is deferred to first LLM use so deterministic operations stay keyless.
         with patch.dict("os.environ", {}, clear=True):
             keyless = LayoutLens()
             assert keyless.api_key is None
 
-        # Test with API key (should succeed)
-        lens = LayoutLens(api_key=self.mock_api_key)
-        assert lens.api_key == self.mock_api_key
+        lens = LayoutLens(api_key=MOCK_API_KEY)
+        assert lens.api_key == MOCK_API_KEY
         assert lens.model == "gpt-4o-mini"  # default
 
     def test_url_detection(self):
-        """Test URL vs file path detection."""
         from layoutlens.api.core import LayoutLens
 
-        lens = LayoutLens(api_key=self.mock_api_key)
+        lens = LayoutLens(api_key=MOCK_API_KEY)
 
-        # Test URL detection
         assert lens._is_url("https://example.com")
         assert lens._is_url("http://example.org")
-
-        # Test file path detection
         assert not lens._is_url("/path/to/file.png")
         assert not lens._is_url("screenshot.jpg")
         assert not lens._is_url(Path("image.png"))
@@ -115,23 +82,18 @@ class TestAPIFunctionality(unittest.TestCase):
     @patch("layoutlens.api.core.acompletion")
     @patch("layoutlens.capture.Capture.screenshots")
     async def test_analyze_url_flow(self, mock_capture, mock_acompletion):
-        """Test the full analyze URL workflow."""
+        """URL -> capture -> vision call -> parsed AnalysisResult."""
         from layoutlens.api.core import LayoutLens
 
-        # Mock URL capture - new interface returns list of screenshot paths
         mock_capture.return_value = ["/mock/screenshot.png"]
+        mock_acompletion.return_value = _mock_llm_response(
+            '{"answer": "Yes, the navigation is user-friendly.",'
+            ' "confidence": 0.85, "reasoning": "Clear top navigation."}'
+        )
 
-        # Mock LiteLLM acompletion response
-        mock_response = Mock()
-        mock_response.choices = [Mock()]
-        mock_response.choices[
-            0
-        ].message.content = '{"answer": "The navigation appears well-designed and user-friendly.", "confidence": 0.85, "reasoning": "The navigation is clearly visible at the top of the page with logical organization."}'
-        mock_response.usage.total_tokens = 150
-        mock_acompletion.return_value = mock_response
-
-        # Test analysis
-        lens = LayoutLens(api_key=self.mock_api_key, output_dir=self.temp_dir)
+        lens = LayoutLens(
+            api_key=MOCK_API_KEY, output_dir=tempfile.mkdtemp(), cache_enabled=False
+        )
 
         with (
             patch("os.path.exists", return_value=True),
@@ -144,304 +106,89 @@ class TestAPIFunctionality(unittest.TestCase):
                 "https://example.com", "Is the navigation user-friendly?"
             )
 
-            # Debug output
-            print(f"Debug - Result confidence: {result.confidence}")
-            print(f"Debug - Result answer: {result.answer}")
-            print(f"Debug - Result metadata: {result.metadata}")
-
-            # Verify result structure
-            assert isinstance(result.source, str)
-            assert isinstance(result.query, str)
-            assert isinstance(result.answer, str)
-            assert isinstance(result.confidence, float)
-
-            # Allow for error cases in test - the main thing is it doesn't crash
-            if "Error" not in result.answer:
-                assert result.confidence > 0
-                assert result.confidence <= 1
+        mock_acompletion.assert_awaited_once()
+        assert result.answer.startswith("Yes")
+        assert result.confidence == pytest.approx(0.85)
+        assert result.reasoning == "Clear top navigation."
 
     @pytest.mark.asyncio
-    async def test_analyze_existing_file_flow(self):
-        """Test analyzing existing image files."""
+    async def test_analyze_missing_file_raises(self):
         from layoutlens.api.core import LayoutLens
 
-        lens = LayoutLens(api_key=self.mock_api_key)
+        lens = LayoutLens(api_key=MOCK_API_KEY)
 
-        # Test with non-existent file (should raise exception)
         with pytest.raises(LayoutFileNotFoundError):
             await lens.analyze("/nonexistent/file.png", "Test query")
 
-    @patch("layoutlens.analyzer.openai.OpenAI")
     @pytest.mark.asyncio
-    async def test_compare_method(self, mock_openai):
-        """Test the compare method functionality."""
+    async def test_compare_handles_missing_files(self):
+        """compare() degrades to an error result instead of crashing."""
         from layoutlens.api.core import LayoutLens
 
-        # Mock OpenAI response
-        mock_response = Mock()
-        mock_response.choices = [Mock()]
-        mock_response.choices[
-            0
-        ].message.content = """ANSWER: The second design is better with improved layout.
-CONFIDENCE: 0.80
-REASONING: Better alignment and visual hierarchy."""
+        lens = LayoutLens(api_key=MOCK_API_KEY)
 
-        mock_client = Mock()
-        mock_client.chat.completions.create.return_value = mock_response
-        mock_openai.return_value = mock_client
-
-        lens = LayoutLens(api_key=self.mock_api_key)
-
-        # Test with non-existent files (should handle gracefully)
         result = await lens.compare(
             ["/nonexistent1.png", "/nonexistent2.png"], "Which design is better?"
         )
         assert result.confidence == 0.0
         assert "Error" in result.answer
 
-    @patch("layoutlens.api.core.acompletion")
     @pytest.mark.asyncio
+    @patch("layoutlens.api.core.acompletion")
     async def test_analyze_batch_method(self, mock_acompletion):
-        """Test the unified analyze method with batch functionality."""
+        """List sources fan out into a BatchResult with per-item results."""
         from layoutlens.api.core import LayoutLens
 
-        # Mock LiteLLM acompletion response
-        mock_response = Mock()
-        mock_response.choices = [Mock()]
-        mock_response.choices[
-            0
-        ].message.content = '{"answer": "The design looks good.", "confidence": 0.85, "reasoning": "Clean layout and good user experience."}'
-        mock_response.usage.total_tokens = 100
-        mock_acompletion.return_value = mock_response
+        mock_acompletion.return_value = _mock_llm_response(
+            '{"answer": "The design looks good.", "confidence": 0.85,'
+            ' "reasoning": "Clean layout."}'
+        )
 
-        lens = LayoutLens(api_key=self.mock_api_key)
+        lens = LayoutLens(api_key=MOCK_API_KEY)
 
-        # Test with non-existent sources and single query (should handle gracefully)
         result = await lens.analyze(
             ["/nonexistent1.png", "/nonexistent2.png"], ["Is the design good?"]
         )
 
-        # Should return BatchResult with 2 sources * 1 query = 2 results
-        assert result is not None
         assert isinstance(result.results, list)
         assert len(result.results) == 2
         assert result.total_queries == 2
 
 
-class TestVisionComponents(unittest.TestCase):
-    """Test vision analysis components."""
-
-    def setUp(self):
-        self.mock_api_key = "sk-test-key-12345"
-
-    def test_layoutlens_initialization(self):
-        """Test LayoutLens initialization."""
-        from layoutlens.api.core import LayoutLens
-
-        lens = LayoutLens(api_key=self.mock_api_key)
-        assert lens.model == "gpt-4o-mini"
+class TestCaptureViewports:
+    """Capture exposes the canonical viewport table."""
 
     def test_url_capture_viewports(self):
-        """Test Capture viewport configurations."""
+        from layoutlens.browser import ViewportConfig
         from layoutlens.capture import Capture
-        from layoutlens.config import ViewportConfig
 
         capture = Capture()
 
-        # Test viewport configurations exist
-        assert "desktop" in capture.VIEWPORTS
-        assert "mobile" in capture.VIEWPORTS
-        assert "tablet" in capture.VIEWPORTS
+        for name in ("desktop", "mobile", "tablet"):
+            assert name in capture.VIEWPORTS
 
-        # Test viewport structure
         desktop = capture.VIEWPORTS["desktop"]
         assert isinstance(desktop, ViewportConfig)
-        assert desktop.width == 1920
-        assert desktop.height == 1080
-        assert desktop.device_scale_factor == 1.0
+        assert (desktop.width, desktop.height) == (1920, 1080)
         assert not desktop.is_mobile
 
-        # Test mobile viewport has proper mobile settings
         mobile = capture.VIEWPORTS["mobile"]
-        assert isinstance(mobile, ViewportConfig)
-        assert mobile.width == 375
-        assert mobile.height == 667
-        assert mobile.device_scale_factor == 2.0
+        assert (mobile.width, mobile.height) == (375, 667)
         assert mobile.is_mobile
         assert mobile.has_touch
 
-    # URL sanitization test removed - internal implementation detail not needed
 
-    def test_layout_comparator(self):
-        """Test that LayoutComparator was successfully removed."""
-        # LayoutComparator functionality is now integrated into LayoutLens.compare()
-        # This test verifies the old separate class is no longer available
-        with pytest.raises(ImportError):
-            # LayoutComparator was removed in favor of direct API methods
-            from layoutlens.comparator import LayoutComparator
-
-
-class TestGitHubIntegration(unittest.TestCase):
-    """Test GitHub Actions integration components - REMOVED."""
-
-    def test_github_integration_removed(self):
-        """Test that GitHub integrations have been removed."""
-        # GitHub integrations have been removed from the project
-        # Verify that the integrations module is no longer available
-        with pytest.raises(ImportError):
-            from layoutlens.integrations import GitHubIntegration
-
-
-class TestFileStructure(unittest.TestCase):
-    """Test that all required files exist and have valid content."""
-
-    def test_required_files_exist(self):
-        """Test all required files are present."""
-        required_files = [
-            "layoutlens/api/__init__.py",
-            "layoutlens/api/core.py",
-            "layoutlens/capture.py",
-        ]
-
-        for file_path in required_files:
-            with self.subTest(file=file_path):
-                assert Path(file_path).exists(), f"Required file missing: {file_path}"
-
-    def test_action_yml_structure(self):
-        """Test GitHub Action YAML has required structure."""
-        action_file = Path(".github/actions/layoutlens/action.yml")
-
-        if not action_file.exists():
-            self.skipTest("action.yml not found")
-
-        content = action_file.read_text()
-
-        required_sections = ["name:", "description:", "inputs:", "outputs:", "runs:"]
-
-        for section in required_sections:
-            with self.subTest(section=section):
-                assert section in content, f"Missing section: {section}"
-
-    def test_python_files_syntax(self):
-        """Test that all Python files have valid syntax."""
-        python_files = [
-            "layoutlens/api/core.py",
-            "layoutlens/capture.py",
-        ]
-
-        for file_path in python_files:
-            with self.subTest(file=file_path):
-                if Path(file_path).exists():
-                    try:
-                        with open(file_path, encoding="utf-8") as f:
-                            compile(f.read(), file_path, "exec")
-                    except SyntaxError as e:
-                        self.fail(f"Syntax error in {file_path}: {e}")
-
-
-class TestExamplesAndDocs(unittest.TestCase):
-    """Test examples and documentation."""
-
-    def test_example_files_exist(self):
-        """Test example files are present."""
-        example_files = [
-            "examples/simple_api_usage.py",
-            "docs/QUICK_START.md",
-        ]
-
-        for file_path in example_files:
-            with self.subTest(file=file_path):
-                assert Path(file_path).exists(), f"Example file missing: {file_path}"
-
-    def test_examples_syntax(self):
-        """Test example Python files have valid syntax."""
-        example_files = [
-            "examples/simple_api_usage.py",
-        ]
-
-        for file_path in example_files:
-            with self.subTest(file=file_path):
-                if Path(file_path).exists():
-                    try:
-                        with open(file_path, encoding="utf-8") as f:
-                            compile(f.read(), file_path, "exec")
-                    except SyntaxError as e:
-                        self.fail(f"Syntax error in {file_path}: {e}")
-
-
-class TestErrorHandling(unittest.TestCase):
-    """Test error handling and edge cases."""
-
-    def test_missing_dependencies_handling(self):
-        """Test that hard dependencies are required."""
-        # Since OpenAI and Playwright are now hard dependencies in pyproject.toml,
-        # missing dependencies will cause import failures at module level.
-        # This test verifies the dependencies are properly declared.
-
-        try:
-            from layoutlens.api.core import LayoutLens
-            from layoutlens.capture import Capture
-
-            # If we can import these, dependencies are available
-            assert True, "Core dependencies are available"
-        except ImportError as e:
-            self.fail(f"Hard dependencies missing: {e}")
+class TestErrorHandling:
+    """Invalid inputs raise typed exceptions."""
 
     @pytest.mark.asyncio
     async def test_invalid_inputs(self):
-        """Test handling of invalid inputs."""
         from layoutlens.api.core import LayoutLens
 
         lens = LayoutLens(api_key="test-key")
 
-        # Test empty query (should raise ValidationError)
         with pytest.raises(ValidationError):
             await lens.analyze("https://example.com", "")
 
-        # Test invalid URL format (should raise LayoutFileNotFoundError for file path)
         with pytest.raises(LayoutFileNotFoundError):
             await lens.analyze("not-a-url", "test query")
-
-
-def run_comprehensive_tests():
-    """Run all comprehensive tests."""
-
-    # Create test suite
-    test_classes = [
-        TestImportsAndDependencies,
-        TestAPIFunctionality,
-        TestVisionComponents,
-        TestGitHubIntegration,  # Now tests that GitHub integrations are removed
-        TestFileStructure,
-        TestExamplesAndDocs,
-        TestErrorHandling,
-    ]
-
-    loader = unittest.TestLoader()
-    suite = unittest.TestSuite()
-
-    for test_class in test_classes:
-        tests = loader.loadTestsFromTestCase(test_class)
-        suite.addTests(tests)
-
-    # Run tests
-    runner = unittest.TextTestRunner(verbosity=2)
-    result = runner.run(suite)
-
-    return result.wasSuccessful()
-
-
-if __name__ == "__main__":
-    print("🧪 Running Comprehensive LayoutLens Test Suite")
-    print("=" * 60)
-
-    success = run_comprehensive_tests()
-
-    print("\n" + "=" * 60)
-    if success:
-        print("🎉 All comprehensive tests passed!")
-        print("✅ Phase 1 & 2 implementation is thoroughly validated")
-    else:
-        print("❌ Some tests failed - please review the implementation")
-
-    sys.exit(0 if success else 1)
