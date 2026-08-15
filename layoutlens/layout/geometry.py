@@ -25,8 +25,10 @@ from .contrast import check_contrast
 from .types import (
     CLIPPING,
     OVERLAP,
+    PAGE_OVERFLOW,
     PROTRUSION,
     TARGET_SIZE,
+    TRUNCATION,
     LayoutFinding,
     LayoutReport,
 )
@@ -112,9 +114,11 @@ _JS_CLIP = (
 }"""
 )
 
-# Protrusion: element right edge past the layout viewport width (bench _JS_PROTRUDE).
-# Only the OUTERMOST protruder is reported (skip if the parent already protrudes),
-# so a wide container does not flood the report with all its descendants.
+# Protrusion: element extends past the horizontal layout viewport, on either
+# edge (bench _JS_PROTRUDE, extended to the left edge; vertical overflow is
+# normal scrolling and never reported). Only the OUTERMOST protruder is
+# reported (skip if the parent already protrudes), so a wide container does not
+# flood the report with all its descendants.
 _JS_PROTRUDE = (
     "(tol) => {"
     + _JS_HELPERS
@@ -127,11 +131,60 @@ _JS_PROTRUDE = (
     const parent = el.parentElement;
     // body/html stretch to fit overflowing content, so they are not counted as
     // protruding ancestors — otherwise they would suppress the real offender.
-    const parentProtrudes = parent && parent !== document.body &&
-      parent !== document.documentElement && parent.getBoundingClientRect().right > vw + tol;
-    if (r.right > vw + tol && !parentProtrudes) {
-      out.push({ selector: cssPath(el), right: r.right, viewportWidth: vw,
-                 overflow: r.right - vw, bbox: [r.x, r.y, r.width, r.height] });
+    const pr = parent && parent !== document.body && parent !== document.documentElement
+      ? parent.getBoundingClientRect() : null;
+    const parentProtrudes = pr && (pr.right > vw + tol || pr.left < -tol);
+    if (parentProtrudes) continue;
+    if (r.right > vw + tol) {
+      out.push({ selector: cssPath(el), edge: 'right', right: r.right,
+                 viewportWidth: vw, overflow: r.right - vw,
+                 bbox: [r.x, r.y, r.width, r.height] });
+    } else if (r.left < -tol) {
+      out.push({ selector: cssPath(el), edge: 'left', right: r.right,
+                 viewportWidth: vw, overflow: -r.left,
+                 bbox: [r.x, r.y, r.width, r.height] });
+    }
+  }
+  return out;
+}"""
+)
+
+# Page-level horizontal overflow: the classic mobile bug — the document is
+# wider than the viewport, so the whole page scrolls sideways. One finding for
+# the page, complementing per-element protrusion above.
+_JS_PAGE_OVERFLOW = (
+    "(tol) => {"
+    + """
+  const vw = document.documentElement.clientWidth;
+  const sw = Math.max(document.documentElement.scrollWidth, document.body ? document.body.scrollWidth : 0);
+  if (sw > vw + tol) {
+    return [{ scrollWidth: sw, viewportWidth: vw, overflow: sw - vw }];
+  }
+  return [];
+}"""
+)
+
+# Text truncation: single-line ellipsis actually cutting text off — the element
+# declares text-overflow: ellipsis with clipped overflow AND its content is
+# wider than its box. Distinct from detect_clipping, which reports any box
+# with hidden overflow; this isolates the "…" case designers care about.
+_JS_TRUNCATION = (
+    "(tol) => {"
+    + _JS_HELPERS
+    + """
+  const out = [];
+  for (const el of document.querySelectorAll('body *')) {
+    if (!visible(el)) continue;
+    const cs = getComputedStyle(el);
+    if (cs.textOverflow !== 'ellipsis') continue;
+    const hiddenX = cs.overflowX === 'hidden' || cs.overflowX === 'clip' || cs.overflow === 'hidden';
+    if (!hiddenX) continue;
+    if (el.scrollWidth > el.clientWidth + tol) {
+      const r = el.getBoundingClientRect();
+      out.push({ selector: cssPath(el), scrollWidth: el.scrollWidth,
+                 clientWidth: el.clientWidth,
+                 text: (el.textContent || '').trim().slice(0, 60),
+                 bbox: [r.x, r.y, r.width, r.height] });
     }
   }
   return out;
@@ -249,7 +302,7 @@ class LayoutScorer:
         return findings
 
     async def detect_protrusion(self, page: Page) -> list[LayoutFinding]:
-        """Return findings for elements protruding past the layout viewport width."""
+        """Return findings for elements protruding past either horizontal viewport edge."""
         raw = await page.evaluate(_JS_PROTRUDE, self.protrude_tolerance_px)
         findings: list[LayoutFinding] = []
         for m in raw:
@@ -259,12 +312,63 @@ class LayoutScorer:
                     selector=m["selector"],
                     bbox=_round_bbox(m["bbox"]),
                     measured={
+                        "edge": m["edge"],
                         "right_px": round(m["right"]),
                         "viewport_width_px": round(m["viewportWidth"]),
                         "overflow_px": round(m["overflow"]),
                     },
                     threshold={"viewport_width_px": round(m["viewportWidth"])},
-                    description=f"extends {round(m['overflow'])}px past the {round(m['viewportWidth'])}px viewport",
+                    description=(
+                        f"extends {round(m['overflow'])}px past the {m['edge']} edge "
+                        f"of the {round(m['viewportWidth'])}px viewport"
+                    ),
+                )
+            )
+        return findings
+
+    async def detect_page_overflow(self, page: Page) -> list[LayoutFinding]:
+        """Return a finding if the whole document scrolls horizontally."""
+        raw = await page.evaluate(_JS_PAGE_OVERFLOW, self.protrude_tolerance_px)
+        findings: list[LayoutFinding] = []
+        for m in raw:
+            findings.append(
+                LayoutFinding(
+                    defect_class=PAGE_OVERFLOW,
+                    selector="html",
+                    bbox=[0, 0, round(m["scrollWidth"]), 0],
+                    measured={
+                        "scroll_width_px": round(m["scrollWidth"]),
+                        "viewport_width_px": round(m["viewportWidth"]),
+                        "overflow_px": round(m["overflow"]),
+                    },
+                    threshold={"viewport_width_px": round(m["viewportWidth"])},
+                    description=(
+                        f"page scrolls horizontally: content is {round(m['scrollWidth'])}px "
+                        f"wide in a {round(m['viewportWidth'])}px viewport"
+                    ),
+                )
+            )
+        return findings
+
+    async def detect_truncation(self, page: Page) -> list[LayoutFinding]:
+        """Return findings for single-line text actually cut off by an ellipsis."""
+        raw = await page.evaluate(_JS_TRUNCATION, self.clip_tolerance_px)
+        findings: list[LayoutFinding] = []
+        for m in raw:
+            hidden_px = m["scrollWidth"] - m["clientWidth"]
+            findings.append(
+                LayoutFinding(
+                    defect_class=TRUNCATION,
+                    selector=m["selector"],
+                    bbox=_round_bbox(m["bbox"]),
+                    measured={
+                        "scroll_width_px": m["scrollWidth"],
+                        "client_width_px": m["clientWidth"],
+                        "hidden_px": hidden_px,
+                        "text_preview": m["text"],
+                    },
+                    threshold={"tolerance_px": self.clip_tolerance_px},
+                    description=f"text truncated by ellipsis, {hidden_px}px hidden",
                 )
             )
         return findings
@@ -312,6 +416,8 @@ class LayoutScorer:
         findings.extend(await self.detect_overlaps(page))
         findings.extend(await self.detect_clipping(page))
         findings.extend(await self.detect_protrusion(page))
+        findings.extend(await self.detect_page_overflow(page))
+        findings.extend(await self.detect_truncation(page))
         findings.extend(await self.detect_small_targets(page))
         return LayoutReport(
             source=source if source is not None else page.url,

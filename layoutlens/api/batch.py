@@ -94,6 +94,32 @@ class BatchRequest:
     prompt: str
 
 
+def batch_usage_summary(results: dict[str, JudgeResult]) -> dict[str, Any]:
+    """Aggregate token usage (and estimated cost) across judge_batch results.
+
+    Returns:
+        Dict with request counts, per-field token totals, and
+        ``estimated_cost_usd`` (None when the model is unknown to litellm).
+    """
+    from .core import _estimate_cost
+
+    prompt = sum(r.usage.get("prompt_tokens", 0) for r in results.values())
+    completion = sum(r.usage.get("completion_tokens", 0) for r in results.values())
+    models = {r.model for r in results.values()}
+    model = next(iter(models)) if len(models) == 1 else ""
+    return {
+        "requests": len(results),
+        "refused": sum(1 for r in results.values() if r.refused),
+        "unparsed": sum(1 for r in results.values() if r.parse_mode == "none"),
+        "prompt_tokens": prompt,
+        "completion_tokens": completion,
+        "total_tokens": sum(r.usage.get("total_tokens", 0) for r in results.values()),
+        "estimated_cost_usd": _estimate_cost(model, prompt, completion)
+        if model
+        else None,
+    }
+
+
 # --- shared helpers -------------------------------------------------------
 
 
@@ -303,7 +329,9 @@ async def _collect_litellm_job(
     if not output_file_id:
         return {}
     content = await afile_content(output_file_id, custom_llm_provider=provider)  # pyright: ignore[reportArgumentType]
-    text = content.text if hasattr(content, "text") else content.content.decode("utf-8")
+    # litellm's return union includes a streaming variant this call never
+    # produces; the hasattr guard handles the real (buffered) shapes.
+    text = content.text if hasattr(content, "text") else content.content.decode("utf-8")  # pyright: ignore[reportAttributeAccessIssue]
     return _parse_litellm_output(lens, text)
 
 
@@ -614,7 +642,11 @@ async def _judge_batch_genai(
             results[req.id] = _unknown_result(lens, "no batch response")
         else:
             results[req.id] = build_judge_result(
-                lens, got["text"] or "", got["usage"], got["finish"]
+                lens,
+                got["text"] or "",
+                got["usage"],
+                got["finish"],
+                prompt=req.prompt,
             )
     return results
 

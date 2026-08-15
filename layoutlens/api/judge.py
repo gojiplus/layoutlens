@@ -25,6 +25,7 @@ patched at ``layoutlens.api.core.acompletion``).
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from dataclasses import dataclass
@@ -77,6 +78,9 @@ class JudgeResult:
         parse_mode: "json", "fallback", or "none".
         truncated: True if the model stopped because it hit the token budget
             (``finish_reason == "length"``) — the verdict may be incomplete.
+        prompt_sha256: SHA-256 of the exact prompt sent (judge-contract
+            pinning: model + prompt hash make a result auditable). Empty when
+            the transport could not supply the prompt (litellm file batches).
     """
 
     answer: str
@@ -88,6 +92,7 @@ class JudgeResult:
     model: str
     parse_mode: str
     truncated: bool = False
+    prompt_sha256: str = ""
 
 
 def detect_refusal(text: str) -> bool:
@@ -269,7 +274,11 @@ def _finish_reason(response: Any) -> str | None:
 
 
 def build_judge_result(
-    lens: LayoutLens, raw: str, usage: dict[str, int], finish_reason: Any = None
+    lens: LayoutLens,
+    raw: str,
+    usage: dict[str, int],
+    finish_reason: Any = None,
+    prompt: str | None = None,
 ) -> JudgeResult:
     """Assemble a :class:`JudgeResult` from raw text + usage (shared by batch).
 
@@ -278,6 +287,7 @@ def build_judge_result(
     backends produce results identically to the synchronous :func:`judge`.
     """
     answer, confidence, rationale, parse_mode = parse_judge_response(raw)
+    prompt_sha256 = hashlib.sha256(prompt.encode("utf-8")).hexdigest() if prompt else ""
     truncated = finish_reason == "length"
     if truncated:
         logger.warning(
@@ -294,6 +304,7 @@ def build_judge_result(
         usage=usage,
         model=lens.model,
         parse_mode=parse_mode,
+        prompt_sha256=prompt_sha256,
         truncated=truncated,
     )
 
@@ -343,5 +354,5 @@ async def judge(
     # despite litellm's broader union.
     raw = response.choices[0].message.content or ""  # pyright: ignore[reportAttributeAccessIssue]
     return build_judge_result(
-        lens, raw, _read_usage(response), _finish_reason(response)
+        lens, raw, _read_usage(response), _finish_reason(response), prompt=prompt
     )

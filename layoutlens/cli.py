@@ -3,12 +3,14 @@
 
 import argparse
 import asyncio
+import json
 import os
 import sys
 from pathlib import Path
 
 from .api.core import BatchResult, ComparisonResult, LayoutLens
 from .exceptions import LayoutLensError
+from .sarif import to_sarif
 
 
 async def _run_a11y(sources, args) -> int:
@@ -39,7 +41,9 @@ async def _run_a11y(sources, args) -> int:
         print(f"Unexpected error: {e}", file=sys.stderr)
         return 1
 
-    if args.output == "json":
+    if args.output == "sarif":
+        print(json.dumps(to_sarif(results), indent=2))
+    elif args.output == "json":
         for result in results:
             print(result.to_json())
     else:
@@ -47,6 +51,46 @@ async def _run_a11y(sources, args) -> int:
         for result in results:
             print(f"📍 {result.source}")
             print(f"♿ Accessibility ({args.a11y}): {result.answer}")
+            print(f"📊 Confidence: {result.confidence:.0%}")
+            if result.reasoning:
+                print(f"💭 {result.reasoning}")
+            print()
+
+    return 0
+
+
+async def _run_layout(sources, args) -> int:
+    """Run deterministic/hybrid layout checks for each source and print results.
+
+    In ``deterministic`` mode this works with no API key configured.
+    """
+    try:
+        lens = LayoutLens(
+            api_key=args.api_key or os.getenv("OPENAI_API_KEY"), model=args.model
+        )
+        results = []
+        for source in sources:
+            result = await lens.check_layout(
+                source, viewport=args.viewport, mode=args.layout
+            )
+            results.append(result)
+    except LayoutLensError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+    except Exception as e:
+        print(f"Unexpected error: {e}", file=sys.stderr)
+        return 1
+
+    if args.output == "sarif":
+        print(json.dumps(to_sarif(results), indent=2))
+    elif args.output == "json":
+        for result in results:
+            print(result.to_json())
+    else:
+        print()
+        for result in results:
+            print(f"📍 {result.source}")
+            print(f"📐 Layout ({args.layout}): {result.answer}")
             print(f"📊 Confidence: {result.confidence:.0%}")
             if result.reasoning:
                 print(f"💭 {result.reasoning}")
@@ -127,8 +171,9 @@ Examples:
         "--output",
         "-o",
         default="text",
-        choices=["text", "json"],
-        help="Output format (default: text)",
+        choices=["text", "json", "sarif"],
+        help="Output format (default: text). 'sarif' emits a SARIF 2.1.0 log "
+        "for GitHub Code Scanning and requires --a11y or --layout.",
     )
     parser.add_argument("--api-key", help="API key (or set OPENAI_API_KEY env)")
     parser.add_argument("--model", "-m", default="gpt-4o-mini", help="AI model to use")
@@ -138,6 +183,14 @@ Examples:
         default=None,
         help="Run a WCAG accessibility check instead of a generic query. "
         "'axe' is deterministic and needs no API key; 'hybrid' also runs LLM vision; 'llm' is vision-only.",
+    )
+    parser.add_argument(
+        "--layout",
+        choices=["hybrid", "deterministic", "llm"],
+        default=None,
+        help="Run the deterministic layout/geometry scan instead of a generic "
+        "query. 'deterministic' needs no API key; 'hybrid' also runs LLM "
+        "vision; 'llm' is vision-only.",
     )
     parser.add_argument(
         "--suite",
@@ -181,21 +234,41 @@ Examples:
         print("Error: No valid sources provided", file=sys.stderr)
         return 1
 
-    # Accessibility mode: run built-in WCAG checks instead of a generic query.
+    # SARIF output only makes sense for deterministic finding streams.
+    if args.output == "sarif" and not (args.a11y or args.layout):
+        print(
+            "Error: --output sarif requires --a11y or --layout (LLM verdicts "
+            "carry no rule ids or locations)",
+            file=sys.stderr,
+        )
+        return 1
+
+    if args.a11y and args.layout:
+        print(
+            "Error: --a11y and --layout are separate check modes; run them "
+            "as two invocations",
+            file=sys.stderr,
+        )
+        return 1
+
+    # Accessibility/layout modes: run built-in checks instead of a generic query.
+    for flag, name in ((args.a11y, "--a11y"), (args.layout, "--layout")):
+        if flag and query:
+            print(
+                f"Error: --query cannot be combined with {name} (built-in checks own the query)",
+                file=sys.stderr,
+            )
+            return 1
+        if flag and args.compare:
+            print(
+                f"Error: --compare cannot be combined with {name} (checks run per source, not comparatively)",
+                file=sys.stderr,
+            )
+            return 1
     if args.a11y:
-        if query:
-            print(
-                "Error: --query cannot be combined with --a11y (accessibility mode uses built-in WCAG checks)",
-                file=sys.stderr,
-            )
-            return 1
-        if args.compare:
-            print(
-                "Error: --compare cannot be combined with --a11y (accessibility checks run per source, not comparatively)",
-                file=sys.stderr,
-            )
-            return 1
         return await _run_a11y(sources, args)
+    if args.layout:
+        return await _run_layout(sources, args)
 
     # Default query
     if not query:

@@ -59,7 +59,8 @@ The CLI is a single flat command — there are no subcommands (`test`, `batch`,
 ```bash
 layoutlens SOURCES... [--query TEXT] [--compare] [--suite FILE] \
   [--viewport {desktop,mobile,tablet}] [--a11y {hybrid,axe,llm}] \
-  [--output {text,json}] [--api-key KEY] [--model MODEL]
+  [--layout {hybrid,deterministic,llm}] \
+  [--output {text,json,sarif}] [--api-key KEY] [--model MODEL]
 ```
 
 - Positional args that are URLs or existing paths become sources; a leftover
@@ -67,6 +68,14 @@ layoutlens SOURCES... [--query TEXT] [--compare] [--suite FILE] \
 - `--a11y {hybrid,axe,llm}` runs the built-in WCAG checks instead of a
   free-form query; it is an error to combine `--a11y` with `--query`.
   `--a11y axe` is fully deterministic and needs no API key.
+- `--layout {hybrid,deterministic,llm}` runs the deterministic geometry/
+  contrast scan (`check_layout`): contrast, overlap, clipping, protrusion
+  (both edges), page-level horizontal overflow, text truncation, target size.
+  `deterministic` needs no API key; in `hybrid` the measured findings ground
+  the LLM and force a "no" verdict when any defect is measured.
+- `--output sarif` (with `--a11y` or `--layout`) emits a SARIF 2.1.0 log for
+  GitHub Code Scanning (`layoutlens/sarif.py`; validated against the official
+  OASIS schema).
 - `--compare` compares the first two sources; `compare()` (CLI and Python)
   accepts URLs, local HTML files, or screenshot images. Every source is
   rendered once and every screenshot is sent to the vision model, with an
@@ -148,6 +157,11 @@ from layoutlens import AxeAuditor
 
 report = await AxeAuditor(run_only=["wcag2a", "wcag2aa"]).audit(source, viewport)
 ```
+
+`check_layout(source, viewport=..., mode="hybrid"|"deterministic"|"llm")`
+mirrors the accessibility stack for the layout scorers: one browser session
+for screenshot + scan, `LayoutReport.summary()` injected as LLM grounding,
+and a deterministic override (measured defects force "no", confidence 1.0).
 
 `check_accessibility` on `LayoutLens` takes a `mode` (plus `compliance_level`
 and optional `standards`/`instructions`):

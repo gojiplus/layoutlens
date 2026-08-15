@@ -8,7 +8,7 @@ natural language visual testing.
 from .a11y import AXE_VERSION, A11yFinding, A11yReport, AxeAuditor
 
 # Import the main API
-from .api.batch import BatchRequest
+from .api.batch import BatchRequest, batch_usage_summary
 from .api.core import AnalysisResult, BatchResult, ComparisonResult, LayoutLens
 from .api.judge import JudgeResult
 from .api.test_suite import UITestCase, UITestResult, UITestSuite
@@ -96,6 +96,7 @@ __all__ = [
     "ValidationError",
     "Viewport",
     "ViewportType",
+    "batch_usage_summary",
     "check_contrast",
     "configure_for_development",
     "configure_for_production",

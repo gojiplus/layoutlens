@@ -9,7 +9,7 @@ import time
 from pathlib import Path
 from urllib.parse import urlparse
 
-from .browser import VIEWPORTS, open_page
+from .browser import VIEWPORTS, open_browser, open_page
 from .logger import get_logger, log_performance_metric
 
 
@@ -74,19 +74,25 @@ class Capture:
 
         semaphore = asyncio.Semaphore(max_concurrent)
 
-        async def capture_single(url: str) -> str:
+        async def capture_single(url: str, browser) -> str:
             async with semaphore:
                 try:
                     return await self._capture_url(
-                        url, viewport, wait_for_selector, wait_time
+                        url, viewport, wait_for_selector, wait_time, browser=browser
                     )
                 except Exception as e:
                     self.logger.warning(f"Failed to capture {url}: {e}")
                     return f"Error: {e!s}"
 
-        # Execute all captures concurrently
-        tasks = [capture_single(url) for url in urls]
-        results = await asyncio.gather(*tasks)
+        if len(urls) > 1:
+            # One chromium launch shared by the whole batch; each capture
+            # still gets its own isolated context.
+            async with open_browser() as browser:
+                results = await asyncio.gather(
+                    *(capture_single(url, browser) for url in urls)
+                )
+        else:
+            results = await asyncio.gather(*(capture_single(url, None) for url in urls))
 
         duration = time.time() - start_time
 
@@ -108,11 +114,14 @@ class Capture:
         viewport: str,
         wait_for_selector: str | None = None,
         wait_time: int | None = None,
+        browser=None,
     ) -> str:
-        """Capture a single URL."""
+        """Capture a single URL, optionally on a shared browser."""
         start_time = time.time()
 
-        async with open_page(url, viewport, timeout=self.timeout) as page:
+        async with open_page(
+            url, viewport, timeout=self.timeout, browser=browser
+        ) as page:
             # Wait for specific selector if provided
             if wait_for_selector:
                 await page.wait_for_selector(wait_for_selector, timeout=self.timeout)

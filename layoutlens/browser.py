@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
 
-from playwright.async_api import Page, async_playwright
+from playwright.async_api import Browser, Page, async_playwright
 
 from .logger import get_logger
 from .types import Viewport, ViewportType
@@ -123,10 +123,27 @@ def _make_server(html_file_path: Path) -> socketserver.TCPServer:
 
 
 @asynccontextmanager
+async def open_browser() -> AsyncIterator[Browser]:
+    """Launch one headless chromium to share across several ``open_page`` calls.
+
+    Capturing N sources otherwise launches N browsers; pass the yielded
+    browser to ``open_page(..., browser=...)`` to reuse it (each page still
+    gets its own isolated context).
+    """
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        try:
+            yield browser
+        finally:
+            await browser.close()
+
+
+@asynccontextmanager
 async def open_page(
     source: str | Path,
     viewport: ViewportType = "desktop",
     timeout: int = 30000,
+    browser: Browser | None = None,
 ) -> AsyncIterator[Page]:
     """Open a loaded Playwright page for a URL or local HTML file.
 
@@ -140,6 +157,9 @@ async def open_page(
         source: A URL (``http``/``https``/``file``) or a path to a local HTML file.
         viewport: Viewport name or :class:`~layoutlens.types.Viewport` enum member.
         timeout: Default navigation/action timeout in milliseconds.
+        browser: Optional already-launched browser to reuse (see
+            :func:`open_browser`); when omitted, one is launched and closed
+            per call.
 
     Yields:
         The loaded page, ready for screenshots or script injection.
@@ -169,30 +189,41 @@ async def open_page(
         target_url = f"http://localhost:{port}/"
         logger.debug(f"Serving {html_file_path} at {target_url}")
 
+    context_options = {
+        "viewport": {
+            "width": viewport_config.width,
+            "height": viewport_config.height,
+        },
+        "device_scale_factor": viewport_config.device_scale_factor,
+        "is_mobile": viewport_config.is_mobile,
+        "has_touch": viewport_config.has_touch,
+        "user_agent": viewport_config.user_agent or DEFAULT_USER_AGENT,
+    }
+
+    async def _run(b: Browser) -> AsyncIterator[Page]:
+        context = await b.new_context(**context_options)
+        page = await context.new_page()
+        page.set_default_timeout(timeout)
+        await page.goto(target_url, wait_until="networkidle")
+        try:
+            yield page
+        finally:
+            await context.close()
+
     try:
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
-            context_options = {
-                "viewport": {
-                    "width": viewport_config.width,
-                    "height": viewport_config.height,
-                },
-                "device_scale_factor": viewport_config.device_scale_factor,
-                "is_mobile": viewport_config.is_mobile,
-                "has_touch": viewport_config.has_touch,
-                "user_agent": viewport_config.user_agent or DEFAULT_USER_AGENT,
-            }
-            context = await browser.new_context(**context_options)
-            page = await context.new_page()
-            page.set_default_timeout(timeout)
-
-            await page.goto(target_url, wait_until="networkidle")
-
-            try:
+        if browser is not None:
+            # Caller owns the browser lifecycle (see open_browser); only the
+            # per-page context is created and torn down here.
+            async for page in _run(browser):
                 yield page
-            finally:
-                await context.close()
-                await browser.close()
+        else:
+            async with async_playwright() as p:
+                own_browser = await p.chromium.launch(headless=True)
+                try:
+                    async for page in _run(own_browser):
+                        yield page
+                finally:
+                    await own_browser.close()
     finally:
         if httpd is not None:
             httpd.shutdown()
