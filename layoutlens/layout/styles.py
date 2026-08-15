@@ -29,7 +29,9 @@ _JS_GEOMETRY = """(sel) => {
 }"""
 
 
-async def read_computed_styles(page: Page, selector: str, props: list[str]) -> dict[str, str] | None:
+async def read_computed_styles(
+    page: Page, selector: str, props: list[str]
+) -> dict[str, str] | None:
     """Read computed CSS property values for the first element matching ``selector``.
 
     Args:

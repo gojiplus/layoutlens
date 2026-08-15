@@ -1,65 +1,23 @@
-name: Documentation
+name: Docs
 
 on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: "pages"
-  cancel-in-progress: false
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build-docs:
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-
-    - name: Install uv
-      uses: astral-sh/setup-uv@v7
-
-    - name: Set up Python
-      run: uv python install 3.11
-
-    - name: Install dependencies
-      run: uv sync --group docs
-
-    - name: Build documentation
-      run: |
-        cd docs
-        rm -rf _build/*
-        uv run sphinx-build -b html . _build/html
-
-    - name: Setup Pages
-      if: github.ref == 'refs/heads/main'
-      uses: actions/configure-pages@v4
-      with:
-        # Enable Pages if not already enabled
-        enablement: true
-
-    - name: Upload artifact
-      if: github.ref == 'refs/heads/main'
-      uses: actions/upload-pages-artifact@v3
-      with:
-        path: docs/_build/html
-
-  deploy-docs:
-    if: github.ref == 'refs/heads/main'
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    needs: build-docs
-
-    steps:
-    - name: Deploy to GitHub Pages
-      id: deployment
-      uses: actions/deploy-pages@v4
+  docs:
+    uses: gojiplus/py-canon/.github/workflows/reusable-docs.yml@v1
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    with:
+      deploy: ${{ github.event_name == 'push' }}

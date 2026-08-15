@@ -36,16 +36,22 @@ class UserContext:
             parts.append(f"Industry: {self.industry}")
 
         if self.accessibility_needs:
-            parts.append(f"Accessibility requirements: {', '.join(self.accessibility_needs)}")
+            parts.append(
+                f"Accessibility requirements: {', '.join(self.accessibility_needs)}"
+            )
 
         if self.technical_constraints:
-            parts.append(f"Technical constraints: {', '.join(self.technical_constraints)}")
+            parts.append(
+                f"Technical constraints: {', '.join(self.technical_constraints)}"
+            )
 
         if self.user_personas:
             parts.append(f"User personas to consider: {', '.join(self.user_personas)}")
 
         if self.brand_guidelines:
-            guidelines_str = ", ".join(f"{k}: {v}" for k, v in self.brand_guidelines.items())
+            guidelines_str = ", ".join(
+                f"{k}: {v}" for k, v in self.brand_guidelines.items()
+            )
             parts.append(f"Brand guidelines: {guidelines_str}")
 
         return ". ".join(parts)
@@ -95,39 +101,70 @@ class Instructions:
 
     @classmethod
     def for_accessibility_audit(
-        cls, standards: list[str] = None, user_needs: list[str] = None, compliance_level: str = "AA"
+        cls,
+        standards: list[str] | None = None,
+        user_needs: list[str] | None = None,
+        compliance_level: str = "AA",
     ) -> Instructions:
         """Create instructions for accessibility auditing."""
         standards = standards or ["WCAG_2.1", "Section_508"]
-        user_needs = user_needs or ["screen_readers", "keyboard_navigation", "low_vision"]
+        user_needs = user_needs or [
+            "screen_readers",
+            "keyboard_navigation",
+            "low_vision",
+        ]
 
         return cls(
             expert_persona="accessibility_expert",
-            focus_areas=["contrast_ratios", "keyboard_navigation", "screen_reader_compatibility"],
+            focus_areas=[
+                "contrast_ratios",
+                "keyboard_navigation",
+                "screen_reader_compatibility",
+            ],
             evaluation_criteria=f"Evaluate against {' and '.join(standards)} Level {compliance_level}",
-            user_context=UserContext(accessibility_needs=user_needs, target_audience="users_with_disabilities"),
+            user_context=UserContext(
+                accessibility_needs=user_needs,
+                target_audience="users_with_disabilities",
+            ),
             output_style="checklist_format",
             depth_level="comprehensive",
         )
 
     @classmethod
     def for_conversion_optimization(
-        cls, business_goals: list[str] = None, industry: str = None, target_audience: str = None
+        cls,
+        business_goals: list[str] | None = None,
+        industry: str | None = None,
+        target_audience: str | None = None,
     ) -> Instructions:
         """Create instructions for conversion rate optimization."""
-        business_goals = business_goals or ["reduce_cart_abandonment", "increase_signups"]
+        business_goals = business_goals or [
+            "reduce_cart_abandonment",
+            "increase_signups",
+        ]
 
         return cls(
             expert_persona="conversion_expert",
-            focus_areas=["cta_prominence", "trust_signals", "friction_points", "value_proposition"],
+            focus_areas=[
+                "cta_prominence",
+                "trust_signals",
+                "friction_points",
+                "value_proposition",
+            ],
             evaluation_criteria="Analyze for conversion optimization and user flow efficiency",
-            user_context=UserContext(business_goals=business_goals, industry=industry, target_audience=target_audience),
+            user_context=UserContext(
+                business_goals=business_goals,
+                industry=industry,
+                target_audience=target_audience,
+            ),
             output_style="actionable_recommendations",
             depth_level="detailed",
         )
 
     @classmethod
-    def for_mobile_optimization(cls, device_types: list[str] = None, performance_focus: bool = True) -> Instructions:
+    def for_mobile_optimization(
+        cls, device_types: list[str] | None = None, performance_focus: bool = True
+    ) -> Instructions:
         """Create instructions for mobile optimization analysis."""
         device_types = device_types or ["smartphone", "tablet"]
 
@@ -140,19 +177,37 @@ class Instructions:
             focus_areas=focus_areas,
             evaluation_criteria="Evaluate mobile user experience and performance",
             user_context=UserContext(
-                device_usage="mobile_primary", technical_constraints=["limited_bandwidth", "touch_only_interaction"]
+                device_usage="mobile_primary",
+                technical_constraints=["limited_bandwidth", "touch_only_interaction"],
             ),
             output_style="actionable_recommendations",
             depth_level="detailed",
         )
 
     @classmethod
-    def for_ecommerce_analysis(cls, page_type: str = "product_page", business_model: str = "b2c") -> Instructions:
+    def for_ecommerce_analysis(
+        cls, page_type: str = "product_page", business_model: str = "b2c"
+    ) -> Instructions:
         """Create instructions for e-commerce analysis."""
         focus_areas_map = {
-            "product_page": ["product_imagery", "pricing_clarity", "add_to_cart", "trust_signals"],
-            "checkout": ["form_simplicity", "payment_security", "progress_indicators", "error_handling"],
-            "homepage": ["value_proposition", "navigation", "product_discovery", "brand_trust"],
+            "product_page": [
+                "product_imagery",
+                "pricing_clarity",
+                "add_to_cart",
+                "trust_signals",
+            ],
+            "checkout": [
+                "form_simplicity",
+                "payment_security",
+                "progress_indicators",
+                "error_handling",
+            ],
+            "homepage": [
+                "value_proposition",
+                "navigation",
+                "product_discovery",
+                "brand_trust",
+            ],
         }
 
         return cls(
@@ -160,7 +215,8 @@ class Instructions:
             focus_areas=focus_areas_map.get(page_type, []),
             evaluation_criteria=f"Analyze {page_type} for {business_model} e-commerce best practices",
             user_context=UserContext(
-                business_goals=["increase_conversions", "reduce_cart_abandonment"], industry="ecommerce"
+                business_goals=["increase_conversions", "reduce_cart_abandonment"],
+                industry="ecommerce",
             ),
             output_style="actionable_recommendations",
             depth_level="detailed",

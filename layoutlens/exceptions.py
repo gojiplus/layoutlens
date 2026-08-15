@@ -23,7 +23,7 @@ class LayoutLensError(Exception):
         details: Dictionary of additional error context information.
     """
 
-    def __init__(self, message: str, details: dict = None):
+    def __init__(self, message: str, details: dict | None = None):
         """Initialize the base LayoutLens exception.
 
         Args:
@@ -36,7 +36,9 @@ class LayoutLensError(Exception):
 
         # Log the exception when it's created
         logger = get_logger("exceptions")
-        logger.error(f"{self.__class__.__name__}: {message}", extra={"details": self.details})
+        logger.error(
+            f"{self.__class__.__name__}: {message}", extra={"details": self.details}
+        )
 
     def __str__(self):
         """Return string representation of the exception.
@@ -67,7 +69,9 @@ class APIError(LayoutLensError):
         response: Raw API response content if available.
     """
 
-    def __init__(self, message: str, status_code: int = None, response: str = None):
+    def __init__(
+        self, message: str, status_code: int | None = None, response: str | None = None
+    ):
         """Initialize API error with response details.
 
         Args:
@@ -97,7 +101,9 @@ class ScreenshotError(LayoutLensError):
         viewport: The viewport configuration string.
     """
 
-    def __init__(self, message: str, source: str = None, viewport: str = None):
+    def __init__(
+        self, message: str, source: str | None = None, viewport: str | None = None
+    ):
         """Initialize screenshot error with capture context.
 
         Args:
@@ -127,7 +133,12 @@ class ConfigurationError(LayoutLensError):
         missing_fields: List of missing required configuration fields.
     """
 
-    def __init__(self, message: str, config_file: str = None, missing_fields: list = None):
+    def __init__(
+        self,
+        message: str,
+        config_file: str | None = None,
+        missing_fields: list | None = None,
+    ):
         """Initialize configuration error with file context.
 
         Args:
@@ -157,7 +168,9 @@ class ValidationError(LayoutLensError):
         value: The invalid value that was rejected.
     """
 
-    def __init__(self, message: str, field: str = None, value: str = None):
+    def __init__(
+        self, message: str, field: str | None = None, value: str | None = None
+    ):
         """Initialize validation error with field context.
 
         Args:
@@ -192,8 +205,8 @@ class AnalysisError(LayoutLensError):
     def __init__(
         self,
         message: str,
-        query: str = None,
-        source: str = None,
+        query: str | None = None,
+        source: str | None = None,
         confidence: float = 0.0,
     ):
         """Initialize analysis error with query context.
@@ -227,7 +240,9 @@ class TestSuiteError(LayoutLensError):
         test_case: Name of the specific failed test case if applicable.
     """
 
-    def __init__(self, message: str, suite_name: str = None, test_case: str = None):
+    def __init__(
+        self, message: str, suite_name: str | None = None, test_case: str | None = None
+    ):
         """Initialize test suite error with execution context.
 
         Args:
@@ -274,7 +289,9 @@ class RateLimitError(APIError):
         retry_after: Number of seconds to wait before retry.
     """
 
-    def __init__(self, message: str = "API rate limit exceeded", retry_after: int = None):
+    def __init__(
+        self, message: str = "API rate limit exceeded", retry_after: int | None = None
+    ):
         """Initialize rate limit error with retry information.
 
         Args:
@@ -302,7 +319,12 @@ class TimeoutError(LayoutLensError):
         operation: The specific operation that timed out.
     """
 
-    def __init__(self, message: str, timeout_duration: float = None, operation: str = None):
+    def __init__(
+        self,
+        message: str,
+        timeout_duration: float | None = None,
+        operation: str | None = None,
+    ):
         """Initialize timeout error with operation context.
 
         Args:
@@ -330,7 +352,7 @@ class LayoutFileNotFoundError(LayoutLensError):
         file_path: The path to the missing file.
     """
 
-    def __init__(self, message: str, file_path: str = None):
+    def __init__(self, message: str, file_path: str | None = None):
         """Initialize file not found error with path context.
 
         Args:
@@ -358,7 +380,9 @@ class NetworkError(LayoutLensError):
         error_code: Network error code if available.
     """
 
-    def __init__(self, message: str, url: str = None, error_code: int = None):
+    def __init__(
+        self, message: str, url: str | None = None, error_code: int | None = None
+    ):
         """Initialize network error with connection context.
 
         Args:
@@ -388,7 +412,9 @@ ERROR_MAPPING = {
 }
 
 
-def handle_api_error(response_code: int, message: str, response: str = None) -> APIError:
+def handle_api_error(
+    response_code: int, message: str, response: str | None = None
+) -> APIError:
     """Factory function to create appropriate API error based on HTTP response code.
 
     Maps HTTP status codes to specific exception types for better error handling
@@ -412,7 +438,9 @@ def handle_api_error(response_code: int, message: str, response: str = None) -> 
         return APIError(message, status_code=response_code, response=response)
 
 
-def wrap_exception(original_exception: Exception, context: str = None) -> LayoutLensError:
+def wrap_exception(
+    original_exception: Exception, context: str | None = None
+) -> LayoutLensError:
     """Wrap a generic exception in an appropriate LayoutLens exception.
 
     Converts standard Python exceptions into LayoutLens-specific exceptions
@@ -431,7 +459,9 @@ def wrap_exception(original_exception: Exception, context: str = None) -> Layout
     if context:
         message = f"{context}: {message}"
 
-    logger.debug(f"Wrapping exception: {type(original_exception).__name__} -> {message}")
+    logger.debug(
+        f"Wrapping exception: {type(original_exception).__name__} -> {message}"
+    )
 
     # Map common exception types
     if isinstance(original_exception, ConnectionError | OSError):
@@ -439,6 +469,8 @@ def wrap_exception(original_exception: Exception, context: str = None) -> Layout
     elif isinstance(original_exception, TimeoutError):
         return TimeoutError(message)
     elif isinstance(original_exception, FileNotFoundError):
-        return LayoutFileNotFoundError(message, file_path=getattr(original_exception, "filename", None))
+        return LayoutFileNotFoundError(
+            message, file_path=getattr(original_exception, "filename", None)
+        )
     else:
         return LayoutLensError(message)

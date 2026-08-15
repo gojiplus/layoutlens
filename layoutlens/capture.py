@@ -1,5 +1,4 @@
-"""
-Simplified URL capture system for live website screenshots.
+"""Simplified URL capture system for live website screenshots.
 
 Provides a single, clean interface that handles any number of URLs naturally.
 """
@@ -15,8 +14,7 @@ from .logger import get_logger, log_performance_metric
 
 
 class Capture:
-    """
-    Simple screenshot capture system using Playwright.
+    """Simple screenshot capture system using Playwright.
 
     One method handles everything - single URLs are just lists of 1 item.
     """
@@ -26,13 +24,14 @@ class Capture:
 
     def __init__(self, output_dir: str | Path = "screenshots", timeout: int = 30000):
         """Initialize capture system."""
-
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.timeout = timeout
         self.logger = get_logger("vision.capture")
 
-        self.logger.info(f"Capture initialized - output_dir: {output_dir}, timeout: {timeout}ms")
+        self.logger.info(
+            f"Capture initialized - output_dir: {output_dir}, timeout: {timeout}ms"
+        )
 
     async def screenshots(
         self,
@@ -42,8 +41,7 @@ class Capture:
         wait_for_selector: str | None = None,
         wait_time: int | None = None,
     ) -> list[str]:
-        """
-        Capture screenshots from URLs.
+        """Capture screenshots from URLs.
 
         Simple interface: give it URLs, get back screenshot paths.
         Single URL? Pass a list with 1 item. Multiple URLs? Pass a list.
@@ -79,10 +77,12 @@ class Capture:
         async def capture_single(url: str) -> str:
             async with semaphore:
                 try:
-                    return await self._capture_url(url, viewport, wait_for_selector, wait_time)
+                    return await self._capture_url(
+                        url, viewport, wait_for_selector, wait_time
+                    )
                 except Exception as e:
                     self.logger.warning(f"Failed to capture {url}: {e}")
-                    return f"Error: {str(e)}"
+                    return f"Error: {e!s}"
 
         # Execute all captures concurrently
         tasks = [capture_single(url) for url in urls]

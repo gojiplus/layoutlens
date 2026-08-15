@@ -1,5 +1,4 @@
-"""
-Report generation for Browser Use validation results.
+"""Report generation for Browser Use validation results.
 
 Provides HTML and JSON report generation for validation sessions.
 """
@@ -44,7 +43,9 @@ class ValidationReportGenerator:
         self.logger = get_logger("integrations.browser_use.reports")
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        self.logger.info(f"ValidationReportGenerator initialized - output_dir: {self.output_dir}")
+        self.logger.info(
+            f"ValidationReportGenerator initialized - output_dir: {self.output_dir}"
+        )
 
     def generate_html_report(
         self,
@@ -127,7 +128,10 @@ class ValidationReportGenerator:
             Path to the generated HTML report.
         """
         if output_path is None:
-            output_path = self.output_dir / f"comparison_{comparison.baseline_id}_vs_{comparison.current_id}.html"
+            output_path = (
+                self.output_dir
+                / f"comparison_{comparison.baseline_id}_vs_{comparison.current_id}.html"
+            )
         else:
             output_path = Path(output_path)
 
@@ -229,15 +233,21 @@ class ValidationReportGenerator:
                     except Exception:
                         screenshot_html = f'<p class="error">Screenshot not available: {step.screenshot_path}</p>'
                 else:
-                    screenshot_html = f'<img src="{step.screenshot_path}" class="screenshot" />'
+                    screenshot_html = (
+                        f'<img src="{step.screenshot_path}" class="screenshot" />'
+                    )
 
             findings_html = ""
             for finding in step.findings:
                 color = severity_colors.get(finding.severity.value, "#6c757d")
                 if finding.verified is True:
-                    verified_html = '<span class="verified verified-yes">✓ machine-verified</span>'
+                    verified_html = (
+                        '<span class="verified verified-yes">✓ machine-verified</span>'
+                    )
                 elif finding.verified is False:
-                    verified_html = '<span class="verified verified-no">✗ not axe-confirmed</span>'
+                    verified_html = (
+                        '<span class="verified verified-no">✗ not axe-confirmed</span>'
+                    )
                 else:
                     verified_html = ""
                 findings_html += f"""
@@ -616,7 +626,11 @@ class ValidationReportGenerator:
                 "url": step.url,
                 "confidence": step.confidence,
                 "finding_count": len(step.findings),
-                "critical_count": sum(1 for f in step.findings if f.severity == ValidationSeverity.CRITICAL),
+                "critical_count": sum(
+                    1
+                    for f in step.findings
+                    if f.severity == ValidationSeverity.CRITICAL
+                ),
                 "execution_time": step.execution_time,
             }
             timeline_data["events"].append(event)

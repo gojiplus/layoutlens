@@ -58,7 +58,9 @@ def resolve_viewport(viewport: ViewportType) -> ViewportConfig:
     """
     name = viewport.value if isinstance(viewport, Viewport) else str(viewport)
     if name not in VIEWPORTS:
-        raise ValueError(f"Unknown viewport: {name}. Available: {list(VIEWPORTS.keys())}")
+        raise ValueError(
+            f"Unknown viewport: {name}. Available: {list(VIEWPORTS.keys())}"
+        )
     return VIEWPORTS[name]
 
 
@@ -99,7 +101,7 @@ def _make_server(html_file_path: Path) -> socketserver.TCPServer:
                 case _:
                     super().do_GET()
 
-        def log_message(self, format, *args):  # noqa: A002 - stdlib signature
+        def log_message(self, format, *args):
             # Suppress default HTTP server logging.
             return
 
@@ -157,7 +159,10 @@ async def open_page(
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
             context_options = {
-                "viewport": {"width": viewport_config.width, "height": viewport_config.height},
+                "viewport": {
+                    "width": viewport_config.width,
+                    "height": viewport_config.height,
+                },
                 "device_scale_factor": viewport_config.device_scale_factor,
                 "is_mobile": viewport_config.is_mobile,
                 "has_touch": viewport_config.has_touch,

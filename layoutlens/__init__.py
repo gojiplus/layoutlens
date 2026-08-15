@@ -1,4 +1,4 @@
-"""LayoutLens: AI-Enabled UI Test System
+"""LayoutLens: AI-Enabled UI Test System.
 
 A production-ready AI-powered UI testing framework that enables
 natural language visual testing.
@@ -60,70 +60,70 @@ from .types import (
 )
 
 __all__ = [
-    "LayoutLens",
-    "AnalysisResult",
-    "ComparisonResult",
-    "BatchResult",
-    "JudgeResult",
-    "BatchRequest",
-    "UITestCase",
-    "UITestSuite",
-    "UITestResult",
-    "Capture",
-    "Config",
-    # Deterministic accessibility engine
-    "AxeAuditor",
-    "A11yReport",
-    "A11yFinding",
     "AXE_VERSION",
-    # Deterministic layout/geometry scorers
-    "LayoutScorer",
-    "LayoutReport",
-    "LayoutFinding",
-    "check_contrast",
-    "contrast_ratio",
-    "read_computed_styles",
-    "element_geometry",
-    # Types and Enums
-    "ComplianceLevel",
-    "Expert",
-    "Viewport",
-    "CacheType",
-    "ViewportType",
-    "ExpertType",
-    "ComplianceLevelType",
-    "CacheTypeType",
-    # Exceptions
-    "LayoutLensError",
+    "A11yFinding",
+    "A11yReport",
     "APIError",
-    "ScreenshotError",
-    "ConfigurationError",
-    "ValidationError",
-    "AnalysisError",
-    "TestSuiteError",
-    "AuthenticationError",
-    "RateLimitError",
-    "TimeoutError",
-    "LayoutFileNotFoundError",
-    "NetworkError",
     # Cache
     "AnalysisCache",
-    "create_cache",
-    # Logging
-    "setup_logging",
+    "AnalysisError",
+    "AnalysisResult",
+    "AuthenticationError",
+    # Deterministic accessibility engine
+    "AxeAuditor",
+    "BatchRequest",
+    "BatchResult",
+    "CacheType",
+    "CacheTypeType",
+    "Capture",
+    "ComparisonResult",
+    # Types and Enums
+    "ComplianceLevel",
+    "ComplianceLevelType",
+    "Config",
+    "ConfigurationError",
+    "Expert",
+    "ExpertType",
+    "JudgeResult",
+    "LayoutFileNotFoundError",
+    "LayoutFinding",
+    "LayoutLens",
+    # Exceptions
+    "LayoutLensError",
+    "LayoutReport",
+    # Deterministic layout/geometry scorers
+    "LayoutScorer",
+    "NetworkError",
+    "RateLimitError",
+    "ScreenshotError",
+    "TestSuiteError",
+    "TimeoutError",
+    "UITestCase",
+    "UITestResult",
+    "UITestSuite",
+    "ValidationError",
+    "Viewport",
+    "ViewportType",
+    "check_contrast",
     "configure_for_development",
     "configure_for_production",
     "configure_for_testing",
     "configure_from_env",
+    "contrast_ratio",
+    "create_cache",
+    "element_geometry",
     "get_logger",
+    "read_computed_styles",
+    # Logging
+    "setup_logging",
 ]
 
 # Import version dynamically from pyproject.toml
-try:
-    import importlib.metadata
+import importlib.metadata
 
+try:
     __version__ = importlib.metadata.version("layoutlens")
-except (importlib.metadata.PackageNotFoundError, ImportError):
+except importlib.metadata.PackageNotFoundError:
     # Fallback for development/editable installs - read from pyproject.toml
     try:
         import tomllib

@@ -224,7 +224,11 @@ class LayoutScorer:
         findings: list[LayoutFinding] = []
         for m in raw:
             axis = "vertically" if m["clippedY"] else "horizontally"
-            clipped_px = m["scrollHeight"] - m["clientHeight"] if m["clippedY"] else m["scrollWidth"] - m["clientWidth"]
+            clipped_px = (
+                m["scrollHeight"] - m["clientHeight"]
+                if m["clippedY"]
+                else m["scrollWidth"] - m["clientWidth"]
+            )
             findings.append(
                 LayoutFinding(
                     defect_class=CLIPPING,
@@ -275,7 +279,10 @@ class LayoutScorer:
                     defect_class=TARGET_SIZE,
                     selector=m["selector"],
                     bbox=_round_bbox(m["bbox"]),
-                    measured={"width_px": round(m["width"], 1), "height_px": round(m["height"], 1)},
+                    measured={
+                        "width_px": round(m["width"], 1),
+                        "height_px": round(m["height"], 1),
+                    },
                     threshold={"min_px": self.min_target_px},
                     description=(
                         f"target {round(m['width'])}x{round(m['height'])}px is below "
@@ -286,7 +293,9 @@ class LayoutScorer:
             )
         return findings
 
-    async def scan_page(self, page: Page, source: str | None = None, viewport: str = "desktop") -> LayoutReport:
+    async def scan_page(
+        self, page: Page, source: str | None = None, viewport: str = "desktop"
+    ) -> LayoutReport:
         """Run every detector on an already-loaded page and return a report.
 
         Args:
@@ -310,7 +319,9 @@ class LayoutScorer:
             findings=findings,
         )
 
-    async def scan(self, source: str | Path, viewport: ViewportType = "desktop") -> LayoutReport:
+    async def scan(
+        self, source: str | Path, viewport: ViewportType = "desktop"
+    ) -> LayoutReport:
         """Scan a URL or local HTML file, owning the browser lifecycle.
 
         Args:
@@ -320,6 +331,10 @@ class LayoutScorer:
         Returns:
             The structured layout report.
         """
-        viewport_name = viewport.value if isinstance(viewport, Viewport) else str(viewport)
+        viewport_name = (
+            viewport.value if isinstance(viewport, Viewport) else str(viewport)
+        )
         async with open_page(source, viewport) as page:
-            return await self.scan_page(page, source=str(source), viewport=viewport_name)
+            return await self.scan_page(
+                page, source=str(source), viewport=viewport_name
+            )

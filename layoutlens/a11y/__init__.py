@@ -12,7 +12,7 @@ from .types import A11yFinding, A11yReport
 
 __all__ = [
     "AXE_VERSION",
-    "AxeAuditor",
     "A11yFinding",
     "A11yReport",
+    "AxeAuditor",
 ]

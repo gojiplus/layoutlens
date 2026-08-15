@@ -46,7 +46,9 @@ class TestAsyncCore:
 
     @patch("layoutlens.api.core.acompletion")
     @patch("pathlib.Path.exists")
-    async def test_analyze_async_single(self, mock_exists, mock_acompletion, mock_api_key):
+    async def test_analyze_async_single(
+        self, mock_exists, mock_acompletion, mock_api_key
+    ):
         """Test async single page analysis."""
         # Setup mocks
         mock_exists.return_value = True
@@ -61,7 +63,9 @@ class TestAsyncCore:
         mock_acompletion.return_value = mock_response
 
         # Test async analyze
-        with patch("layoutlens.api.core.LayoutLens._encode_image", return_value="fake-base64"):
+        with patch(
+            "layoutlens.api.core.LayoutLens._encode_image", return_value="fake-base64"
+        ):
             lens = LayoutLens(api_key=mock_api_key)
             result = await lens.analyze("test.html", "Test query")
 
@@ -75,7 +79,9 @@ class TestAsyncCore:
         """Test async batch analysis."""
 
         # Setup mock
-        async def mock_analyze_side_effect(source, query, viewport="desktop", context=None, max_concurrent=5):
+        async def mock_analyze_side_effect(
+            source, query, viewport="desktop", context=None, max_concurrent=5
+        ):
             # The smart analyze method now returns BatchResult for multiple inputs
             from layoutlens.api.core import BatchResult
 
@@ -136,7 +142,9 @@ class TestAsyncCore:
         """Test async batch analysis with some failures."""
 
         # Setup mock with failures
-        async def mock_analyze_side_effect(source, query, viewport="desktop", context=None, max_concurrent=5):
+        async def mock_analyze_side_effect(
+            source, query, viewport="desktop", context=None, max_concurrent=5
+        ):
             from layoutlens.api.core import BatchResult
 
             # Handle both single and multiple source/query combinations
@@ -155,7 +163,10 @@ class TestAsyncCore:
                                 answer=f"Error analyzing {s}: Analysis failed",
                                 confidence=0.0,
                                 reasoning="Analysis failed due to: Analysis failed",
-                                metadata={"error": "Analysis failed", "error_type": "Exception"},
+                                metadata={
+                                    "error": "Analysis failed",
+                                    "error_type": "Exception",
+                                },
                             )
                         )
                     else:
@@ -173,7 +184,9 @@ class TestAsyncCore:
                 results=results,
                 total_queries=len(results),
                 successful_queries=sum(1 for r in results if r.confidence > 0),
-                average_confidence=sum(r.confidence for r in results) / len(results) if results else 0,
+                average_confidence=sum(r.confidence for r in results) / len(results)
+                if results
+                else 0,
                 total_execution_time=0.1,
             )
 
@@ -200,7 +213,9 @@ class TestAsyncCore:
         """Test that async processing provides performance benefits."""
 
         # Mock a slow analyze function
-        async def slow_analyze(source, query, viewport="desktop", context=None, max_concurrent=5):
+        async def slow_analyze(
+            source, query, viewport="desktop", context=None, max_concurrent=5
+        ):
             await asyncio.sleep(0.1)  # Simulate network delay
             from layoutlens.api.core import BatchResult
 
@@ -283,7 +298,9 @@ async def test_async_performance_comparison():
     mock_api_key = "test-key"
 
     # Mock a realistic delay for individual analysis
-    async def mock_analyze_async(source, query, viewport="desktop", context=None, max_concurrent=5):
+    async def mock_analyze_async(
+        source, query, viewport="desktop", context=None, max_concurrent=5
+    ):
         await asyncio.sleep(0.05)  # 50ms delay per analysis
         from layoutlens.api.core import BatchResult
 
@@ -319,18 +336,24 @@ async def test_async_performance_comparison():
     # Test with high concurrency (should be faster)
     with patch.object(lens, "analyze", side_effect=mock_analyze_async):
         start_time = time.time()
-        result_concurrent = await lens.analyze(source=sources, query=queries, max_concurrent=10)
+        result_concurrent = await lens.analyze(
+            source=sources, query=queries, max_concurrent=10
+        )
         concurrent_time = time.time() - start_time
 
         # Test with low concurrency (should be slower)
         start_time = time.time()
-        result_limited = await lens.analyze(source=sources, query=queries, max_concurrent=1)
+        result_limited = await lens.analyze(
+            source=sources, query=queries, max_concurrent=1
+        )
         limited_time = time.time() - start_time
 
     # High concurrency should be faster than limited concurrency
     # 10 analyses: concurrent ~100ms vs limited ~500ms
     # Note: timing tests can be flaky, so we use a generous assertion
-    assert concurrent_time <= limited_time + 0.1  # Should be at least as fast or just slightly slower due to overhead
+    assert (
+        concurrent_time <= limited_time + 0.1
+    )  # Should be at least as fast or just slightly slower due to overhead
     assert result_concurrent.total_queries == 10
     assert result_limited.total_queries == 10
 

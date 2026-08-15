@@ -1,4 +1,4 @@
-# CLAUDE.md - LayoutLens v1.9.0
+# CLAUDE.md - LayoutLens
 
 Guidance for Claude Code when working in this repository. Describes what the
 code actually does — verify against source before trusting older assumptions;
@@ -83,13 +83,13 @@ call with `await` inside an `async def`, or wrap top-level scripts in
 from layoutlens import LayoutLens
 
 lens = LayoutLens(
-    api_key=None,             # optional; falls back to the provider's env var.
-                               # NOT required at construction (see below)
+    api_key=None,  # optional; falls back to the provider's env var.
+    # NOT required at construction (see below)
     model="gpt-4o-mini",
-    provider="openai",        # "openai" | "anthropic" | "google" | "gemini" | "litellm"
+    provider="openai",  # "openai" | "anthropic" | "google" | "gemini" | "litellm"
     output_dir="layoutlens_output",
     cache_enabled=True,
-    cache_type="memory",      # "memory" | "file"
+    cache_type="memory",  # "memory" | "file"
 )
 
 result = await lens.analyze(source, query, viewport="desktop", max_concurrent=5)
@@ -142,6 +142,7 @@ page via `AxeAuditor`.
 
 ```python
 from layoutlens import AxeAuditor
+
 report = await AxeAuditor(run_only=["wcag2a", "wcag2aa"]).audit(source, viewport)
 ```
 
@@ -204,14 +205,44 @@ the same commit, from an actual run.
 
 ```bash
 uv run ruff check --fix && uv run ruff format   # Lint + format, zero tolerance for failures
+uv run pyright                                   # Type check (CI gate, standard mode over layoutlens/)
 uv run pytest tests/ -v                          # Full suite
 uv run pytest tests/ -v -m "not browser"         # Skip tests that launch a real Chromium browser
 uv build                                         # Build the wheel/sdist
+uv run sphinx-build -W -q -b html docs /tmp/_site  # Docs build; warnings are errors in CI
 ```
 
 The `browser` pytest marker (`pytest.mark.browser`) flags tests that launch a
 real Chromium instance via Playwright — slower and require
 `playwright install chromium` first.
+
+## Fleet Standard (py-canon) and Releases
+
+This repo is adopted into the [py-canon](https://github.com/gojiplus/py-canon)
+fleet standard (`.copier-answers.yml` tracks the template version; `preen
+check` audits conformance). Consequences that matter here:
+
+- **Version comes from git tags** (hatchling + uv-dynamic-versioning). There
+  is no static `version` in `pyproject.toml`; do not add one. A release is
+  `git tag vX.Y.Z && git push --tags` (or `preen release X.Y.Z`) — the tag
+  triggers `release.yml`, which tests, builds, publishes to PyPI via trusted
+  publishing, and creates the GitHub Release. `citation-sync.yml` then
+  updates CITATION.cff.
+- **CI is a shim** (`.github/workflows/ci.yml`) calling py-canon's
+  reusable-ci: ruff + pyright + pydoclint lint job, a 3-OS × 3.11–3.13 test
+  matrix, a wheel install smoke test, zizmor workflow-security lint, and
+  dependency review. Do NOT add jobs to `ci.yml` — `preen update` overwrites
+  it wholesale. Repo-specific CI lives in sibling workflows:
+  `browser.yml` (installs Chromium, runs `pytest -m browser` — the reusable
+  CI has no pre-test hook, so browser tests skip there) and
+  `citation-sync.yml`. Pin third-party actions by SHA (zizmor gates on it).
+- **Dependabot auto-merges** via `dependabot-auto-merge.yml` (py-canon
+  reusable): GitHub-Actions updates and minor/patch Python bumps merge once
+  every check is green; majors wait for a human.
+- Docs build with `-W` and a doctest pass through the shared
+  `py_canon.sphinx.configure` (see `docs/conf.py`). Docstring `>>>` blocks
+  are illustrative and deliberately not executed
+  (`doctest_test_doctest_blocks=""`).
 
 ## Development Standards
 

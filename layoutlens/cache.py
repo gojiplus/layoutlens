@@ -29,6 +29,7 @@ class CacheEntry:
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
+        """Normalize a missing metadata mapping to an empty dict."""
         if self.metadata is None:
             self.metadata = {}
 
@@ -78,6 +79,7 @@ class InMemoryCache(CacheBackend):
     """In-memory cache implementation."""
 
     def __init__(self, max_size: int = 1000):
+        """Create a cache holding at most ``max_size`` entries."""
         self.max_size = max_size
         self._cache: dict[str, CacheEntry] = {}
 
@@ -126,7 +128,10 @@ class InMemoryCache(CacheBackend):
 class FileCache(CacheBackend):
     """File-based cache implementation using pickle."""
 
-    def __init__(self, cache_dir: str | Path = ".layoutlens_cache", max_files: int = 500):
+    def __init__(
+        self, cache_dir: str | Path = ".layoutlens_cache", max_files: int = 500
+    ):
+        """Create the cache directory and cap it at ``max_files`` files."""
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(exist_ok=True)
         self.max_files = max_files
@@ -140,7 +145,7 @@ class FileCache(CacheBackend):
 
         try:
             with open(file_path, "rb") as f:
-                entry = pickle.load(f)  # nosec B301 - Internal cache file, not user input
+                entry = pickle.load(f)  # noqa: S301 - internal cache file, not user input
 
             if entry.is_expired:
                 file_path.unlink()
@@ -199,7 +204,7 @@ class FileCache(CacheBackend):
         for file_path in self.cache_dir.glob("*.cache"):
             try:
                 with open(file_path, "rb") as f:
-                    entry = pickle.load(f)  # nosec B301 - Internal cache file, not user input
+                    entry = pickle.load(f)  # noqa: S301 - internal cache file, not user input
                 if entry.is_expired:
                     file_path.unlink()
             except (pickle.PickleError, EOFError, OSError):
@@ -218,12 +223,11 @@ class AnalysisCache:
 
     def __init__(
         self,
-        backend: CacheBackend = None,
+        backend: CacheBackend | None = None,
         default_ttl: int = 3600,
         enabled: bool = True,
     ):
-        """
-        Initialize the analysis cache.
+        """Initialize the analysis cache.
 
         Parameters
         ----------
@@ -247,7 +251,7 @@ class AnalysisCache:
         source: str,
         query: str,
         viewport: str = "desktop",
-        context: dict[str, Any] = None,
+        context: dict[str, Any] | None = None,
     ) -> str:
         """Generate a cache key for an analysis request."""
         # Include screenshot content hash for files
@@ -271,7 +275,7 @@ class AnalysisCache:
         sources: list,
         query: str = "Are these layouts consistent?",
         viewport: str = "desktop",
-        context: dict[str, Any] = None,
+        context: dict[str, Any] | None = None,
     ) -> str:
         """Generate a cache key for a comparison request."""
         # Sort sources for consistent hashing
@@ -311,7 +315,7 @@ class AnalysisCache:
         self,
         key: str,
         result: "AnalysisResult | ComparisonResult",
-        ttl: int = None,
+        ttl: int | None = None,
     ) -> None:
         """Cache a result.
 
@@ -378,8 +382,7 @@ def create_cache(
     default_ttl: int = 3600,
     enabled: bool = True,
 ) -> AnalysisCache:
-    """
-    Create an AnalysisCache with the specified backend.
+    """Create an AnalysisCache with the specified backend.
 
     Parameters
     ----------
@@ -394,7 +397,7 @@ def create_cache(
     enabled : bool, default True
         Whether caching is enabled
 
-    Returns
+    Returns:
     -------
     AnalysisCache
         Configured cache instance

@@ -1,0 +1,24 @@
+name: Citation sync
+
+# Keeps CITATION.cff's version/date in step with releases. The fleet release
+# workflow (release.yml -> reusable-release) creates the GitHub Release on tag
+# push, which fires this. Lived inside python-publish.yml before adoption;
+# the canon release workflow has no home for it, hence a sibling workflow.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: recite/citation-sync@31eb42e556de413833c2c361ed4aa8244e97db55 # v0.3.0
+        with:
+          commit: true

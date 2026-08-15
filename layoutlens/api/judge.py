@@ -161,7 +161,9 @@ def _extract_json_object(text: str) -> dict[str, Any] | None:
 
     # Strip a ```json ... ``` (or plain ``` ... ```) fence if present, so the
     # scanner works on the fence body too.
-    fence = re.search(r"```(?:json)?\s*(.*?)\s*```", stripped, re.DOTALL | re.IGNORECASE)
+    fence = re.search(
+        r"```(?:json)?\s*(.*?)\s*```", stripped, re.DOTALL | re.IGNORECASE
+    )
     scan_targets = []
     if fence:
         scan_targets.append(fence.group(1).strip())
@@ -233,7 +235,9 @@ def _image_data_url(lens: LayoutLens, image_path: str | Path) -> str:
     return f"data:{mime};base64,{image_b64}"
 
 
-def build_judge_messages(lens: LayoutLens, image_path: str | Path, prompt: str) -> list[dict[str, Any]]:
+def build_judge_messages(
+    lens: LayoutLens, image_path: str | Path, prompt: str
+) -> list[dict[str, Any]]:
     """Build the single-user-message payload a judge call sends.
 
     One user message with the caller's ``prompt`` VERBATIM as the only text
@@ -264,7 +268,9 @@ def _finish_reason(response: Any) -> str | None:
         return None
 
 
-def build_judge_result(lens: LayoutLens, raw: str, usage: dict[str, int], finish_reason: Any = None) -> JudgeResult:
+def build_judge_result(
+    lens: LayoutLens, raw: str, usage: dict[str, int], finish_reason: Any = None
+) -> JudgeResult:
     """Assemble a :class:`JudgeResult` from raw text + usage (shared by batch).
 
     Parses ``raw`` with :func:`parse_judge_response`, flags refusals, and sets
@@ -333,5 +339,9 @@ async def judge(
 
     response = await acompletion(**completion_kwargs)
 
-    raw = response.choices[0].message.content or ""
-    return build_judge_result(lens, raw, _read_usage(response), _finish_reason(response))
+    # stream is never enabled here, so the response is a plain ModelResponse
+    # despite litellm's broader union.
+    raw = response.choices[0].message.content or ""  # pyright: ignore[reportAttributeAccessIssue]
+    return build_judge_result(
+        lens, raw, _read_usage(response), _finish_reason(response)
+    )

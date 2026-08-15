@@ -1,5 +1,4 @@
-"""
-Session recording and replay for Browser Use integration.
+"""Session recording and replay for Browser Use integration.
 
 Provides SessionRecorder for capturing agent sessions and SessionReplayer
 for replaying recordings with validation.
@@ -273,12 +272,18 @@ class SessionReplayer:
                     all_reasoning.append(f"[{expert}] {result.reasoning}")
                     total_confidence += result.confidence
 
-                    expert_findings = self._extract_findings(result.reasoning, expert, result.confidence)
+                    expert_findings = self._extract_findings(
+                        result.reasoning, expert, result.confidence
+                    )
                     findings.extend(expert_findings)
                 except Exception as e:
-                    self.logger.warning(f"Expert {expert} analysis failed for step {step_num}: {e}")
+                    self.logger.warning(
+                        f"Expert {expert} analysis failed for step {step_num}: {e}"
+                    )
 
-            avg_confidence = total_confidence / len(experts_to_use) if experts_to_use else 0.0
+            avg_confidence = (
+                total_confidence / len(experts_to_use) if experts_to_use else 0.0
+            )
 
             action_log_entry = next(
                 (a for a in recording.action_log if a.get("step") == step_num),
@@ -299,7 +304,9 @@ class SessionReplayer:
             )
             results.append(step_result)
 
-            self.logger.debug(f"Step {step_num} replayed: {len(findings)} findings, confidence {avg_confidence:.2f}")
+            self.logger.debug(
+                f"Step {step_num} replayed: {len(findings)} findings, confidence {avg_confidence:.2f}"
+            )
 
         self.logger.info(
             f"Replay completed: {len(results)} steps, {sum(len(r.findings) for r in results)} total findings"
@@ -318,9 +325,18 @@ class SessionReplayer:
         reasoning_lower = reasoning.lower()
 
         severity_keywords = {
-            ValidationSeverity.CRITICAL: ["critical", "severe", "major violation", "unusable"],
+            ValidationSeverity.CRITICAL: [
+                "critical",
+                "severe",
+                "major violation",
+                "unusable",
+            ],
             ValidationSeverity.HIGH: ["significant", "serious", "major issue", "poor"],
-            ValidationSeverity.MEDIUM: ["moderate", "should improve", "could be better"],
+            ValidationSeverity.MEDIUM: [
+                "moderate",
+                "should improve",
+                "could be better",
+            ],
             ValidationSeverity.LOW: ["minor", "slight", "small improvement"],
             ValidationSeverity.INFO: ["note", "consider", "suggestion"],
         }
@@ -357,7 +373,9 @@ class SessionReplayer:
         Returns:
             SessionComparison with new, resolved, and persistent findings.
         """
-        self.logger.info(f"Comparing sessions: {baseline.recording_id} vs {current.recording_id}")
+        self.logger.info(
+            f"Comparing sessions: {baseline.recording_id} vs {current.recording_id}"
+        )
 
         baseline_results = await self.replay_with_validation(baseline)
         current_results = await self.replay_with_validation(current)
@@ -374,7 +392,9 @@ class SessionReplayer:
 
         new_findings = [f for f in current_findings if f.issue in new_issues]
         resolved_findings = [f for f in baseline_findings if f.issue in resolved_issues]
-        persistent_findings = [f for f in current_findings if f.issue in persistent_issues]
+        persistent_findings = [
+            f for f in current_findings if f.issue in persistent_issues
+        ]
 
         severity_weights = {
             ValidationSeverity.CRITICAL: 10,
@@ -385,7 +405,9 @@ class SessionReplayer:
         }
 
         new_score = sum(severity_weights.get(f.severity, 0) for f in new_findings)
-        resolved_score = sum(severity_weights.get(f.severity, 0) for f in resolved_findings)
+        resolved_score = sum(
+            severity_weights.get(f.severity, 0) for f in resolved_findings
+        )
         regression_score = new_score - resolved_score
 
         if regression_score > 0:
@@ -393,7 +415,9 @@ class SessionReplayer:
         elif regression_score < 0:
             summary = f"Improvement: {len(resolved_findings)} issues resolved (score: {regression_score})"
         else:
-            summary = f"No significant change: {len(persistent_findings)} persistent issues"
+            summary = (
+                f"No significant change: {len(persistent_findings)} persistent issues"
+            )
 
         comparison = SessionComparison(
             baseline_id=baseline.recording_id,

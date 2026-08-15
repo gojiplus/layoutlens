@@ -1,13 +1,13 @@
 [build-system]
-requires = ["uv_build>=0.9.14,<0.10.0"]
-build-backend = "uv_build"
+requires = ["hatchling", "uv-dynamic-versioning"]
+build-backend = "hatchling.build"
 
 [project]
 name = "layoutlens"
-version = "1.9.0"
 description = "AI-powered UI testing framework with natural language visual validation"
 readme = "README.md"
 license = "MIT"
+license-files = ["LICENSE"]
 authors = [
     {name = "Gaurav Sood", email = "contact@gsood.com"}
 ]
@@ -18,7 +18,6 @@ keywords = ["ui testing", "visual regression", "ai", "computer vision", "web tes
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -39,6 +38,7 @@ dependencies = [
     "rich>=13.0.0",
     "pydantic>=2.0.0",
 ]
+dynamic = ["version"]
 
 [project.optional-dependencies]
 # Optional extra for the google-genai inline batch backend (AI-Studio Gemini,
@@ -54,8 +54,9 @@ dev = [
     "pytest-xdist>=3.0.0",
     "ruff>=0.7.0",
     "pre-commit>=3.0.0",
-    "bandit>=1.7.0",
     "rich>=14.2.0",
+    "pyright>=1.1.390",
+    "pydoclint>=0.5",
 ]
 test = [
     "pytest>=7.0.0",
@@ -72,6 +73,8 @@ docs = [
     "furo>=2024.1.29",
     "myst-parser>=2.0",
     "sphinx-autodoc-typehints>=1.25",
+    "sphinx-copybutton",
+    "py-canon @ git+https://github.com/gojiplus/py-canon@v1",
 ]
 browser-use = [
     "browser-use>=0.1.0",
@@ -86,9 +89,6 @@ browser-use = [
 
 [project.scripts]
 layoutlens = "layoutlens.cli:cli"
-
-[tool.uv.build-backend]
-module-root = ""
 
 [tool.pytest.ini_options]
 minversion = "7.0"
@@ -141,50 +141,57 @@ exclude_lines = [
 
 
 [tool.ruff]
-line-length = 120
+line-length = 88
 target-version = "py311"
-include = ["*.py", "*.pyi"]
-exclude = [
-    ".git",
-    "__pycache__",
-    "build",
-    "dist",
-    ".eggs",
-    "*.egg-info",
-    ".tox",
-    ".venv",
-    "venv",
-    "docs/conf.py",
-    ".pytest_cache",
-    "htmlcov",
-    ".coverage",
-    "*.pyc",
-    "*.pyo",
-]
 
 [tool.ruff.lint]
-select = [
-    "E",   # pycodestyle errors
-    "W",   # pycodestyle warnings
-    "F",   # pyflakes
-    "I",   # isort
-    "B",   # flake8-bugbear
-    "C4",  # flake8-comprehensions
-    "UP",  # pyupgrade
-    "SIM", # flake8-simplify
-]
-ignore = [
-    "E203",  # whitespace before ':'
-    "E501",  # line too long (handled by line-length)
-    "F401",  # imported but unused (handled per-file below)
-    "F541",  # f-string is missing placeholders
-]
+external = ["DOC"]
+select = ["E", "W", "F", "I", "B", "C4", "UP", "N", "D", "S", "SIM", "T20", "PT", "RUF"]
+ignore = ["D203", "D213", "E203", "E501", "F401", "F541"]
+# × in viewport-size strings and ℹ in UI labels are intentional typography.
+allowed-confusables = ["×", "ℹ"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
-"__init__.py" = ["F401"]
-"test_*.py" = ["F841"]
-"*/tests/*" = ["F841"]
-"examples/*" = ["F841"]
+"tests/**" = ["S101", "D", "T20"]
+"docs/**" = ["D"]
+# Demo scripts and benchmark harnesses talk to a terminal; printing is their job.
+"examples/**" = ["T20", "D", "S", "F841"]
+"benchmarks/**" = ["T20", "D", "S"]
+"streamlit/**" = ["T20", "D", "S", "F841"]
+"layoutlens/cli.py" = ["T20"]
+# test_prompt/test_queries are library API names, not pytest items.
+"layoutlens/prompts/utils.py" = ["PT"]
 
-[tool.ruff.lint.isort]
-known-first-party = ["layoutlens"]
+[tool.pyright]
+include = ["layoutlens"]
+typeCheckingMode = "standard"
+
+[tool.pydoclint]
+style = "google"
+arg-type-hints-in-docstring = false
+check-return-types = false
+check-class-attributes = false
+allow-init-docstring = true
+exclude = '\.venv|tests|docs'
+
+[tool.hatch.version]
+source = "uv-dynamic-versioning"
+
+[tool.hatch.build.targets.wheel]
+packages = ["layoutlens"]
+
+[tool.uv-dynamic-versioning]
+vcs = "git"
+style = "pep440"
+
+[tool.codespell]
+# assets holds the vendored axe.min.js; benchmarks/results are frozen records
+# of real runs (honest-numbers policy) — neither may be edited. codespell
+# matches these globs against path components, not path prefixes.
+skip = "assets,results,*.lock,.venv,_build,htmlcov"
+# EHR is the healthcare acronym; "ment"/"unparseable" appear in a regex
+# character class and in the frozen benchmark vocabulary respectively.
+ignore-words-list = "unparseable,EHR,ment"

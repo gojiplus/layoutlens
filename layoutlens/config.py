@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any, ClassVar, Optional, Union
 
 import yaml
 
@@ -58,7 +58,9 @@ class TestConfig:
     """Configuration for test execution."""
 
     auto_generate_queries: bool = True
-    focus_areas: list[str] = field(default_factory=lambda: ["typography", "layout", "color", "accessibility"])
+    focus_areas: list[str] = field(
+        default_factory=lambda: ["typography", "layout", "color", "accessibility"]
+    )
     parallel_execution: bool = False
     max_workers: int = 4
     continue_on_error: bool = True
@@ -91,7 +93,7 @@ class Config:
     """
 
     # Default viewport presets
-    DEFAULT_VIEWPORTS = [
+    DEFAULT_VIEWPORTS: ClassVar[list[ViewportConfig]] = [
         ViewportConfig("mobile_portrait", 375, 667, 2.0, True, True),
         ViewportConfig("tablet_portrait", 768, 1024, 2.0, True, True),
         ViewportConfig("desktop", 1440, 900, 1.0, False, False),
@@ -150,44 +152,82 @@ class Config:
             self.llm.timeout = llm_data.get("timeout", self.llm.timeout)
             self.llm.temperature = llm_data.get("temperature", self.llm.temperature)
             self.llm.api_base = llm_data.get("api_base", self.llm.api_base)
-            self.llm.custom_params = llm_data.get("custom_params", self.llm.custom_params)
+            self.llm.custom_params = llm_data.get(
+                "custom_params", self.llm.custom_params
+            )
 
         # Load screenshot configuration
         if "screenshot" in data:
             screenshot_data = data["screenshot"]
-            self.screenshot.format = screenshot_data.get("format", self.screenshot.format)
-            self.screenshot.quality = screenshot_data.get("quality", self.screenshot.quality)
-            self.screenshot.full_page = screenshot_data.get("full_page", self.screenshot.full_page)
-            self.screenshot.omit_background = screenshot_data.get("omit_background", self.screenshot.omit_background)
-            self.screenshot.animations = screenshot_data.get("animations", self.screenshot.animations)
-            self.screenshot.wait_timeout = screenshot_data.get("wait_timeout", self.screenshot.wait_timeout)
+            self.screenshot.format = screenshot_data.get(
+                "format", self.screenshot.format
+            )
+            self.screenshot.quality = screenshot_data.get(
+                "quality", self.screenshot.quality
+            )
+            self.screenshot.full_page = screenshot_data.get(
+                "full_page", self.screenshot.full_page
+            )
+            self.screenshot.omit_background = screenshot_data.get(
+                "omit_background", self.screenshot.omit_background
+            )
+            self.screenshot.animations = screenshot_data.get(
+                "animations", self.screenshot.animations
+            )
+            self.screenshot.wait_timeout = screenshot_data.get(
+                "wait_timeout", self.screenshot.wait_timeout
+            )
             self.screenshot.wait_for_selector = screenshot_data.get(
                 "wait_for_selector", self.screenshot.wait_for_selector
             )
-            self.screenshot.mask_selectors = screenshot_data.get("mask_selectors", self.screenshot.mask_selectors)
-            self.screenshot.mask_color = screenshot_data.get("mask_color", self.screenshot.mask_color)
+            self.screenshot.mask_selectors = screenshot_data.get(
+                "mask_selectors", self.screenshot.mask_selectors
+            )
+            self.screenshot.mask_color = screenshot_data.get(
+                "mask_color", self.screenshot.mask_color
+            )
 
         # Load test configuration
         if "test" in data:
             test_data = data["test"]
-            self.test.auto_generate_queries = test_data.get("auto_generate_queries", self.test.auto_generate_queries)
+            self.test.auto_generate_queries = test_data.get(
+                "auto_generate_queries", self.test.auto_generate_queries
+            )
             self.test.focus_areas = test_data.get("focus_areas", self.test.focus_areas)
-            self.test.parallel_execution = test_data.get("parallel_execution", self.test.parallel_execution)
+            self.test.parallel_execution = test_data.get(
+                "parallel_execution", self.test.parallel_execution
+            )
             self.test.max_workers = test_data.get("max_workers", self.test.max_workers)
-            self.test.continue_on_error = test_data.get("continue_on_error", self.test.continue_on_error)
-            self.test.save_screenshots = test_data.get("save_screenshots", self.test.save_screenshots)
-            self.test.save_detailed_results = test_data.get("save_detailed_results", self.test.save_detailed_results)
+            self.test.continue_on_error = test_data.get(
+                "continue_on_error", self.test.continue_on_error
+            )
+            self.test.save_screenshots = test_data.get(
+                "save_screenshots", self.test.save_screenshots
+            )
+            self.test.save_detailed_results = test_data.get(
+                "save_detailed_results", self.test.save_detailed_results
+            )
 
         # Load output configuration
         if "output" in data:
             output_data = data["output"]
             self.output.base_dir = output_data.get("base_dir", self.output.base_dir)
-            self.output.screenshots_dir = output_data.get("screenshots_dir", self.output.screenshots_dir)
-            self.output.results_dir = output_data.get("results_dir", self.output.results_dir)
-            self.output.reports_dir = output_data.get("reports_dir", self.output.reports_dir)
+            self.output.screenshots_dir = output_data.get(
+                "screenshots_dir", self.output.screenshots_dir
+            )
+            self.output.results_dir = output_data.get(
+                "results_dir", self.output.results_dir
+            )
+            self.output.reports_dir = output_data.get(
+                "reports_dir", self.output.reports_dir
+            )
             self.output.format = output_data.get("format", self.output.format)
-            self.output.include_metadata = output_data.get("include_metadata", self.output.include_metadata)
-            self.output.compress_results = output_data.get("compress_results", self.output.compress_results)
+            self.output.include_metadata = output_data.get(
+                "include_metadata", self.output.include_metadata
+            )
+            self.output.compress_results = output_data.get(
+                "compress_results", self.output.compress_results
+            )
 
         # Load viewport configurations
         if "viewports" in data:
@@ -300,14 +340,10 @@ class Config:
     def get_output_path(self, subdir: str) -> Path:
         """Get path for output subdirectory.
 
-        Parameters
-        ----------
-        subdir : str
-            Subdirectory name (screenshots, results, reports)
+        Args:
+            subdir: Subdirectory name (screenshots, results, reports)
 
-        Returns
-        -------
-        Path
+        Returns:
             Full path to the subdirectory
         """
         base_path = Path(self.output.base_dir)
@@ -324,15 +360,11 @@ class Config:
     def get_viewport_by_name(self, name: str) -> ViewportConfig | None:
         """Get viewport configuration by name.
 
-        Parameters
-        ----------
-        name : str
-            Viewport name
+        Args:
+            name: Viewport name
 
-        Returns
-        -------
-        ViewportConfig, optional
-            Viewport configuration if found
+        Returns:
+            Viewport configuration if found, else ``None``
         """
         for viewport in self.viewports:
             if viewport.name == name:
@@ -368,16 +400,16 @@ class Config:
     def validate(self) -> list[str]:
         """Validate configuration and return any issues.
 
-        Returns
-        -------
-        list[str]
+        Returns:
             List of validation errors (empty if valid)
         """
         errors = []
 
         # Check API key
         if not self.llm.api_key and not os.getenv(self.llm.api_key_env):
-            errors.append(f"No API key found. Set {self.llm.api_key_env} environment variable.")
+            errors.append(
+                f"No API key found. Set {self.llm.api_key_env} environment variable."
+            )
 
         # Check viewports
         if not self.viewports:
@@ -385,7 +417,9 @@ class Config:
 
         for viewport in self.viewports:
             if viewport.width <= 0 or viewport.height <= 0:
-                errors.append(f"Invalid viewport size for {viewport.name}: {viewport.width}x{viewport.height}")
+                errors.append(
+                    f"Invalid viewport size for {viewport.name}: {viewport.width}x{viewport.height}"
+                )
 
         # Check output directory
         try:
@@ -399,14 +433,10 @@ class Config:
 def create_default_config(config_path: str) -> Config:
     """Create a default configuration file.
 
-    Parameters
-    ----------
-    config_path : str
-        Path where to save the default configuration
+    Args:
+        config_path: Path where to save the default configuration
 
-    Returns
-    -------
-    Config
+    Returns:
         The created configuration instance
     """
     config = Config()

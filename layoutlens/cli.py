@@ -8,7 +8,7 @@ import os
 import sys
 from pathlib import Path
 
-from .api.core import LayoutLens
+from .api.core import BatchResult, ComparisonResult, LayoutLens
 from .exceptions import LayoutLensError
 
 
@@ -19,7 +19,9 @@ async def _run_a11y(sources, args) -> int:
     fully deterministic.
     """
     try:
-        lens = LayoutLens(api_key=args.api_key or os.getenv("OPENAI_API_KEY"), model=args.model)
+        lens = LayoutLens(
+            api_key=args.api_key or os.getenv("OPENAI_API_KEY"), model=args.model
+        )
     except Exception as e:
         print(f"Error initializing LayoutLens: {e}", file=sys.stderr)
         return 1
@@ -27,7 +29,9 @@ async def _run_a11y(sources, args) -> int:
     try:
         results = []
         for source in sources:
-            result = await lens.check_accessibility(source, viewport=args.viewport, mode=args.a11y)
+            result = await lens.check_accessibility(
+                source, viewport=args.viewport, mode=args.a11y
+            )
             results.append(result)
     except LayoutLensError as e:
         print(f"Error: {e}", file=sys.stderr)
@@ -67,9 +71,16 @@ Examples:
     )
 
     # Main arguments
-    parser.add_argument("sources", nargs="*", help="URLs, HTML files, or screenshots to analyze")
+    parser.add_argument(
+        "sources", nargs="*", help="URLs, HTML files, or screenshots to analyze"
+    )
     parser.add_argument("--query", "-q", help="Question to ask about the UI")
-    parser.add_argument("--compare", "-c", action="store_true", help="Compare sources instead of analyzing separately")
+    parser.add_argument(
+        "--compare",
+        "-c",
+        action="store_true",
+        help="Compare sources instead of analyzing separately",
+    )
 
     # Options
     parser.add_argument(
@@ -80,7 +91,11 @@ Examples:
         help="Viewport size (default: desktop)",
     )
     parser.add_argument(
-        "--output", "-o", default="text", choices=["text", "json"], help="Output format (default: text)"
+        "--output",
+        "-o",
+        default="text",
+        choices=["text", "json"],
+        help="Output format (default: text)",
     )
     parser.add_argument("--api-key", help="API key (or set OPENAI_API_KEY env)")
     parser.add_argument("--model", "-m", default="gpt-4o-mini", help="AI model to use")
@@ -139,7 +154,9 @@ Examples:
 
     # Initialize LayoutLens
     try:
-        lens = LayoutLens(api_key=args.api_key or os.getenv("OPENAI_API_KEY"), model=args.model)
+        lens = LayoutLens(
+            api_key=args.api_key or os.getenv("OPENAI_API_KEY"), model=args.model
+        )
     except Exception as e:
         print(f"Error initializing LayoutLens: {e}", file=sys.stderr)
         return 1
@@ -156,7 +173,9 @@ Examples:
         else:
             # Regular analysis (smart method handles single/multiple)
             source = sources[0] if len(sources) == 1 else sources
-            result = await lens.analyze(source=source, query=query, viewport=args.viewport)
+            result = await lens.analyze(
+                source=source, query=query, viewport=args.viewport
+            )
 
         # Output results
         if args.output == "json":
@@ -164,14 +183,14 @@ Examples:
         else:
             # Human-readable output
             print()
-            if hasattr(result, "results"):  # BatchResult
+            if isinstance(result, BatchResult):
                 for r in result.results:
                     print(f"📍 {r.source}")
                     print(f"❓ {r.query}")
                     print(f"✅ {r.answer}")
                     print(f"📊 Confidence: {r.confidence:.0%}\n")
             else:  # Single result or ComparisonResult
-                if hasattr(result, "sources"):  # ComparisonResult
+                if isinstance(result, ComparisonResult):
                     print(f"📍 Comparing: {' vs '.join(result.sources)}")
                 else:
                     print(f"📍 {result.source}")

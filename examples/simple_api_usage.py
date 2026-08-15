@@ -112,7 +112,9 @@ async def batch_analysis():
 
         print(f"Analyzed {len(sources)} sources with {len(queries)} queries")
         for i, result in enumerate(results.results):
-            print(f"Source {i + 1}: {result.answer[:80]}... (confidence: {result.confidence:.1%})")
+            print(
+                f"Source {i + 1}: {result.answer[:80]}... (confidence: {result.confidence:.1%})"
+            )
 
     except Exception as e:
         print(f"Error: {e}")
@@ -135,7 +137,9 @@ async def viewport_analysis():
                 query=f"How well does this page work on {viewport}?",
                 viewport=viewport,
             )
-            print(f"{viewport.capitalize()}: {result.answer[:60]}... ({result.confidence:.1%})")
+            print(
+                f"{viewport.capitalize()}: {result.answer[:60]}... ({result.confidence:.1%})"
+            )
 
     except Exception as e:
         print(f"Error: {e}")

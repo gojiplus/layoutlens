@@ -1,5 +1,4 @@
-"""
-Simple LayoutLens API for natural language UI testing.
+"""Simple LayoutLens API for natural language UI testing.
 
 This is the main entry point for the new simplified API that focuses on
 real-world developer workflows and live website testing.
@@ -15,7 +14,7 @@ import re
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, overload
 from urllib.parse import urlparse
 
 if TYPE_CHECKING:
@@ -176,15 +175,13 @@ class BatchResult:
 
 
 class LayoutLens:
-    """
-    Simple API for AI-powered UI testing with natural language.
+    """Simple API for AI-powered UI testing with natural language.
 
     This class provides an intuitive interface for analyzing websites and
     screenshots using natural language queries, designed for developer
     workflows and CI/CD integration.
 
-    Examples
-    --------
+    Examples:
     >>> lens = LayoutLens(api_key="sk-...")
     >>> result = lens.analyze("https://example.com", "Is the navigation clearly visible?")
     >>> print(result.answer)
@@ -267,7 +264,9 @@ class LayoutLens:
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(exist_ok=True)
 
-        self.logger.info(f"Initialized LayoutLens with {provider} provider using {model} model")
+        self.logger.info(
+            f"Initialized LayoutLens with {provider} provider using {model} model"
+        )
         self.logger.debug(f"Output directory: {self.output_dir}")
 
         # Components will be created as needed (no persistent instances)
@@ -282,7 +281,9 @@ class LayoutLens:
                 default_ttl=cache_ttl,
                 enabled=cache_enabled,
             )
-            self.logger.info(f"Initialized {cache_type} cache (enabled: {cache_enabled})")
+            self.logger.info(
+                f"Initialized {cache_type} cache (enabled: {cache_enabled})"
+            )
         except Exception as e:
             self.logger.error(f"Failed to initialize cache: {e}")
             raise
@@ -330,7 +331,10 @@ class LayoutLens:
             return base64.b64encode(image_file.read()).decode("utf-8")
 
     def _format_query_prompt(
-        self, query: str, context: dict[str, Any] | None = None, instructions: Instructions | None = None
+        self,
+        query: str,
+        context: dict[str, Any] | None = None,
+        instructions: Instructions | None = None,
     ) -> str:
         """Format the query into a proper prompt using enhanced instruction system."""
         # Use enhanced prompt system if instructions provided
@@ -434,7 +438,9 @@ Focus on:
         # Encode image
         try:
             image_b64 = self._encode_image(image_path)
-            self.logger.debug(f"Image encoded successfully: {len(image_b64)} characters")
+            self.logger.debug(
+                f"Image encoded successfully: {len(image_b64)} characters"
+            )
         except Exception as e:
             self.logger.error(f"Image encoding failed: {e}")
             return {
@@ -461,12 +467,19 @@ Focus on:
                         "role": "user",
                         "content": [
                             {"type": "text", "text": prompt},
-                            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{image_b64}"}},
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/png;base64,{image_b64}"
+                                },
+                            },
                         ],
                     }
                 ],
                 "timeout": 30.0,
-                **completion_params(self.model, temperature=temperature, max_tokens=1000),
+                **completion_params(
+                    self.model, temperature=temperature, max_tokens=1000
+                ),
             }
             # Only pass api_key when we actually resolved one; otherwise let
             # LiteLLM fall back to its own provider-specific env resolution.
@@ -479,8 +492,9 @@ Focus on:
 
             self.logger.debug(f"API call successful")
 
-            # Extract content
-            content = response.choices[0].message.content or ""
+            # Extract content. stream is never enabled here, so the response is
+            # a plain ModelResponse despite litellm's broader union.
+            content = response.choices[0].message.content or ""  # pyright: ignore[reportAttributeAccessIssue]
             usage = _read_usage(response)
 
             # Parse structured response
@@ -510,6 +524,39 @@ Focus on:
                 "reasoning": f"Analysis failed: API call failed: {e}",
                 "metadata": {"error": str(e), "error_type": "api_error"},
             }
+
+    @overload
+    async def analyze(
+        self,
+        source: str | Path,
+        query: str,
+        viewport: ViewportType = "desktop",
+        context: dict[str, Any] | None = None,
+        instructions: Instructions | None = None,
+        max_concurrent: int = 5,
+    ) -> AnalysisResult: ...
+
+    @overload
+    async def analyze(
+        self,
+        source: list[str | Path],
+        query: str | list[str],
+        viewport: ViewportType = "desktop",
+        context: dict[str, Any] | None = None,
+        instructions: Instructions | None = None,
+        max_concurrent: int = 5,
+    ) -> BatchResult: ...
+
+    @overload
+    async def analyze(
+        self,
+        source: str | Path,
+        query: list[str],
+        viewport: ViewportType = "desktop",
+        context: dict[str, Any] | None = None,
+        instructions: Instructions | None = None,
+        max_concurrent: int = 5,
+    ) -> BatchResult: ...
 
     async def analyze(
         self,
@@ -548,7 +595,9 @@ Focus on:
             >>> result = await lens.analyze(["page1.html", "page2.html"], ["Accessible?", "Mobile?"])
         """
         # Handle enum/string for viewport
-        viewport_value = viewport.value if isinstance(viewport, Viewport) else str(viewport)
+        viewport_value = (
+            viewport.value if isinstance(viewport, Viewport) else str(viewport)
+        )
 
         # Normalize inputs to lists
         sources = [source] if not isinstance(source, list) else source
@@ -578,14 +627,19 @@ Focus on:
         # Create semaphore to limit concurrent operations
         semaphore = asyncio.Semaphore(max_concurrent)
 
-        async def analyze_single_combination(source: str | Path, query: str) -> AnalysisResult:
+        async def analyze_single_combination(
+            source: str | Path, query: str
+        ) -> AnalysisResult:
             """Analyze single source+query combination with concurrency control."""
             async with semaphore:
                 combination_start_time = time.time()
 
                 # Check cache first
                 cache_key = self.cache.get_analysis_key(
-                    source=str(source), query=query, viewport=viewport_value, context=context
+                    source=str(source),
+                    query=query,
+                    viewport=viewport_value,
+                    context=context,
                 )
                 # ``AnalysisCache.get`` returns a defensive deep copy, so mutating
                 # the result here (and by downstream callers such as the hybrid
@@ -594,42 +648,62 @@ Focus on:
                 if cached_result and isinstance(cached_result, AnalysisResult):
                     cached_result.execution_time = time.time() - combination_start_time
                     cached_result.metadata["cache_hit"] = True
-                    self.logger.info(f"Cache hit for {str(source)[:50]}... - confidence: {cached_result.confidence}")
+                    self.logger.info(
+                        f"Cache hit for {str(source)[:50]}... - confidence: {cached_result.confidence}"
+                    )
                     return cached_result
 
                 try:
                     # Determine if source is URL, HTML file, or image file
                     if self._is_url(source):
                         self.logger.debug(f"Capturing screenshot from URL: {source}")
-                        capture_engine = Capture(output_dir=self.output_dir / "screenshots")
-                        screenshot_paths = await capture_engine.screenshots([str(source)], viewport_value)
+                        capture_engine = Capture(
+                            output_dir=self.output_dir / "screenshots"
+                        )
+                        screenshot_paths = await capture_engine.screenshots(
+                            [str(source)], viewport_value
+                        )
                         screenshot_path = screenshot_paths[0]
-                        self.logger.info(f"Successfully captured screenshot: {screenshot_path}")
+                        self.logger.info(
+                            f"Successfully captured screenshot: {screenshot_path}"
+                        )
                     elif self._is_html_file(source):
-                        self.logger.debug(f"Capturing screenshot from HTML file: {source}")
+                        self.logger.debug(
+                            f"Capturing screenshot from HTML file: {source}"
+                        )
                         screenshot_path = await self.capture(source, viewport=viewport)
-                        self.logger.info(f"Successfully captured HTML file screenshot: {screenshot_path}")
+                        self.logger.info(
+                            f"Successfully captured HTML file screenshot: {screenshot_path}"
+                        )
                     else:
                         # Use existing image file
                         screenshot_path = str(source)
                         if not Path(screenshot_path).exists():
-                            self.logger.error(f"Screenshot file not found: {screenshot_path}")
+                            self.logger.error(
+                                f"Screenshot file not found: {screenshot_path}"
+                            )
                             raise LayoutFileNotFoundError(
                                 f"Screenshot file not found: {screenshot_path}",
                                 file_path=screenshot_path,
                             )
-                        self.logger.debug(f"Using existing screenshot: {screenshot_path}")
+                        self.logger.debug(
+                            f"Using existing screenshot: {screenshot_path}"
+                        )
 
                     # Analyze with direct API call
 
-                    self.logger.debug(f"Starting vision analysis for query: {query[:50]}...")
+                    self.logger.debug(
+                        f"Starting vision analysis for query: {query[:50]}..."
+                    )
                     vision_response = await self._call_vision_api(
                         image_path=screenshot_path,
                         query=query,
                         context=context,
                         instructions=instructions,
                     )
-                    self.logger.debug(f"Vision analysis completed with confidence: {vision_response['confidence']}")
+                    self.logger.debug(
+                        f"Vision analysis completed with confidence: {vision_response['confidence']}"
+                    )
 
                     combination_execution_time = time.time() - combination_start_time
 
@@ -658,13 +732,15 @@ Focus on:
                 except Exception as e:
                     if isinstance(e, LayoutLensError):
                         raise
-                    self.logger.warning(f"Analysis failed for {source} + query '{query[:50]}...': {e}")
+                    self.logger.warning(
+                        f"Analysis failed for {source} + query '{query[:50]}...': {e}"
+                    )
                     return AnalysisResult(
                         source=str(source),
                         query=query,
-                        answer=f"Error analyzing {source}: {str(e)}",
+                        answer=f"Error analyzing {source}: {e!s}",
                         confidence=0.0,
-                        reasoning=f"Analysis failed due to: {str(e)}",
+                        reasoning=f"Analysis failed due to: {e!s}",
                         execution_time=time.time() - combination_start_time,
                         metadata={
                             "error": str(e),
@@ -696,9 +772,9 @@ Focus on:
                 error_result = AnalysisResult(
                     source=str(source),
                     query=query,
-                    answer=f"Error analyzing {source}: {str(result)}",
+                    answer=f"Error analyzing {source}: {result!s}",
                     confidence=0.0,
-                    reasoning=f"Analysis failed due to: {str(result)}",
+                    reasoning=f"Analysis failed due to: {result!s}",
                     metadata={
                         "error": str(result),
                         "error_type": type(result).__name__,
@@ -717,7 +793,9 @@ Focus on:
             successful_results = [r for r in processed_results if r.confidence > 0]
             total_execution_time = time.time() - start_time
             average_confidence = (
-                sum(r.confidence for r in successful_results) / len(successful_results) if successful_results else 0.0
+                sum(r.confidence for r in successful_results) / len(successful_results)
+                if successful_results
+                else 0.0
             )
 
             return BatchResult(
@@ -750,18 +828,22 @@ Focus on:
 
         Example:
             >>> result = await lens.compare([
-            ...     "https://mysite.com/before",
-            ...     "https://mysite.com/after"
+            ...     "https://example.com/before",
+            ...     "https://example.com/after"
             ... ], "Did the redesign improve the user experience?")
         """
         # Handle enum/string for viewport
-        viewport_value = viewport.value if isinstance(viewport, Viewport) else str(viewport)
+        viewport_value = (
+            viewport.value if isinstance(viewport, Viewport) else str(viewport)
+        )
 
         start_time = time.time()
 
         log_function_call(
             "LayoutLens.compare",
-            sources=[str(s)[:30] + "..." if len(str(s)) > 30 else str(s) for s in sources],
+            sources=[
+                str(s)[:30] + "..." if len(str(s)) > 30 else str(s) for s in sources
+            ],
             query=query[:100] + "..." if len(query) > 100 else query,
             viewport=viewport_value,
         )
@@ -774,16 +856,24 @@ Focus on:
             screenshot_paths = []
 
             for i, source in enumerate(sources):
-                self.logger.debug(f"Processing source {i + 1}/{len(sources)}: {str(source)[:50]}...")
+                self.logger.debug(
+                    f"Processing source {i + 1}/{len(sources)}: {str(source)[:50]}..."
+                )
                 if self._is_url(source):
                     capture_engine = Capture(output_dir=self.output_dir / "screenshots")
-                    screenshot_paths_batch = await capture_engine.screenshots([str(source)], viewport_value)
-                    screenshot_path = screenshot_paths_batch[0]  # Get first (and only) result
+                    screenshot_paths_batch = await capture_engine.screenshots(
+                        [str(source)], viewport_value
+                    )
+                    screenshot_path = screenshot_paths_batch[
+                        0
+                    ]  # Get first (and only) result
                 elif self._is_html_file(source):
                     # Render local HTML to a real screenshot; otherwise the raw
                     # HTML bytes would be base64-encoded and sent to the vision
                     # API mislabeled as a PNG (garbage comparative analysis).
-                    screenshot_path = await self._serve_html_and_capture(source, viewport_value)
+                    screenshot_path = await self._serve_html_and_capture(
+                        source, viewport_value
+                    )
                 else:
                     # Existing image file passes through unchanged.
                     screenshot_path = str(source)
@@ -791,7 +881,9 @@ Focus on:
                 screenshot_paths.append(screenshot_path)
 
                 # Individual analysis
-                individual_result = await self.analyze(source, query, viewport_value, context)
+                individual_result = await self.analyze(
+                    source, query, viewport_value, context
+                )
                 individual_results.append(individual_result)
 
             # Comparative analysis using first screenshot with comparison query
@@ -858,7 +950,7 @@ Focus on:
             return ComparisonResult(
                 sources=[str(s) for s in sources],
                 query=query,
-                answer=f"Error during comparison: {str(e)}",
+                answer=f"Error during comparison: {e!s}",
                 confidence=0.0,
                 reasoning="Comparison failed due to error",
                 execution_time=execution_time,
@@ -882,7 +974,9 @@ Focus on:
         return path.suffix.lower() in [".html", ".htm"]
 
     # Recognized raster/vector image extensions treated as pre-rendered screenshots.
-    _IMAGE_SUFFIXES = frozenset({".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tiff", ".svg"})
+    _IMAGE_SUFFIXES = frozenset(
+        {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tiff", ".svg"}
+    )
 
     def _is_image_file(self, source: str | Path) -> bool:
         """Check if source is an image file (a pre-rendered screenshot).
@@ -916,15 +1010,41 @@ Focus on:
                 file_path=str(html_file_path),
             )
 
+        viewport_value = (
+            viewport.value if isinstance(viewport, Viewport) else str(viewport)
+        )
         capture_engine = Capture(output_dir=self.output_dir / "screenshots")
         screenshot_paths = await capture_engine.screenshots(
-            [str(html_file_path)], viewport, wait_for_selector=wait_for_selector, wait_time=wait_time
+            [str(html_file_path)],
+            viewport_value,
+            wait_for_selector=wait_for_selector,
+            wait_time=wait_time,
         )
         screenshot_path = screenshot_paths[0]
         self.logger.info(f"Successfully captured HTML file: {html_file_path.name}")
         return screenshot_path
 
     # Unified Capture Method
+
+    @overload
+    async def capture(
+        self,
+        source: str | Path,
+        viewport: ViewportType = "desktop",
+        wait_for_selector: str | None = None,
+        wait_time: int | None = None,
+        max_concurrent: int = 3,
+    ) -> str: ...
+
+    @overload
+    async def capture(
+        self,
+        source: list[str | Path],
+        viewport: ViewportType = "desktop",
+        wait_for_selector: str | None = None,
+        wait_time: int | None = None,
+        max_concurrent: int = 3,
+    ) -> dict[str, str]: ...
 
     async def capture(
         self,
@@ -953,8 +1073,8 @@ Focus on:
             # Returns: "/path/to/screenshot.png"
 
             # Multiple URLs
-            >>> paths = await lens.capture(["https://site1.com", "https://site2.com"])
-            # Returns: {"https://site1.com": "/path1.png", "https://site2.com": "/path2.png"}
+            >>> paths = await lens.capture(["https://example.com/page1", "https://site2.com"])
+            # Returns: {"https://example.com/page1": "/path1.png", "https://site2.com": "/path2.png"}
 
             # HTML files
             >>> path = await lens.capture("page.html")
@@ -964,7 +1084,9 @@ Focus on:
             >>> path = await lens.capture("screenshot.png")
         """
         # Handle enum/string for viewport
-        viewport_value = viewport.value if isinstance(viewport, Viewport) else str(viewport)
+        viewport_value = (
+            viewport.value if isinstance(viewport, Viewport) else str(viewport)
+        )
 
         # Normalize input to determine return type
         is_single_source = not isinstance(source, list)
@@ -988,7 +1110,9 @@ Focus on:
         # Separate sources by type for optimal processing
         urls_to_capture = [s for s in sources if self._is_url(s)]
         html_files = [s for s in sources if self._is_html_file(s)]
-        existing_files = [s for s in sources if not (self._is_url(s) or self._is_html_file(s))]
+        existing_files = [
+            s for s in sources if not (self._is_url(s) or self._is_html_file(s))
+        ]
 
         # Validate existing files (images)
         for file_path in existing_files:
@@ -1007,7 +1131,11 @@ Focus on:
                 # Create Capture instance for URL processing
                 capture_engine = Capture(output_dir=self.output_dir / "screenshots")
                 screenshot_paths = await capture_engine.screenshots(
-                    urls_to_capture, viewport_value, max_concurrent, wait_for_selector, wait_time
+                    [str(u) for u in urls_to_capture],
+                    viewport_value,
+                    max_concurrent,
+                    wait_for_selector,
+                    wait_time,
                 )
 
                 # Map results back
@@ -1023,7 +1151,7 @@ Focus on:
                 self.logger.error(f"URL capture failed: {e}")
                 for url in urls_to_capture:
                     failed_count += 1
-                    results[str(url)] = f"Error: {str(e)}"
+                    results[str(url)] = f"Error: {e!s}"
 
         # Capture HTML files individually (they need special serving)
         if html_files:
@@ -1037,7 +1165,7 @@ Focus on:
                         )
                     except Exception as e:
                         self.logger.warning(f"HTML capture failed for {html_path}: {e}")
-                        return f"Error: {str(e)}"
+                        return f"Error: {e!s}"
 
             # Process HTML files concurrently
             html_tasks = [capture_html_file(html_path) for html_path in html_files]
@@ -1045,9 +1173,15 @@ Focus on:
 
             for i, result in enumerate(html_results):
                 html_path = html_files[i]
-                if isinstance(result, Exception) or (isinstance(result, str) and result.startswith("Error:")):
+                if isinstance(result, Exception) or (
+                    isinstance(result, str) and result.startswith("Error:")
+                ):
                     failed_count += 1
-                    results[str(html_path)] = f"Error: {str(result)}" if isinstance(result, Exception) else result
+                    results[str(html_path)] = (
+                        f"Error: {result!s}"
+                        if isinstance(result, Exception)
+                        else result
+                    )
                 else:
                     results[str(html_path)] = result
 
@@ -1164,7 +1298,9 @@ Focus on:
         if report.violations:
             result.answer = self._axe_answer(report, self._wcag_level_label(run_only))
             result.confidence = 1.0
-            result.reasoning = f"{report.summary()}\n\nLLM assessment:\n{result.reasoning}"
+            result.reasoning = (
+                f"{report.summary()}\n\nLLM assessment:\n{result.reasoning}"
+            )
         result.metadata["a11y"] = asdict(report)
         result.metadata["mode"] = mode
         result.metadata["engine"] = f"axe-core {AXE_VERSION}"
@@ -1213,16 +1349,22 @@ Focus on:
             self.logger.warning(
                 f"Image source {source} has no DOM; falling back to llm-only for hybrid accessibility check."
             )
-            result = await self.analyze(source, query, viewport=viewport_value, instructions=instructions)
+            result = await self.analyze(
+                source, query, viewport=viewport_value, instructions=instructions
+            )
             result.metadata["mode"] = "llm"
             result.metadata["a11y_skipped"] = "image source"
             return result
 
         if mode == "axe":
             report = await AxeAuditor(run_only=run_only).audit(source, viewport_value)
-            return self._build_axe_result(source, query, viewport_value, report, mode, run_only)
+            return self._build_axe_result(
+                source, query, viewport_value, report, mode, run_only
+            )
 
-        return await self._hybrid_a11y(source, query, viewport_value, run_only, mode, instructions)
+        return await self._hybrid_a11y(
+            source, query, viewport_value, run_only, mode, instructions
+        )
 
     async def _hybrid_a11y(
         self,
@@ -1243,7 +1385,10 @@ Focus on:
         the check degrades gracefully to LLM-only with an ``a11y_error`` note.
         """
         cache_key = self.cache.get_analysis_key(
-            source=str(source), query=query, viewport=viewport_value, context={"a11y_mode": mode}
+            source=str(source),
+            query=query,
+            viewport=viewport_value,
+            context={"a11y_mode": mode},
         )
         # ``AnalysisCache.get`` already hands back a defensive deep copy.
         cached = self.cache.get(cache_key)
@@ -1253,7 +1398,9 @@ Focus on:
 
         start_time = time.time()
         capture_engine = Capture(output_dir=self.output_dir / "screenshots")
-        screenshot_path = capture_engine.output_dir / capture_engine._generate_filename(str(source), viewport_value)
+        screenshot_path = capture_engine.output_dir / capture_engine._generate_filename(
+            str(source), viewport_value
+        )
 
         report: A11yReport | None = None
         axe_error: str | None = None
@@ -1263,11 +1410,15 @@ Focus on:
                 report = await AxeAuditor(run_only=run_only).audit_page(
                     page, source=str(source), viewport=viewport_value
                 )
-            except Exception as e:  # noqa: BLE001 - degrade to LLM-only on axe failure
+            except Exception as e:
                 axe_error = str(e)
-                self.logger.warning(f"axe audit failed in hybrid mode; proceeding LLM-only: {e}")
+                self.logger.warning(
+                    f"axe audit failed in hybrid mode; proceeding LLM-only: {e}"
+                )
 
-        llm_query = self._inject_axe_context(query, report) if report is not None else query
+        llm_query = (
+            self._inject_axe_context(query, report) if report is not None else query
+        )
         vision_response = await self._call_vision_api(
             image_path=str(screenshot_path), query=llm_query, instructions=instructions
         )
@@ -1337,7 +1488,9 @@ Focus on:
         """
         from .judge import judge as _judge
 
-        return await _judge(self, image_path, prompt, max_tokens=max_tokens, timeout=timeout)
+        return await _judge(
+            self, image_path, prompt, max_tokens=max_tokens, timeout=timeout
+        )
 
     async def judge_batch(
         self,
@@ -1419,7 +1572,9 @@ Focus on:
             full axe report, ``metadata["mode"]`` the mode, and
             ``metadata["engine"]`` the axe-core version.
         """
-        viewport_value = viewport.value if isinstance(viewport, Viewport) else str(viewport)
+        viewport_value = (
+            viewport.value if isinstance(viewport, Viewport) else str(viewport)
+        )
         query = """
         Analyze this page for accessibility issues. Check:
         1. Color contrast and readability
@@ -1436,7 +1591,9 @@ Focus on:
             result.metadata["mode"] = mode
             return result
 
-        return await self._run_a11y_check(source, query, viewport_value, ["wcag2a", "wcag2aa"], mode)
+        return await self._run_a11y_check(
+            source, query, viewport_value, ["wcag2a", "wcag2aa"], mode
+        )
 
     async def check_mobile_friendly(self, source: str | Path) -> AnalysisResult:
         """Quick mobile responsiveness check."""
@@ -1473,7 +1630,7 @@ Focus on:
     async def audit_accessibility(
         self,
         source: str | Path,
-        standards: list[str] = None,
+        standards: list[str] | None = None,
         compliance_level: ComplianceLevelType = "AA",
         viewport: ViewportType = "desktop",
         mode: Literal["hybrid", "axe", "llm"] = "hybrid",
@@ -1511,28 +1668,36 @@ Focus on:
                 compliance_level_value = compliance_level_enum.value
             except ValueError:
                 valid_levels = [level.value for level in ComplianceLevel]
-                raise ValueError(f"compliance_level must be one of {valid_levels}, got: '{compliance_level}'") from None
+                raise ValueError(
+                    f"compliance_level must be one of {valid_levels}, got: '{compliance_level}'"
+                ) from None
 
-        viewport_value = viewport.value if isinstance(viewport, Viewport) else str(viewport)
+        viewport_value = (
+            viewport.value if isinstance(viewport, Viewport) else str(viewport)
+        )
         instructions = Instructions.for_accessibility_audit(
             standards=standards, compliance_level=compliance_level_value
         )
         query = f"Perform a comprehensive accessibility audit for WCAG {compliance_level_value} compliance"
 
         if mode == "llm":
-            result = await self.analyze(source, query, viewport=viewport_value, instructions=instructions)
+            result = await self.analyze(
+                source, query, viewport=viewport_value, instructions=instructions
+            )
             result.metadata["mode"] = mode
             return result
 
         run_only = self._axe_run_only_for_level(compliance_level_value)
-        return await self._run_a11y_check(source, query, viewport_value, run_only, mode, instructions=instructions)
+        return await self._run_a11y_check(
+            source, query, viewport_value, run_only, mode, instructions=instructions
+        )
 
     async def optimize_conversions(
         self,
         source: str | Path,
-        business_goals: list[str] = None,
-        industry: str = None,
-        target_audience: str = None,
+        business_goals: list[str] | None = None,
+        industry: str | None = None,
+        target_audience: str | None = None,
         viewport: ViewportType = "desktop",
     ) -> AnalysisResult:
         """Conversion rate optimization analysis using CRO expert knowledge.
@@ -1550,14 +1715,21 @@ Focus on:
         from ..prompts import Instructions
 
         instructions = Instructions.for_conversion_optimization(
-            business_goals=business_goals, industry=industry, target_audience=target_audience
+            business_goals=business_goals,
+            industry=industry,
+            target_audience=target_audience,
         )
 
         query = "Analyze for conversion optimization opportunities with specific recommendations"
-        return await self.analyze(source, query, viewport=viewport, instructions=instructions)
+        return await self.analyze(
+            source, query, viewport=viewport, instructions=instructions
+        )
 
     async def analyze_mobile_ux(
-        self, source: str | Path, device_types: list[str] = None, performance_focus: bool = True
+        self,
+        source: str | Path,
+        device_types: list[str] | None = None,
+        performance_focus: bool = True,
     ) -> AnalysisResult:
         """Mobile UX analysis using mobile expert knowledge.
 
@@ -1575,8 +1747,12 @@ Focus on:
             device_types=device_types, performance_focus=performance_focus
         )
 
-        query = "Evaluate mobile user experience and provide optimization recommendations"
-        return await self.analyze(source, query, viewport="mobile_portrait", instructions=instructions)
+        query = (
+            "Evaluate mobile user experience and provide optimization recommendations"
+        )
+        return await self.analyze(
+            source, query, viewport="mobile_portrait", instructions=instructions
+        )
 
     async def audit_ecommerce(
         self,
@@ -1598,18 +1774,22 @@ Focus on:
         """
         from ..prompts import Instructions
 
-        instructions = Instructions.for_ecommerce_analysis(page_type=page_type, business_model=business_model)
+        instructions = Instructions.for_ecommerce_analysis(
+            page_type=page_type, business_model=business_model
+        )
 
         query = f"Audit this {page_type} for e-commerce best practices and conversion optimization"
-        return await self.analyze(source, query, viewport=viewport, instructions=instructions)
+        return await self.analyze(
+            source, query, viewport=viewport, instructions=instructions
+        )
 
     async def analyze_with_expert(
         self,
         source: str | Path,
         query: str,
         expert_persona: ExpertType,
-        focus_areas: list[str] = None,
-        user_context: dict[str, Any] = None,
+        focus_areas: list[str] | None = None,
+        user_context: dict[str, Any] | None = None,
         viewport: ViewportType = "desktop",
     ) -> AnalysisResult:
         """Analyze using a specific domain expert persona.
@@ -1628,10 +1808,16 @@ Focus on:
         from ..prompts import Instructions, UserContext
 
         # Handle enum/string for expert_persona
-        expert_persona_value = expert_persona.value if isinstance(expert_persona, Expert) else str(expert_persona)
+        expert_persona_value = (
+            expert_persona.value
+            if isinstance(expert_persona, Expert)
+            else str(expert_persona)
+        )
 
         # Handle enum/string for viewport
-        viewport_value = viewport.value if isinstance(viewport, Viewport) else str(viewport)
+        viewport_value = (
+            viewport.value if isinstance(viewport, Viewport) else str(viewport)
+        )
 
         # Convert user_context dict to UserContext object if provided
         context_obj = None
@@ -1639,17 +1825,21 @@ Focus on:
             context_obj = UserContext(**user_context)
 
         instructions = Instructions(
-            expert_persona=expert_persona_value, focus_areas=focus_areas or [], user_context=context_obj
+            expert_persona=expert_persona_value,
+            focus_areas=focus_areas or [],
+            user_context=context_obj,
         )
 
-        return await self.analyze(source, query, viewport=viewport_value, instructions=instructions)
+        return await self.analyze(
+            source, query, viewport=viewport_value, instructions=instructions
+        )
 
     async def compare_with_expert(
         self,
         sources: list[str | Path],
         query: str,
         expert_persona: ExpertType,
-        focus_areas: list[str] = None,
+        focus_areas: list[str] | None = None,
         viewport: ViewportType = "desktop",
     ) -> ComparisonResult:
         """Compare multiple sources using domain expert knowledge.
@@ -1667,14 +1857,24 @@ Focus on:
         from ..prompts import Instructions
 
         # Handle enum/string for expert_persona
-        expert_persona_value = expert_persona.value if isinstance(expert_persona, Expert) else str(expert_persona)
+        expert_persona_value = (
+            expert_persona.value
+            if isinstance(expert_persona, Expert)
+            else str(expert_persona)
+        )
 
         # Handle enum/string for viewport
-        viewport_value = viewport.value if isinstance(viewport, Viewport) else str(viewport)
+        viewport_value = (
+            viewport.value if isinstance(viewport, Viewport) else str(viewport)
+        )
 
-        instructions = Instructions(expert_persona=expert_persona_value, focus_areas=focus_areas or [])
+        instructions = Instructions(
+            expert_persona=expert_persona_value, focus_areas=focus_areas or []
+        )
 
-        return await self.compare(sources, query, viewport=viewport_value, instructions=instructions)
+        return await self.compare(
+            sources, query, viewport=viewport_value, instructions=instructions
+        )
 
     # Cache management methods
     def get_cache_stats(self) -> dict[str, Any]:

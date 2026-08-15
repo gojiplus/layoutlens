@@ -266,7 +266,9 @@ viewports:
         assert "color contrast" in config.custom_queries["accessibility"][0]
 
         # Add more queries to existing category
-        config.add_custom_queries("accessibility", ["Is keyboard navigation supported?"])
+        config.add_custom_queries(
+            "accessibility", ["Is keyboard navigation supported?"]
+        )
 
         assert len(config.custom_queries["accessibility"]) == 3
 

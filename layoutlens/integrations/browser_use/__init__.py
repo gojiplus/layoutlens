@@ -1,5 +1,4 @@
-"""
-Browser Use integration for LayoutLens.
+"""Browser Use integration for LayoutLens.
 
 Provides hooks and utilities for validating browser agent actions
 using LayoutLens visual analysis.
@@ -33,16 +32,16 @@ from .validator import AgentValidator
 
 __all__ = [
     "AgentValidator",
-    "SessionRecorder",
-    "SessionReplayer",
-    "ValidationReportGenerator",
-    "ValidationPolicy",
-    "ValidationSession",
-    "ValidationStepResult",
-    "ValidationFinding",
-    "ValidationTrigger",
-    "ValidationSeverity",
-    "SessionState",
-    "SessionRecording",
     "SessionComparison",
+    "SessionRecorder",
+    "SessionRecording",
+    "SessionReplayer",
+    "SessionState",
+    "ValidationFinding",
+    "ValidationPolicy",
+    "ValidationReportGenerator",
+    "ValidationSession",
+    "ValidationSeverity",
+    "ValidationStepResult",
+    "ValidationTrigger",
 ]

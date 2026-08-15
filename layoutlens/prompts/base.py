@@ -21,7 +21,9 @@ class PromptTemplate:
     evaluation_criteria: list[str] = field(default_factory=list)
     confidence_calibration: dict[str, Any] = field(default_factory=dict)
 
-    def render(self, query: str, instructions: Instructions | None = None, **kwargs) -> tuple[str, str]:
+    def render(
+        self, query: str, instructions: Instructions | None = None, **kwargs
+    ) -> tuple[str, str]:
         """Render the template with provided variables and context.
 
         Returns:
@@ -45,7 +47,9 @@ class PromptTemplate:
             system += confidence_text
 
         # Render user prompt with variables
-        user_prompt = self.user_prompt_template.format(query=query, **self.variables, **kwargs)
+        user_prompt = self.user_prompt_template.format(
+            query=query, **self.variables, **kwargs
+        )
 
         # Add instruction-based enhancements
         if instructions:
@@ -53,7 +57,9 @@ class PromptTemplate:
                 user_prompt += f"\n\nPay special attention to: {', '.join(instructions.focus_areas)}"
 
             if instructions.evaluation_criteria:
-                user_prompt += f"\n\nEvaluation criteria: {instructions.evaluation_criteria}"
+                user_prompt += (
+                    f"\n\nEvaluation criteria: {instructions.evaluation_criteria}"
+                )
 
             if instructions.user_context:
                 context_str = instructions.user_context.to_prompt_text()
@@ -61,7 +67,9 @@ class PromptTemplate:
                     user_prompt += f"\n\nUser context: {context_str}"
 
             if instructions.output_style:
-                style_guidance = self._get_output_style_guidance(instructions.output_style)
+                style_guidance = self._get_output_style_guidance(
+                    instructions.output_style
+                )
                 user_prompt += f"\n\n{style_guidance}"
 
         return system, user_prompt
@@ -104,7 +112,9 @@ class ExpertPrompt(ABC):
         """Get the expert's prompt template."""
         pass
 
-    def analyze(self, query: str, instructions: Instructions | None = None) -> tuple[str, str]:
+    def analyze(
+        self, query: str, instructions: Instructions | None = None
+    ) -> tuple[str, str]:
         """Generate expert analysis prompts for the given query.
 
         Returns:

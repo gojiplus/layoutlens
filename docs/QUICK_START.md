@@ -35,10 +35,12 @@ layoutlens page.html --a11y axe
 import asyncio
 from layoutlens import AxeAuditor
 
+
 async def main():
     report = await AxeAuditor().audit("page.html")
     print(report.summary())
     print(report.ok)  # True if zero violations
+
 
 asyncio.run(main())
 ```
@@ -60,17 +62,16 @@ top-level calls in `asyncio.run(...)`.
 import asyncio
 from layoutlens import LayoutLens
 
+
 async def main():
     lens = LayoutLens()
 
     # Test any live website
-    result = await lens.analyze(
-        "https://your-website.com",
-        "Is the navigation easy to use?"
-    )
+    result = await lens.analyze("https://example.com", "Is the navigation easy to use?")
 
     print(f"Answer: {result.answer}")
     print(f"Confidence: {result.confidence:.1%}")
+
 
 asyncio.run(main())
 ```
@@ -80,8 +81,7 @@ asyncio.run(main())
 ```python
 # Test an existing screenshot image
 result = await lens.analyze(
-    "screenshot.png",
-    "Are the buttons large enough for mobile users?"
+    "screenshot.png", "Are the buttons large enough for mobile users?"
 )
 ```
 
@@ -90,10 +90,10 @@ result = await lens.analyze(
 ```python
 # Compare two live pages (compare() takes URLs or already-captured
 # screenshots directly; for local HTML files, call capture() first)
-result = await lens.compare([
-    "https://old-design.com",
-    "https://new-design.com"
-], "Which design is more user-friendly?")
+result = await lens.compare(
+    ["https://old-design.com", "https://new-design.com"],
+    "Which design is more user-friendly?",
+)
 ```
 
 ## 📱 Built-in Checks
@@ -105,7 +105,9 @@ result = await lens.check_mobile_friendly("https://your-site.com")
 
 ### Accessibility Check
 ```python
-result = await lens.check_accessibility("https://your-site.com")  # mode="hybrid" by default
+result = await lens.check_accessibility(
+    "https://your-site.com"
+)  # mode="hybrid" by default
 ```
 
 ### Conversion Optimization
@@ -154,7 +156,7 @@ jobs:
 queries = [
     "Is the 'Add to Cart' button prominent and trustworthy?",
     "Does the checkout process look simple?",
-    "Are product images clear and appealing?"
+    "Are product images clear and appealing?",
 ]
 ```
 
@@ -163,7 +165,7 @@ queries = [
 queries = [
     "Is the dashboard easy to navigate for new users?",
     "Are the data visualizations clear?",
-    "Is the overall layout professional?"
+    "Is the overall layout professional?",
 ]
 ```
 
@@ -172,7 +174,7 @@ queries = [
 queries = [
     "Is the article easy to read?",
     "Is the navigation helpful?",
-    "Does the layout encourage engagement?"
+    "Does the layout encourage engagement?",
 ]
 ```
 
@@ -182,7 +184,7 @@ queries = [
 `analyze()` handles single or multiple sources/queries directly — pass lists
 to fan out concurrently:
 ```python
-urls = ["https://page1.com", "https://page2.com", "https://page3.com"]
+urls = ["https://page1.com", "https://example.com/page2", "https://example.com/page3"]
 queries = ["Is navigation consistent?", "Is mobile experience good?"]
 
 result = await lens.analyze(source=urls, query=queries)  # returns a BatchResult
@@ -194,19 +196,19 @@ print(f"Average confidence: {result.average_confidence:.1%}")
 # Compare pre-captured screenshots from different browsers
 result = await lens.compare(
     sources=["chrome.png", "firefox.png", "safari.png"],
-    query="Are these layouts consistent across browsers?"
+    query="Are these layouts consistent across browsers?",
 )
 ```
 
 ### Custom Context
 ```python
 result = await lens.analyze(
-    "https://app.com/dashboard",
+    "https://example.com/dashboard",
     "Is this suitable for elderly users?",
     context={
         "user_type": "elderly",
         "accessibility": True,
-    }
+    },
 )
 ```
 
@@ -274,7 +276,6 @@ first and pass the resulting screenshot paths to `compare()`.
 
 - 📖 [Full Documentation](https://gojiplus.github.io/layoutlens/)
 - 🐛 [Report Issues](https://github.com/gojiplus/layoutlens/issues)
-- 💬 [Discussions](https://github.com/gojiplus/layoutlens/discussions)
 
 ## 🎯 Next Steps
 

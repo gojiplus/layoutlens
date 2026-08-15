@@ -7,7 +7,14 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from layoutlens import AnalysisResult, LayoutLens, UITestCase, UITestResult, UITestSuite, ValidationError
+from layoutlens import (
+    AnalysisResult,
+    LayoutLens,
+    UITestCase,
+    UITestResult,
+    UITestSuite,
+    ValidationError,
+)
 
 
 def test_test_case_creation():
@@ -64,7 +71,9 @@ def test_test_suite_save_and_load():
         expected_results={"answer": "yes"},
     )
 
-    suite = UITestSuite(name="Save Suite", description="Test saving and loading", test_cases=[test_case])
+    suite = UITestSuite(
+        name="Save Suite", description="Test saving and loading", test_cases=[test_case]
+    )
 
     # Save to temporary file
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
@@ -155,7 +164,9 @@ async def test_run_test_suite(mock_analyze):
         expected_results={"contains": ["passed"]},
     )
 
-    suite = UITestSuite(name="Test Suite", description="Test description", test_cases=[test_case])
+    suite = UITestSuite(
+        name="Test Suite", description="Test description", test_cases=[test_case]
+    )
 
     # Run the suite - now async
     lens = LayoutLens(api_key="test_key")
@@ -189,7 +200,9 @@ async def test_run_test_suite_with_failure(mock_analyze):
         expected_results={"answer": "yes"},
     )
 
-    suite = UITestSuite(name="Failing Suite", description="Test with failures", test_cases=[test_case])
+    suite = UITestSuite(
+        name="Failing Suite", description="Test with failures", test_cases=[test_case]
+    )
 
     # Run the suite - now async
     lens = LayoutLens(api_key="test_key")
@@ -263,7 +276,9 @@ def test_create_test_suite():
         },
     ]
 
-    suite = lens.create_test_suite(name="Website Tests", description="Test all pages", test_cases=test_cases)
+    suite = lens.create_test_suite(
+        name="Website Tests", description="Test all pages", test_cases=test_cases
+    )
 
     assert suite.name == "Website Tests"
     assert len(suite.test_cases) == 2
@@ -289,7 +304,9 @@ def test_create_test_suite_requires_expected_results():
     ]
 
     with pytest.raises(ValidationError) as exc_info:
-        lens.create_test_suite(name="Website Tests", description="Test all pages", test_cases=test_cases)
+        lens.create_test_suite(
+            name="Website Tests", description="Test all pages", test_cases=test_cases
+        )
 
     message = str(exc_info.value)
     assert "No Expectations" in message
@@ -366,7 +383,9 @@ async def test_run_test_suite_to_json_includes_assertion_detail(mock_analyze):
     assert entry["passed"] is False
     assert entry["assertion_detail"]["passed"] is False
     failure_reasons = entry["assertion_detail"]["failure_reasons"]
-    assert any("expected answer 'no', got 'yes'" in reason for reason in failure_reasons)
+    assert any(
+        "expected answer 'no', got 'yes'" in reason for reason in failure_reasons
+    )
 
 
 @patch("layoutlens.api.core.LayoutLens.analyze")
@@ -606,7 +625,9 @@ def test_shipped_sample_suite_uses_valid_viewports():
 
     for case in suite.test_cases:
         for viewport in case.viewports:
-            assert viewport in VIEWPORTS, f"case '{case.name}' uses unknown viewport '{viewport}'"
+            assert viewport in VIEWPORTS, (
+                f"case '{case.name}' uses unknown viewport '{viewport}'"
+            )
 
 
 def test_from_dict_to_dict_round_trip_preserves_expected_fields():

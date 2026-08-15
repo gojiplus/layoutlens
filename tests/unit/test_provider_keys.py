@@ -16,7 +16,7 @@ class TestProviderApiKeySelection:
     """`_get_api_key_for_provider` should pick the right env var per provider."""
 
     @pytest.mark.parametrize(
-        "provider,env_var",
+        ("provider", "env_var"),
         [
             ("openai", "OPENAI_API_KEY"),
             ("anthropic", "ANTHROPIC_API_KEY"),
@@ -60,19 +60,23 @@ class TestProviderApiKeySelection:
     def test_explicit_api_key_wins_over_env_var(self, monkeypatch):
         monkeypatch.setenv("ANTHROPIC_API_KEY", "env-key")
 
-        lens = LayoutLens(provider="anthropic", model="test-model", api_key="explicit-key")
+        lens = LayoutLens(
+            provider="anthropic", model="test-model", api_key="explicit-key"
+        )
 
         assert lens.api_key == "explicit-key"
 
     @pytest.mark.parametrize(
-        "provider,env_var",
+        ("provider", "env_var"),
         [
             ("openai", "OPENAI_API_KEY"),
             ("anthropic", "ANTHROPIC_API_KEY"),
             ("google", "GEMINI_API_KEY"),
         ],
     )
-    def test_missing_key_does_not_raise_in_constructor(self, monkeypatch, provider, env_var):
+    def test_missing_key_does_not_raise_in_constructor(
+        self, monkeypatch, provider, env_var
+    ):
         """The constructor must be usable with zero API keys (keyless axe mode)."""
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
@@ -83,14 +87,16 @@ class TestProviderApiKeySelection:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
-        "provider,env_var",
+        ("provider", "env_var"),
         [
             ("openai", "OPENAI_API_KEY"),
             ("anthropic", "ANTHROPIC_API_KEY"),
             ("google", "GEMINI_API_KEY"),
         ],
     )
-    async def test_missing_key_error_surfaces_on_first_llm_use(self, monkeypatch, tmp_path, provider, env_var):
+    async def test_missing_key_error_surfaces_on_first_llm_use(
+        self, monkeypatch, tmp_path, provider, env_var
+    ):
         """The missing-key error must surface on the first LLM call, naming the right env var."""
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
@@ -106,7 +112,9 @@ class TestProviderApiKeySelection:
             await lens._call_vision_api(str(image), "Is it accessible?")
 
     @pytest.mark.asyncio
-    async def test_missing_key_error_surfaces_through_analyze(self, monkeypatch, tmp_path):
+    async def test_missing_key_error_surfaces_through_analyze(
+        self, monkeypatch, tmp_path
+    ):
         """analyze() must surface the deferred key error in its result (not a bare success)."""
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
 

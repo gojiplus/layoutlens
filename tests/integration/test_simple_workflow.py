@@ -30,20 +30,27 @@ class TestSimpleWorkflow:
 
         # Create temporary HTML file
         with tempfile.NamedTemporaryFile(mode="w", suffix=".html", delete=False) as f:
-            f.write("<html><head><title>Test</title></head><body><h1>Test Page</h1></body></html>")
+            f.write(
+                "<html><head><title>Test</title></head><body><h1>Test Page</h1></body></html>"
+            )
             temp_file = f.name
 
         try:
             with (
                 patch("os.path.exists", return_value=True),
-                patch("layoutlens.api.core.LayoutLens._encode_image", return_value="fake-base64"),
+                patch(
+                    "layoutlens.api.core.LayoutLens._encode_image",
+                    return_value="fake-base64",
+                ),
             ):
                 # Initialize LayoutLens
                 lens = LayoutLens(api_key="test-key")
 
                 # Analyze the page
                 result = await lens.analyze(
-                    source="https://example.com", query="Is this page accessible?", viewport="desktop"
+                    source="https://example.com",
+                    query="Is this page accessible?",
+                    viewport="desktop",
                 )
 
                 # Verify results
@@ -68,9 +75,7 @@ class TestSimpleWorkflow:
         mock_response.choices = [Mock()]
         mock_response.choices[
             0
-        ].message.content = (
-            '{"answer": "The second design is better.", "confidence": 0.78, "reasoning": "Better visual hierarchy."}'
-        )
+        ].message.content = '{"answer": "The second design is better.", "confidence": 0.78, "reasoning": "Better visual hierarchy."}'
         mock_response.usage.total_tokens = 120
         mock_acompletion.return_value = mock_response
 
@@ -80,13 +85,18 @@ class TestSimpleWorkflow:
             # screenshots instead of raw HTML bytes), which existence-checks the
             # file via Path.exists — mocked here alongside the mocked capture.
             patch("pathlib.Path.exists", return_value=True),
-            patch("layoutlens.api.core.LayoutLens._encode_image", return_value="fake-base64"),
+            patch(
+                "layoutlens.api.core.LayoutLens._encode_image",
+                return_value="fake-base64",
+            ),
         ):
             # Initialize LayoutLens
             lens = LayoutLens(api_key="test-key")
 
             # Compare pages
-            result = await lens.compare(sources=["page1.html", "page2.html"], query="Which design is better?")
+            result = await lens.compare(
+                sources=["page1.html", "page2.html"], query="Which design is better?"
+            )
 
             # Verify results
             assert "second" in result.answer.lower()

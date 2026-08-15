@@ -127,17 +127,18 @@ python examples/advanced_usage.py
 import asyncio
 from layoutlens import LayoutLens
 
+
 async def main():
     lens = LayoutLens()
 
     # Analyze a page
     result = await lens.analyze(
-        source="https://example.com",
-        query="Is this page user-friendly and accessible?"
+        source="https://example.com", query="Is this page user-friendly and accessible?"
     )
 
     print(f"Answer: {result.answer}")
     print(f"Confidence: {result.confidence:.1%}")
+
 
 asyncio.run(main())
 ```
@@ -157,13 +158,13 @@ asyncio.run(main())
 context = {
     "user_type": "elderly_users",
     "purpose": "accessibility_audit",
-    "business_context": "healthcare_website"
+    "business_context": "healthcare_website",
 }
 
 result = await lens.analyze(
     source="https://example.com",
     query="Is this suitable for elderly users?",
-    context=context
+    context=context,
 )
 ```
 

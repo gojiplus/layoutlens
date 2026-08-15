@@ -1,5 +1,4 @@
-"""
-Type definitions for LayoutLens JSON schemas and API interfaces.
+"""Type definitions for LayoutLens JSON schemas and API interfaces.
 
 This module provides TypedDict definitions for all JSON inputs and outputs,
 plus enums for type-safe parameter validation.
@@ -296,25 +295,25 @@ class LayoutLensConfigJSON(TypedDict, total=False):
 
 # Export commonly used types
 __all__ = [
-    # Enums
-    "ComplianceLevel",
-    "Expert",
-    "Viewport",
-    "CacheType",
-    # Union types
-    "ViewportType",
-    "ExpertType",
-    "ComplianceLevelType",
-    "CacheTypeType",
     # TypedDict schemas
     "AnalysisResultJSON",
-    "ComparisonResultJSON",
-    "BatchResultJSON",
-    "UITestCaseJSON",
-    "UITestSuiteJSON",
-    "UITestResultJSON",
-    "CacheStatsJSON",
     "AnalyzeInput",
+    "BatchResultJSON",
+    "CacheStatsJSON",
+    "CacheType",
+    "CacheTypeType",
     "CompareInput",
+    "ComparisonResultJSON",
+    # Enums
+    "ComplianceLevel",
+    "ComplianceLevelType",
+    "Expert",
+    "ExpertType",
     "LayoutLensConfigJSON",
+    "UITestCaseJSON",
+    "UITestResultJSON",
+    "UITestSuiteJSON",
+    "Viewport",
+    # Union types
+    "ViewportType",
 ]

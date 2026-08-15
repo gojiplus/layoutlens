@@ -50,7 +50,9 @@ def png2(tmp_path):
 
 @pytest.fixture
 def lens(tmp_path):
-    return LayoutLens(api_key="sk-test", model="gpt-4o-mini", output_dir=str(tmp_path / "out"))
+    return LayoutLens(
+        api_key="sk-test", model="gpt-4o-mini", output_dir=str(tmp_path / "out")
+    )
 
 
 @pytest.fixture
@@ -66,7 +68,9 @@ def gemini_lens(tmp_path):
 # --- litellm fakes --------------------------------------------------------
 
 
-def _openai_batch_line(custom_id: str, content: str, *, finish_reason="stop", pt=100, ct=20) -> str:
+def _openai_batch_line(
+    custom_id: str, content: str, *, finish_reason="stop", pt=100, ct=20
+) -> str:
     """One line of a completed litellm/OpenAI batch output file."""
     return json.dumps(
         {
@@ -74,20 +78,33 @@ def _openai_batch_line(custom_id: str, content: str, *, finish_reason="stop", pt
             "response": {
                 "status_code": 200,
                 "body": {
-                    "choices": [{"message": {"content": content}, "finish_reason": finish_reason}],
-                    "usage": {"prompt_tokens": pt, "completion_tokens": ct, "total_tokens": pt + ct},
+                    "choices": [
+                        {
+                            "message": {"content": content},
+                            "finish_reason": finish_reason,
+                        }
+                    ],
+                    "usage": {
+                        "prompt_tokens": pt,
+                        "completion_tokens": ct,
+                        "total_tokens": pt + ct,
+                    },
                 },
             },
         }
     )
 
 
-def _make_litellm_mocks(output_text: str, *, status="completed", output_file_id="file-out"):
+def _make_litellm_mocks(
+    output_text: str, *, status="completed", output_file_id="file-out"
+):
     """Build AsyncMocks for the four litellm batch helpers returning ``output_text``."""
     acreate_file = AsyncMock(return_value=SimpleNamespace(id="file-in"))
     acreate_batch = AsyncMock(return_value=SimpleNamespace(id="batch-1"))
     aretrieve_batch = AsyncMock(
-        return_value=SimpleNamespace(status=status, output_file_id=output_file_id, error_file_id=None)
+        return_value=SimpleNamespace(
+            status=status, output_file_id=output_file_id, error_file_id=None
+        )
     )
     afile_content = AsyncMock(return_value=SimpleNamespace(text=output_text))
     return acreate_file, acreate_batch, aretrieve_batch, afile_content
@@ -119,7 +136,9 @@ async def test_dispatch_genai_for_gemini_studio(gemini_lens, png):
         patch.object(batch_mod, "acreate_file", AsyncMock()) as acf,
         _fake_genai(batch_mod, {"r1": '{"answer": "no", "confidence": 0.8}'}),
     ):
-        results = await gemini_lens.judge_batch([BatchRequest("r1", png, "Is it good?")])
+        results = await gemini_lens.judge_batch(
+            [BatchRequest("r1", png, "Is it good?")]
+        )
     acf.assert_not_awaited()  # litellm path NOT used
     assert results["r1"].answer == "no"
 
@@ -193,14 +212,24 @@ async def test_litellm_two_requests_keyed_by_id(lens, png, png2):
         patch.object(batch_mod, "aretrieve_batch", arb),
         patch.object(batch_mod, "afile_content", afc),
     ):
-        results = await lens.judge_batch([BatchRequest("a", png, "p1"), BatchRequest("b", png2, "p2")])
+        results = await lens.judge_batch(
+            [BatchRequest("a", png, "p1"), BatchRequest("b", png2, "p2")]
+        )
     assert set(results) == {"a", "b"}
     assert all(isinstance(r, JudgeResult) for r in results.values())
     assert results["a"].answer == "A"
     assert results["b"].answer == "B"
     # Usage split recorded per request.
-    assert results["a"].usage == {"prompt_tokens": 100, "completion_tokens": 20, "total_tokens": 120}
-    assert results["b"].usage == {"prompt_tokens": 50, "completion_tokens": 10, "total_tokens": 60}
+    assert results["a"].usage == {
+        "prompt_tokens": 100,
+        "completion_tokens": 20,
+        "total_tokens": 120,
+    }
+    assert results["b"].usage == {
+        "prompt_tokens": 50,
+        "completion_tokens": 10,
+        "total_tokens": 60,
+    }
     # The JSONL carried two lines.
     uploaded = acf.await_args.kwargs["file"].decode("utf-8").strip().splitlines()
     assert len(uploaded) == 2
@@ -209,7 +238,12 @@ async def test_litellm_two_requests_keyed_by_id(lens, png, png2):
 
 @pytest.mark.asyncio
 async def test_litellm_truncation_flag(lens, png):
-    output = _openai_batch_line("r1", '{"answer": "A", "confidence": 0.9}', finish_reason="length") + "\n"
+    output = (
+        _openai_batch_line(
+            "r1", '{"answer": "A", "confidence": 0.9}', finish_reason="length"
+        )
+        + "\n"
+    )
     acf, acb, arb, afc = _make_litellm_mocks(output)
     with (
         patch.object(batch_mod, "acreate_file", acf),
@@ -235,7 +269,9 @@ async def test_missing_image_yields_unknown_without_crash(lens, png, tmp_path):
         patch.object(batch_mod, "aretrieve_batch", arb),
         patch.object(batch_mod, "afile_content", afc),
     ):
-        results = await lens.judge_batch([BatchRequest("gone", missing, "p"), BatchRequest("ok", png, "p")])
+        results = await lens.judge_batch(
+            [BatchRequest("gone", missing, "p"), BatchRequest("ok", png, "p")]
+        )
     assert results["gone"].answer == "unknown"
     assert results["gone"].parse_mode == "none"
     assert results["ok"].answer == "A"
@@ -287,8 +323,17 @@ async def test_resume_litellm_skips_covered_ids(lens, png, png2):
 
     # aretrieve returns completed for both prior + new batch; afile_content
     # returns prior_output for the prior job then new_output for the new one.
-    arb = AsyncMock(return_value=SimpleNamespace(status="completed", output_file_id="out", error_file_id=None))
-    afc = AsyncMock(side_effect=[SimpleNamespace(text=prior_output), SimpleNamespace(text=new_output)])
+    arb = AsyncMock(
+        return_value=SimpleNamespace(
+            status="completed", output_file_id="out", error_file_id=None
+        )
+    )
+    afc = AsyncMock(
+        side_effect=[
+            SimpleNamespace(text=prior_output),
+            SimpleNamespace(text=new_output),
+        ]
+    )
     acf = AsyncMock(return_value=SimpleNamespace(id="file-in"))
     acb = AsyncMock(return_value=SimpleNamespace(id="batch-new"))
 
@@ -309,7 +354,8 @@ async def test_resume_litellm_skips_covered_ids(lens, png, png2):
     # Only ONE new batch submitted (for 'b'); 'a' recovered from the prior job.
     acf.assert_awaited_once()
     submitted_ids = {
-        json.loads(x)["custom_id"] for x in acf.await_args.kwargs["file"].decode("utf-8").strip().splitlines()
+        json.loads(x)["custom_id"]
+        for x in acf.await_args.kwargs["file"].decode("utf-8").strip().splitlines()
     }
     assert submitted_ids == {"b"}
 
@@ -321,7 +367,9 @@ class _FakeGenaiResp:
     def __init__(self, text, prompt_tok, total_tok):
         self.text = text
         self.usage_metadata = SimpleNamespace(
-            prompt_token_count=prompt_tok, candidates_token_count=10, total_token_count=total_tok
+            prompt_token_count=prompt_tok,
+            candidates_token_count=10,
+            total_token_count=total_tok,
         )
 
 
@@ -405,20 +453,28 @@ async def test_genai_end_to_end_keyed_by_metadata(gemini_lens, png, png2):
             "b": '{"answer": "no", "confidence": 0.5}',
         },
     ):
-        results = await gemini_lens.judge_batch([BatchRequest("a", png, "p1"), BatchRequest("b", png2, "p2")])
+        results = await gemini_lens.judge_batch(
+            [BatchRequest("a", png, "p1"), BatchRequest("b", png2, "p2")]
+        )
     assert set(results) == {"a", "b"}
     assert results["a"].answer == "yes"
     assert results["a"].rationale == "x"
     assert results["b"].answer == "no"
     # Usage: output = total - prompt (Gemini bills thinking as output).
-    assert results["a"].usage == {"prompt_tokens": 1200, "completion_tokens": 700, "total_tokens": 1900}
+    assert results["a"].usage == {
+        "prompt_tokens": 1200,
+        "completion_tokens": 700,
+        "total_tokens": 1900,
+    }
 
 
 @pytest.mark.asyncio
 async def test_genai_missing_image_unknown(gemini_lens, png, tmp_path):
     missing = str(tmp_path / "nope.png")
     with _fake_genai(batch_mod, {"ok": '{"answer": "yes", "confidence": 0.9}'}):
-        results = await gemini_lens.judge_batch([BatchRequest("gone", missing, "p"), BatchRequest("ok", png, "p")])
+        results = await gemini_lens.judge_batch(
+            [BatchRequest("gone", missing, "p"), BatchRequest("ok", png, "p")]
+        )
     assert results["gone"].answer == "unknown"
     assert results["ok"].answer == "yes"
 
@@ -436,7 +492,9 @@ async def test_empty_requests_returns_empty(lens):
 async def test_anthropic_batch_raises_clear_error(tmp_path, png, model):
     """litellm 1.80.10 supports neither acreate_file nor acreate_batch for
     anthropic, so a Claude model must fail loud and helpful at submit time."""
-    lens = LayoutLens(api_key="sk", model=model, provider="anthropic", output_dir=str(tmp_path / "o"))
+    lens = LayoutLens(
+        api_key="sk", model=model, provider="anthropic", output_dir=str(tmp_path / "o")
+    )
     acf, acb, arb, afc = _make_litellm_mocks("")
     with (
         patch.object(batch_mod, "acreate_file", acf),
@@ -460,7 +518,9 @@ async def test_litellm_malformed_line_yields_unknown(lens, png, png2):
     the batch does not crash and other ids parse normally."""
     good = _openai_batch_line("good", '{"answer": "A", "confidence": 0.9}')
     # Error line as a real batch API failure emits: response null / error set.
-    err_line = json.dumps({"custom_id": "bad", "response": None, "error": {"message": "boom"}})
+    err_line = json.dumps(
+        {"custom_id": "bad", "response": None, "error": {"message": "boom"}}
+    )
     output = good + "\n" + err_line + "\n"
     acf, acb, arb, afc = _make_litellm_mocks(output)
     with (
@@ -469,7 +529,9 @@ async def test_litellm_malformed_line_yields_unknown(lens, png, png2):
         patch.object(batch_mod, "aretrieve_batch", arb),
         patch.object(batch_mod, "afile_content", afc),
     ):
-        results = await lens.judge_batch([BatchRequest("good", png, "p1"), BatchRequest("bad", png2, "p2")])
+        results = await lens.judge_batch(
+            [BatchRequest("good", png, "p1"), BatchRequest("bad", png2, "p2")]
+        )
     assert set(results) == {"good", "bad"}
     assert results["good"].answer == "A"
     # Malformed line: parsed into an unknown result (empty raw, no crash).

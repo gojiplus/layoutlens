@@ -1,5 +1,4 @@
-"""
-Type definitions for Browser Use integration.
+"""Type definitions for Browser Use integration.
 
 Provides data classes for validation policies, results, and session recordings.
 """
@@ -252,7 +251,9 @@ class SessionRecording:
         data["session"]["policy"]["experts"] = self.session.policy.experts
         for step in data["session"]["steps"]:
             step["trigger"] = (
-                step["trigger"].value if isinstance(step["trigger"], ValidationTrigger) else step["trigger"]
+                step["trigger"].value
+                if isinstance(step["trigger"], ValidationTrigger)
+                else step["trigger"]
             )
             for finding in step["findings"]:
                 finding["severity"] = (
@@ -336,13 +337,13 @@ class SessionComparison:
 
 
 __all__ = [
-    "ValidationTrigger",
-    "ValidationSeverity",
-    "SessionState",
-    "ValidationPolicy",
-    "ValidationFinding",
-    "ValidationStepResult",
-    "ValidationSession",
-    "SessionRecording",
     "SessionComparison",
+    "SessionRecording",
+    "SessionState",
+    "ValidationFinding",
+    "ValidationPolicy",
+    "ValidationSession",
+    "ValidationSeverity",
+    "ValidationStepResult",
+    "ValidationTrigger",
 ]

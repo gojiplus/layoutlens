@@ -58,6 +58,12 @@ LayoutLens is an AI-powered UI testing framework that enables natural language v
 -----------------
 
 .. toctree::
+   :maxdepth: 1
+   :caption: Guides
+
+   QUICK_START
+
+.. toctree::
    :maxdepth: 2
    :caption: API Reference
 

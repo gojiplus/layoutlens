@@ -2,6 +2,36 @@
 
 All notable changes to LayoutLens are documented in this file.
 
+## [Unreleased]
+
+### Changed
+
+- **Adopted the py-canon fleet standard** (`preen adopt --release-migration`):
+  - Build backend switched from `uv_build` to hatchling + uv-dynamic-versioning;
+    the version now derives from git tags (`vX.Y.Z`) instead of a static
+    `version` field in `pyproject.toml`.
+  - CI/docs/release/Dependabot-automerge workflows are now thin shims calling
+    py-canon's reusable workflows. Playwright browser tests moved to a
+    dedicated `browser.yml` workflow (the reusable CI has no pre-test hook).
+  - Releases are cut by pushing a `v*` tag (or `preen release`); the old
+    `python-publish.yml` (GitHub-release-triggered) was removed. CITATION.cff
+    syncing moved to its own `citation-sync.yml`.
+  - Ruff config replaced by the fleet standard: line length 120 → 88, a much
+    wider rule set (docstrings, security, print bans outside CLIs/scripts).
+  - Pyright (`standard` mode) is now a hard CI gate; the package is clean, and
+    `analyze()`/`capture()` gained `@overload` signatures so single-source
+    calls type as `AnalysisResult`/`str` rather than unions.
+  - Docs build via the shared `py_canon.sphinx.configure` config, with `-W`
+    (warnings are errors) and a doctest pass.
+
+### Fixed
+
+- `_initialize_default_logging` no longer assumes the layoutlens logger has a
+  parent, and the `__init__` version fallback no longer references
+  `importlib` from an except clause where it could be unbound.
+- Placeholder URLs in docs/examples now use the RFC-reserved `example.com` /
+  `example.org` domains.
+
 ## [1.9.0] - 2026-07-25
 
 ### 🚀 Major Features

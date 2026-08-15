@@ -54,14 +54,18 @@ contexts; only the first one spells out the `asyncio.run(...)` wrapper.
 import asyncio
 from layoutlens import LayoutLens
 
+
 async def main():
     # Initialize (uses OPENAI_API_KEY env var)
     lens = LayoutLens()
 
     # Test any website or local HTML
-    result = await lens.analyze("https://your-site.com", "Is the header properly aligned?")
+    result = await lens.analyze(
+        "https://your-site.com", "Is the header properly aligned?"
+    )
     print(f"Answer: {result.answer}")
     print(f"Confidence: {result.confidence:.1%}")
+
 
 asyncio.run(main())
 ```
@@ -95,13 +99,15 @@ from layoutlens import LayoutLens, AxeAuditor
 # Raw axe-core report — no LayoutLens instance or API key needed at all
 report = await AxeAuditor().audit("page.html")
 print(report.summary())
-print(report.ok)          # True if there are zero violations
+print(report.ok)  # True if there are zero violations
 print(report.violations)  # list[A11yFinding]: rule_id, impact, wcag_refs, nodes, ...
 
 # Via the LayoutLens API, restricted to WCAG A/AA tags, still keyless
 lens = LayoutLens()  # no API key required at construction
 result = await lens.check_accessibility("page.html", mode="axe")
-print(result.answer)      # "Yes — axe-core found no WCAG A/AA violations" (or lists violated rules)
+print(
+    result.answer
+)  # "Yes — axe-core found no WCAG A/AA violations" (or lists violated rules)
 ```
 
 ### The three modes
@@ -117,7 +123,7 @@ print(result.answer)      # "Yes — axe-core found no WCAG A/AA violations" (or
 ```python
 # Hybrid: axe grounds the LLM and can force the verdict
 result = await lens.check_accessibility("page.html", mode="hybrid")
-print(result.metadata["a11y"])   # full axe report dict
+print(result.metadata["a11y"])  # full axe report dict
 print(result.metadata["engine"])  # "axe-core 4.10.3"
 ```
 
@@ -139,13 +145,15 @@ from layoutlens.layout import LayoutScorer, contrast_ratio, read_computed_styles
 
 # Scan a page — no LayoutLens instance, no API key, deterministic.
 report = await LayoutScorer().scan("page.html", viewport="mobile")
-print(report.ok)          # True if no defects found
-print(report.summary())   # findings grouped by class, with measured receipts
+print(report.ok)  # True if no defects found
+print(report.summary())  # findings grouped by class, with measured receipts
 for f in report.findings:
-    print(f.defect_class, f.selector, f.measured)  # each finding carries the numbers behind it
+    print(
+        f.defect_class, f.selector, f.measured
+    )  # each finding carries the numbers behind it
 
 # Or use the pure WCAG contrast math directly (no browser):
-contrast_ratio((0x76, 0x76, 0x76), (0xff, 0xff, 0xff))  # -> 4.54
+contrast_ratio((0x76, 0x76, 0x76), (0xFF, 0xFF, 0xFF))  # -> 4.54
 ```
 
 Every finding is a receipt: the offending selector, its bounding box, the measured value, and
@@ -166,15 +174,14 @@ from layoutlens.prompts import Instructions, UserContext
 instructions = Instructions(
     expert_persona="conversion_expert",
     user_context=UserContext(
-        business_goals=["reduce_cart_abandonment"],
-        target_audience="mobile_shoppers"
-    )
+        business_goals=["reduce_cart_abandonment"], target_audience="mobile_shoppers"
+    ),
 )
 
 result = await lens.analyze(
     "checkout.html",
     "How can we optimize this checkout flow?",
-    instructions=instructions
+    instructions=instructions,
 )
 ```
 
@@ -185,7 +192,7 @@ screenshots first with `lens.capture(...)`:
 ```python
 result = await lens.compare(
     ["https://old-design.example.com", "https://new-design.example.com"],
-    "Which design is more accessible?"
+    "Which design is more accessible?",
 )
 print(f"Winner: {result.answer}")
 ```
@@ -197,8 +204,9 @@ Domain expert knowledge with one line of code:
 result = await lens.audit_accessibility("product-page.html", compliance_level="AA")
 
 # Conversion rate optimization (CRO expert)
-result = await lens.optimize_conversions("landing.html",
-    business_goals=["increase_signups"], industry="saas")
+result = await lens.optimize_conversions(
+    "landing.html", business_goals=["increase_signups"], industry="saas"
+)
 
 # Mobile UX analysis (Mobile expert)
 result = await lens.analyze_mobile_ux("app.html", performance_focus=True)
@@ -216,7 +224,7 @@ result = await lens.check_accessibility("product-page.html")  # Backward compati
 ```python
 results = await lens.analyze(
     source=["home.html", "about.html", "contact.html"],
-    query=["Is it accessible?", "Is it mobile-friendly?"]
+    query=["Is it accessible?", "Is it mobile-friendly?"],
 )
 # Returns a BatchResult; processes 6 combinations concurrently
 print(f"{results.successful_queries}/{results.total_queries} succeeded")
@@ -228,7 +236,7 @@ print(f"{results.successful_queries}/{results.total_queries} succeeded")
 result = await lens.analyze(
     source=["page1.html", "page2.html", "page3.html"],
     query="Is it accessible?",
-    max_concurrent=5
+    max_concurrent=5,
 )
 ```
 
@@ -256,6 +264,7 @@ print(json_data)
 # Type-safe structured access
 from layoutlens.types import AnalysisResultJSON
 import json
+
 data: AnalysisResultJSON = json.loads(result.to_json())
 confidence = data["confidence"]  # Fully typed: float
 ```
@@ -275,8 +284,8 @@ result = await lens.analyze_with_expert(
     user_context={
         "target_audience": "elderly_patients",
         "accessibility_needs": ["large_text", "simple_navigation"],
-        "industry": "healthcare"
-    }
+        "industry": "healthcare",
+    },
 )
 
 # Expert comparison analysis (compare/compare_with_expert take URLs or
@@ -285,7 +294,7 @@ result = await lens.compare_with_expert(
     sources=["https://old.example.com", "https://new.example.com"],
     query="Which design converts better?",
     expert_persona="conversion_expert",
-    focus_areas=["cta_prominence", "trust_signals"]
+    focus_areas=["cta_prominence", "trust_signals"],
 )
 ```
 
@@ -353,12 +362,12 @@ prompt = (
 
 result = await lens.judge("candidate.png", prompt, max_tokens=300)
 
-result.answer      # parsed "answer" field, or "unknown" if unparseable
+result.answer  # parsed "answer" field, or "unknown" if unparseable
 result.confidence  # parsed 0-1, else 0.0
-result.rationale   # parsed "rationale"/"reasoning", else ""
-result.raw         # full raw model text
-result.refused     # True if the model declined
-result.usage       # {"prompt_tokens": ..., "completion_tokens": ..., "total_tokens": ...}
+result.rationale  # parsed "rationale"/"reasoning", else ""
+result.raw  # full raw model text
+result.refused  # True if the model declined
+result.usage  # {"prompt_tokens": ..., "completion_tokens": ..., "total_tokens": ...}
 result.parse_mode  # "json" | "fallback" | "none"
 ```
 
@@ -426,6 +435,7 @@ Run `layoutlens` with no arguments (or `--help`) to see the full flag reference:
 ```python
 import pytest
 from layoutlens import LayoutLens
+
 
 @pytest.mark.asyncio
 async def test_homepage_quality():
@@ -499,22 +509,25 @@ Create your own test data and answer keys:
 # Use the async API for custom benchmark workflows
 from layoutlens import LayoutLens
 
+
 async def run_custom_benchmark():
     lens = LayoutLens()
 
     test_cases = [
         {"source": "page1.html", "query": "Is it accessible?"},
-        {"source": "page2.html", "query": "Is it mobile-friendly?"}
+        {"source": "page2.html", "query": "Is it mobile-friendly?"},
     ]
 
     results = []
     for case in test_cases:
         result = await lens.analyze(case["source"], case["query"])
-        results.append({
-            "test": case,
-            "result": result.to_json(),  # Clean JSON output
-            "passed": result.confidence > 0.7
-        })
+        results.append(
+            {
+                "test": case,
+                "result": result.to_json(),  # Clean JSON output
+                "passed": result.confidence > 0.7,
+            }
+        )
 
     return results
 ```
@@ -539,8 +552,7 @@ lens = LayoutLens(
 
 - 📖 **[Full Documentation](https://gojiplus.github.io/layoutlens/)** - Comprehensive guides and API reference
 - 🎯 **[Examples](https://github.com/gojiplus/layoutlens/tree/main/examples)** - Real-world usage patterns
-- 🐛 **[Issues](https://github.com/gojiplus/layoutlens/issues)** - Report bugs or request features
-- 💬 **[Discussions](https://github.com/gojiplus/layoutlens/discussions)** - Get help and share ideas
+- 🐛 **[Issues](https://github.com/gojiplus/layoutlens/issues)** - Report bugs, request features, get help
 
 ## Why LayoutLens?
 

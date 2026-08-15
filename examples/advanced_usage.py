@@ -16,7 +16,9 @@ async def advanced_analysis_with_context():
     """Demonstrate analysis with detailed context information."""
 
     # Initialize with custom model and output directory
-    tester = LayoutLens(model="gpt-4o", output_dir="advanced_analysis_output")  # Use more powerful model
+    tester = LayoutLens(
+        model="gpt-4o", output_dir="advanced_analysis_output"
+    )  # Use more powerful model
 
     # Analyze with rich context
     context = {
@@ -92,7 +94,9 @@ async def batch_analysis_workflow():
     print(f"\nBatch analysis completed for {len(results.results)} pages:")
     for i, result in enumerate(results.results):
         page_name = Path(pages[i]).stem
-        print(f"  {page_name}: {result.answer[:100]}... (confidence: {result.confidence:.1%})")
+        print(
+            f"  {page_name}: {result.answer[:100]}... (confidence: {result.confidence:.1%})"
+        )
 
 
 async def specialized_checks_workflow():
@@ -118,7 +122,9 @@ async def specialized_checks_workflow():
 
     # Conversion optimization check
     print("\n=== Conversion Optimization Analysis ===")
-    conversion_result = await tester.check_conversion_optimization(source="https://example.com")
+    conversion_result = await tester.check_conversion_optimization(
+        source="https://example.com"
+    )
     print(f"Conversion optimization: {conversion_result.answer}")
     print(f"Confidence: {conversion_result.confidence:.1%}")
 
@@ -189,7 +195,7 @@ async def error_handling_patterns():
     # Handle invalid URLs gracefully
     try:
         result = await tester.analyze(
-            source="https://nonexistent-website-12345.com",
+            source="https://nonexistent.example.com",
             query="Is this page accessible?",
         )
         print(f"Result: {result.answer}")
@@ -198,7 +204,9 @@ async def error_handling_patterns():
 
     # Handle missing files gracefully
     try:
-        result = await tester.analyze(source="nonexistent_file.html", query="How is the layout?")
+        result = await tester.analyze(
+            source="nonexistent_file.html", query="How is the layout?"
+        )
         print(f"Result: {result.answer}")
     except Exception as e:
         print(f"Handled file error: {type(e).__name__}")

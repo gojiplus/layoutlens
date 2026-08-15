@@ -38,7 +38,7 @@ async def async_batch_analysis():
     sources = [
         "https://example.com",
         "https://httpbin.org/html",
-        "https://httpstat.us/200",
+        "https://example.com",
     ]
 
     # Multiple queries per page
@@ -114,7 +114,9 @@ async def compare_sync_vs_async():
         print(f"  Synchronous Time: {sync_time:.2f}s")
         print(f"  Asynchronous Time: {async_time:.2f}s")
         print(f"  Performance Improvement: {sync_time / async_time:.1f}x faster")
-        print(f"  Time Saved: {sync_time - async_time:.2f}s ({(sync_time - async_time) / sync_time:.1%})")
+        print(
+            f"  Time Saved: {sync_time - async_time:.2f}s ({(sync_time - async_time) / sync_time:.1%})"
+        )
 
     except Exception as e:
         print(f"Performance comparison failed: {e}")
@@ -179,7 +181,9 @@ async def async_test_suite_simulation():
 
         print("\nTest Suite Summary:")
         print(f"  Total Analyses: {total_analyses}")
-        print(f"  Overall Passed: {overall_passed}/{total_analyses} ({overall_passed / total_analyses:.1%})")
+        print(
+            f"  Overall Passed: {overall_passed}/{total_analyses} ({overall_passed / total_analyses:.1%})"
+        )
         print(f"  Total Time: {overall_time:.2f}s")
         print(f"  Avg per Analysis: {overall_time / total_analyses:.2f}s")
 

@@ -24,13 +24,17 @@ _PNG_1x1 = base64.b64decode(
 
 def _vision_response() -> MagicMock:
     response = MagicMock()
-    response.choices[0].message.content = '{"answer": "Yes", "confidence": 0.8, "reasoning": "ok"}'
+    response.choices[
+        0
+    ].message.content = '{"answer": "Yes", "confidence": 0.8, "reasoning": "ok"}'
     response.usage.total_tokens = 42
     return response
 
 
 @pytest.mark.asyncio
-async def test_litellm_provider_omits_api_key_and_does_not_require_openai_key(tmp_path, monkeypatch):
+async def test_litellm_provider_omits_api_key_and_does_not_require_openai_key(
+    tmp_path, monkeypatch
+):
     """provider='litellm' with only ANTHROPIC_API_KEY set resolves via LiteLLM.
 
     No AuthenticationError is raised, and ``acompletion`` is called WITHOUT an
@@ -42,10 +46,17 @@ async def test_litellm_provider_omits_api_key_and_does_not_require_openai_key(tm
     png = tmp_path / "shot.png"
     png.write_bytes(_PNG_1x1)
 
-    lens = LayoutLens(provider="litellm", model="anthropic/claude-3-5-sonnet", output_dir=str(tmp_path / "out"))
+    lens = LayoutLens(
+        provider="litellm",
+        model="anthropic/claude-3-5-sonnet",
+        output_dir=str(tmp_path / "out"),
+    )
     assert lens.api_key is None  # OpenAI key was NOT grabbed for litellm.
 
-    with patch("layoutlens.api.core.acompletion", new=AsyncMock(return_value=_vision_response())) as mock_llm:
+    with patch(
+        "layoutlens.api.core.acompletion",
+        new=AsyncMock(return_value=_vision_response()),
+    ) as mock_llm:
         result = await lens.analyze(str(png), "Is it accessible?")
 
     assert result.confidence == 0.8
@@ -71,10 +82,17 @@ async def test_compare_routes_local_html_through_capture(tmp_path):
     lens._serve_html_and_capture = AsyncMock(side_effect=fake_serve)
     # Individual per-source analyses are irrelevant to this assertion.
     lens.analyze = AsyncMock(
-        return_value=AnalysisResult(source="x", query="q", answer="ok", confidence=0.7, reasoning="r")
+        return_value=AnalysisResult(
+            source="x", query="q", answer="ok", confidence=0.7, reasoning="r"
+        )
     )
     lens._call_vision_api = AsyncMock(
-        return_value={"answer": "B is better", "confidence": 0.8, "reasoning": "r", "metadata": {}}
+        return_value={
+            "answer": "B is better",
+            "confidence": 0.8,
+            "reasoning": "r",
+            "metadata": {},
+        }
     )
 
     await lens.compare([str(a), str(b)], "Which is better?")

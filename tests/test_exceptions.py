@@ -56,7 +56,9 @@ class TestCustomExceptions:
 
     def test_analysis_error(self):
         """Test AnalysisError."""
-        error = AnalysisError("Analysis failed", query="test query", source="test.html", confidence=0.2)
+        error = AnalysisError(
+            "Analysis failed", query="test query", source="test.html", confidence=0.2
+        )
 
         assert error.query == "test query"
         assert error.source == "test.html"
@@ -179,7 +181,10 @@ class TestLayoutLensExceptions:
         with (
             patch.dict("os.environ", {"OPENAI_API_KEY": "test_key"}),
             patch("os.path.exists", return_value=True),
-            patch("layoutlens.api.core.LayoutLens._encode_image", return_value="fake-base64"),
+            patch(
+                "layoutlens.api.core.LayoutLens._encode_image",
+                return_value="fake-base64",
+            ),
         ):
             lens = LayoutLens()
 
@@ -237,7 +242,10 @@ class TestGracefulDegradation:
         with (
             patch.dict("os.environ", {"OPENAI_API_KEY": "test_key"}),
             patch("os.path.exists", return_value=True),
-            patch("layoutlens.api.core.LayoutLens._encode_image", return_value="fake-base64"),
+            patch(
+                "layoutlens.api.core.LayoutLens._encode_image",
+                return_value="fake-base64",
+            ),
         ):
             lens = LayoutLens()
 

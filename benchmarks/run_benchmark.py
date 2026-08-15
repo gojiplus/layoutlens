@@ -67,7 +67,9 @@ class BenchmarkRunner:
     async def run_single_test(self, html_file: Path, query: str) -> dict[str, Any]:
         """Run a single test and return structured result."""
         try:
-            result = await self.lens.analyze(source=str(html_file), query=query, viewport="desktop")
+            result = await self.lens.analyze(
+                source=str(html_file), query=query, viewport="desktop"
+            )
 
             return {
                 "html_file": html_file.name,
@@ -84,7 +86,7 @@ class BenchmarkRunner:
             return {
                 "html_file": html_file.name,
                 "query": query,
-                "answer": f"Error: {str(e)}",
+                "answer": f"Error: {e!s}",
                 "confidence": 0.0,
                 "reasoning": f"Test failed due to: {type(e).__name__}",
                 "success": False,
@@ -92,7 +94,9 @@ class BenchmarkRunner:
                 "metadata": {"error_type": type(e).__name__},
             }
 
-    async def run_batch_test(self, html_files: list[Path], queries: list[str]) -> list[dict[str, Any]]:
+    async def run_batch_test(
+        self, html_files: list[Path], queries: list[str]
+    ) -> list[dict[str, Any]]:
         """Run batch analysis for multiple files and queries."""
         try:
             # Convert paths to strings for LayoutLens
@@ -133,7 +137,7 @@ class BenchmarkRunner:
                         {
                             "html_file": html_file.name,
                             "query": query,
-                            "answer": f"Batch error: {str(e)}",
+                            "answer": f"Batch error: {e!s}",
                             "confidence": 0.0,
                             "reasoning": f"Batch test failed: {type(e).__name__}",
                             "success": False,
@@ -222,7 +226,9 @@ class BenchmarkRunner:
                 "total_tests": len(all_results),
                 "successful_tests": len(successful_tests),
                 "failed_tests": len(failed_tests),
-                "success_rate": len(successful_tests) / len(all_results) if all_results else 0,
+                "success_rate": len(successful_tests) / len(all_results)
+                if all_results
+                else 0,
                 "batch_processing_used": use_batch,
                 "model_used": "gpt-4o-mini",
             },
@@ -237,7 +243,9 @@ class BenchmarkRunner:
 
         return summary
 
-    def save_results(self, results: dict[str, Any], filename: str = "benchmark_results.json") -> Path:
+    def save_results(
+        self, results: dict[str, Any], filename: str = "benchmark_results.json"
+    ) -> Path:
         """Save benchmark results to JSON file."""
         output_file = self.output_dir / filename
 
@@ -259,15 +267,23 @@ Examples:
         """,
     )
 
-    parser.add_argument("--api-key", help="OpenAI API key (or set OPENAI_API_KEY env var)")
+    parser.add_argument(
+        "--api-key", help="OpenAI API key (or set OPENAI_API_KEY env var)"
+    )
     parser.add_argument(
         "--output",
         default="benchmarks/layoutlens_output",
         help="Output directory for results (default: benchmarks/layoutlens_output)",
     )
-    parser.add_argument("--no-batch", action="store_true", help="Disable batch processing (run tests individually)")
     parser.add_argument(
-        "--filename", default="benchmark_results.json", help="Output filename (default: benchmark_results.json)"
+        "--no-batch",
+        action="store_true",
+        help="Disable batch processing (run tests individually)",
+    )
+    parser.add_argument(
+        "--filename",
+        default="benchmark_results.json",
+        help="Output filename (default: benchmark_results.json)",
     )
 
     args = parser.parse_args()
