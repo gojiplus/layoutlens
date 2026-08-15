@@ -4,4 +4,4 @@ layoutlens>=1.0.4
 # Streamlit dependencies
 streamlit>=1.61.1
 validators>=0.35.0
-requests>=2.32.0
+requests>=2.33.0
