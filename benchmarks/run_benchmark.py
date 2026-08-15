@@ -28,23 +28,33 @@ sys.path.insert(0, str(project_root))
 class BenchmarkRunner:
     """Runs LayoutLens against benchmark test data."""
 
-    def __init__(self, api_key: str, output_dir: str = "layoutlens_output"):
+    def __init__(
+        self,
+        api_key: str,
+        output_dir: str = "layoutlens_output",
+        model: str = "gpt-4o-mini",
+        provider: str = "openai",
+        api_base: str | None = None,
+    ):
         """Initialize benchmark runner."""
         self.api_key = api_key
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(exist_ok=True)
 
-        # Initialize LayoutLens with performance settings
+        # Cache keys include the model fingerprint (see cache.get_analysis_key),
+        # so the persistent file cache is safe across model switches.
         self.lens = LayoutLens(
             api_key=api_key,
-            model="gpt-4o-mini",  # Cost-effective for benchmarks
+            model=model,
+            provider=provider,
+            api_base=api_base,
             output_dir=str(self.output_dir / "screenshots"),
             cache_enabled=True,
             cache_type="file",
         )
 
         print(f"⚙️  Benchmark Settings:")
-        print(f"   Model: gpt-4o-mini")
+        print(f"   Model: {model}")
         print(f"   Cache: Enabled (file-based)")
         print(f"   Output: {self.output_dir}")
 
@@ -230,7 +240,7 @@ class BenchmarkRunner:
                 if all_results
                 else 0,
                 "batch_processing_used": use_batch,
-                "model_used": "gpt-4o-mini",
+                "model_used": self.lens.model,
             },
             "results": all_results,
         }
@@ -276,6 +286,21 @@ Examples:
         help="Output directory for results (default: benchmarks/layoutlens_output)",
     )
     parser.add_argument(
+        "--model",
+        default="gpt-4o-mini",
+        help="Model to benchmark (default: gpt-4o-mini)",
+    )
+    parser.add_argument(
+        "--provider",
+        default="openai",
+        help="Provider for the model (openai, anthropic, google, gemini, litellm)",
+    )
+    parser.add_argument(
+        "--api-base",
+        default=None,
+        help="Optional OpenAI-compatible base URL (Ollama/vLLM)",
+    )
+    parser.add_argument(
         "--no-batch",
         action="store_true",
         help="Disable batch processing (run tests individually)",
@@ -297,7 +322,13 @@ Examples:
 
     try:
         # Run benchmark
-        runner = BenchmarkRunner(api_key, args.output)
+        runner = BenchmarkRunner(
+            api_key,
+            args.output,
+            model=args.model,
+            provider=args.provider,
+            api_base=args.api_base,
+        )
         results = await runner.run_benchmark(use_batch=not args.no_batch)
 
         # Save results

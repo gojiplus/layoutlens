@@ -145,6 +145,18 @@ is persona/instructions-free. A missing image raises `ValidationError`.
 - **Usage split** — `_read_usage` records prompt/completion/total tokens in
   analysis metadata and `JudgeResult.usage` (0 when the provider omits them).
 
+## pytest Plugin & MCP Server (v2.0.0)
+
+- `layoutlens/pytest_plugin.py` registers via the `pytest11` entry point: a
+  session-scoped `layoutlens` fixture with keyless `assert_a11y`/`assert_layout`
+  and LLM-backed `assert_ui` (skips without a key / with `--layoutlens-no-llm`).
+  Tested via pytester in `tests/test_pytest_plugin.py`.
+- `layoutlens/mcp_server.py` (extra `layoutlens[mcp]`, script `layoutlens-mcp`,
+  FastMCP): tools `audit_accessibility`/`scan_layout` (keyless, compact
+  summaries — never raw axe JSON) and `check_ui`/`compare_ui` (LLM).
+- `layoutlens/sarif.py` emits SARIF 2.1.0 for both deterministic engines
+  (validated against the official OASIS schema).
+
 ## Deterministic Accessibility (axe-core)
 
 `layoutlens/a11y/` wraps a vendored axe-core bundle
@@ -205,7 +217,8 @@ repo's browser/axe modules; LayoutLens is a planned baseline there).
 
 ```bash
 # 1. Run LayoutLens over all fixtures
-uv run python benchmarks/run_benchmark.py --no-batch --output benchmarks/run_out
+uv run python benchmarks/run_benchmark.py --no-batch --output benchmarks/run_out \
+#   [--model MODEL --provider PROVIDER --api-base URL]  # harness is model-agnostic
 
 # 2. Score deterministically (leading yes/no token vs. answer key;
 #    ambiguous/unparseable answers count as INCORRECT, never free "no" credit)
