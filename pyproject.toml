@@ -93,11 +93,12 @@ browser-use = [
 layoutlens = "layoutlens.cli:cli"
 
 [tool.uv]
-# browser-use 0.13.x hard-pins aiohttp==3.13.4, which has known CVEs
-# (PYSEC-2026-2xxx family; fixed in 3.14). The pin is lockstep caution, not a
-# known incompatibility, so force the patched line. Drop this once browser-use
-# ships with aiohttp>=3.14.
-override-dependencies = ["aiohttp>=3.14.3"]
+# browser-use 0.13.x hard-pins aiohttp==3.13.4 (known CVEs, fixed in 3.14)
+# and openai==2.16.0 (which caps litellm below 1.84, the release fixing
+# critical proxy CVEs). Both pins are lockstep caution, not known
+# incompatibilities, so force the patched lines. Drop once browser-use
+# loosens its pins.
+override-dependencies = ["aiohttp>=3.14.3", "openai>=2.20.0,<3"]
 
 [tool.pytest.ini_options]
 minversion = "7.0"
