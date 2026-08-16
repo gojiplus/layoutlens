@@ -220,6 +220,17 @@ Upload with `github/codeql-action/upload-sarif` and findings appear as PR
 annotations with stable rule ids (`layout/page-overflow`, `axe/color-contrast`,
 ...) tracked over time — keyless, so it works on every fork.
 
+Or use the packaged action —
+[`gojiplus/layoutlens-action`](https://github.com/gojiplus/layoutlens-action)
+— which bundles install, scan, job summary, PR annotations, a sticky results
+comment, and the SARIF upload into one step:
+
+```yaml
+- uses: gojiplus/layoutlens-action@v1
+  with:
+    sources: "dist/*.html"
+```
+
 ## Key Functions
 
 ### 1. Analyze Pages
