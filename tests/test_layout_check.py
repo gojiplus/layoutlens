@@ -187,3 +187,36 @@ class TestCheckLayoutModes:
         lens.analyze.assert_awaited_once()
         assert result.metadata["mode"] == "llm"
         assert result.metadata["layout_skipped"] == "image source"
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+class TestScorerCacheKey:
+    """A rerun with different scorer thresholds must not hit the old cache."""
+
+    async def test_custom_scorer_thresholds_bypass_stale_cache(self):
+        from layoutlens.layout.geometry import LayoutScorer
+
+        lens = LayoutLens(cache_enabled=True)
+        page = Mock()
+        page.screenshot = AsyncMock()
+        lens._call_vision_api = _fake_vision("Yes", 0.6, "fine")
+
+        with (
+            patch("layoutlens.api.core.open_page", _fake_open_page(page, [])),
+            patch(
+                "layoutlens.api.core.LayoutScorer.scan_page",
+                new=AsyncMock(return_value=_report([])),
+            ) as mock_scan,
+        ):
+            first = await lens.check_layout("page.html", mode="hybrid")
+            # Same source, stricter custom scorer: must re-scan, not replay.
+            strict = LayoutScorer(min_target_px=48, contrast_threshold=7.0)
+            second = await lens.check_layout("page.html", mode="hybrid", scorer=strict)
+            # And an identical rerun with the default scorer IS a cache hit.
+            third = await lens.check_layout("page.html", mode="hybrid")
+
+        assert mock_scan.await_count == 2
+        assert not first.metadata.get("cache_hit")
+        assert not second.metadata.get("cache_hit")
+        assert third.metadata.get("cache_hit") is True

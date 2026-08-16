@@ -263,3 +263,50 @@ class TestSimpleCLI:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+@pytest.mark.asyncio
+class TestSuiteModeGuards:
+    """Suite-mode option conflicts and parse failures exit cleanly."""
+
+    async def test_suite_rejects_sarif_output(self, capsys, tmp_path):
+        suite = tmp_path / "suite.yaml"
+        suite.write_text("name: s\ndescription: d\ntest_cases: []\n")
+        with patch(
+            "sys.argv",
+            ["layoutlens", "--suite", str(suite), "--output", "sarif"],
+        ):
+            result = await main()
+        assert result == 1
+        assert "sarif" in capsys.readouterr().err
+
+    async def test_suite_rejects_layout_flag(self, capsys, tmp_path):
+        suite = tmp_path / "suite.yaml"
+        suite.write_text("name: s\ndescription: d\ntest_cases: []\n")
+        with patch(
+            "sys.argv",
+            ["layoutlens", "--suite", str(suite), "--layout", "deterministic"],
+        ):
+            result = await main()
+        assert result == 1
+        assert "--layout" in capsys.readouterr().err
+
+    async def test_malformed_suite_yaml_errors_without_traceback(
+        self, capsys, tmp_path
+    ):
+        suite = tmp_path / "bad.yaml"
+        suite.write_text("name: [unclosed\n")
+        with patch("sys.argv", ["layoutlens", "--suite", str(suite)]):
+            result = await main()
+        assert result == 1
+        assert "Error loading suite" in capsys.readouterr().err
+
+    async def test_malformed_suite_json_errors_without_traceback(
+        self, capsys, tmp_path
+    ):
+        suite = tmp_path / "bad.json"
+        suite.write_text("{not json")
+        with patch("sys.argv", ["layoutlens", "--suite", str(suite)]):
+            result = await main()
+        assert result == 1
+        assert "Error loading suite" in capsys.readouterr().err

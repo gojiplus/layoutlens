@@ -132,3 +132,25 @@ class TestKeylessAssertionsEndToEnd:
         )
         result = pytester.runpytest_subprocess()
         result.assert_outcomes(passed=1)
+
+
+def test_assert_ui_runs_with_provider_specific_key(
+    pytester: pytest.Pytester, monkeypatch
+):
+    """ANTHROPIC_API_KEY + provider anthropic => assert_ui runs (fails, not skips)."""
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
+    pytester.makepyfile(
+        """
+        def test_llm_check(layoutlens):
+            layoutlens.assert_ui("missing.html", "Is it good?")
+        """
+    )
+    result = pytester.runpytest_subprocess(
+        "--layoutlens-provider", "anthropic", "--layoutlens-model", "claude-x"
+    )
+    # The check RAN (and failed on the missing source) instead of skipping —
+    # proving the anthropic credential was recognized.
+    outcomes = result.parseoutcomes()
+    assert outcomes.get("skipped", 0) == 0
+    assert outcomes.get("failed", 0) == 1 or outcomes.get("errors", 0) == 1

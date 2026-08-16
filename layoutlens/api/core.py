@@ -853,11 +853,13 @@ Focus on:
                 else 0.0
             )
 
-            prompt_tokens = sum(
-                r.metadata.get("prompt_tokens", 0) for r in processed_results
-            )
+            # Cache hits keep their original token metadata for transparency,
+            # but this run made no model request for them — exclude them from
+            # the per-run usage/cost totals.
+            billed = [r for r in processed_results if not r.metadata.get("cache_hit")]
+            prompt_tokens = sum(r.metadata.get("prompt_tokens", 0) for r in billed)
             completion_tokens = sum(
-                r.metadata.get("completion_tokens", 0) for r in processed_results
+                r.metadata.get("completion_tokens", 0) for r in billed
             )
             return BatchResult(
                 results=processed_results,
@@ -867,9 +869,7 @@ Focus on:
                 total_execution_time=total_execution_time,
                 total_prompt_tokens=prompt_tokens,
                 total_completion_tokens=completion_tokens,
-                total_tokens=sum(
-                    r.metadata.get("tokens_used", 0) for r in processed_results
-                ),
+                total_tokens=sum(r.metadata.get("tokens_used", 0) for r in billed),
                 estimated_cost_usd=_estimate_cost(
                     self.model, prompt_tokens, completion_tokens
                 ),
@@ -1845,7 +1845,18 @@ Focus on:
             source=str(source),
             query=query,
             viewport=viewport_value,
-            context={"layout_mode": mode},
+            # Scorer thresholds are part of the key: a rerun with a stricter
+            # custom scorer must never be served the lenient scorer's verdict.
+            context={
+                "layout_mode": mode,
+                "scorer": {
+                    "min_target_px": scorer.min_target_px,
+                    "overlap_threshold_px2": scorer.overlap_threshold_px2,
+                    "clip_tolerance_px": scorer.clip_tolerance_px,
+                    "protrude_tolerance_px": scorer.protrude_tolerance_px,
+                    "contrast_threshold": scorer.contrast_threshold,
+                },
+            },
             model=self._model_fingerprint(),
         )
         cached = self.cache.get(cache_key)

@@ -508,3 +508,44 @@ class TestCachePerformance:
         # Should be fast
         assert write_time < 0.1
         assert read_time < 0.1
+
+
+class TestBatchUsageExcludesCacheHits:
+    """Cache hits keep their metadata but never re-bill the run totals."""
+
+    @pytest.mark.asyncio
+    async def test_second_batch_reports_zero_tokens(self, tmp_path):
+        response = Mock()
+        response.choices = [Mock()]
+        response.choices[
+            0
+        ].message.content = '{"answer": "Yes", "confidence": 0.9, "reasoning": "ok"}'
+        response.usage.prompt_tokens = 100
+        response.usage.completion_tokens = 20
+        response.usage.total_tokens = 120
+
+        shot = tmp_path / "a.png"
+        shot.write_bytes(b"fake")
+        shot2 = tmp_path / "b.png"
+        shot2.write_bytes(b"fake2")
+
+        lens = LayoutLens(api_key="sk-test", cache_enabled=True)
+        with (
+            patch(
+                "layoutlens.api.core.acompletion",
+                new=AsyncMock(return_value=response),
+            ),
+            patch(
+                "layoutlens.api.core.LayoutLens._encode_image",
+                return_value="fake-b64",
+            ),
+        ):
+            first = await lens.analyze([str(shot), str(shot2)], "Is it good?")
+            second = await lens.analyze([str(shot), str(shot2)], "Is it good?")
+
+        assert first.total_tokens == 240
+        assert first.total_prompt_tokens == 200
+        # Every result in the second run is a cache hit: nothing was billed.
+        assert all(r.metadata.get("cache_hit") for r in second.results)
+        assert second.total_tokens == 0
+        assert second.total_prompt_tokens == 0

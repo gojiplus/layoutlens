@@ -39,6 +39,13 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         help="Model for LLM-backed assert_ui checks (default: gpt-4o-mini)",
     )
     group.addoption(
+        "--layoutlens-provider",
+        default="openai",
+        help="Provider for assert_ui checks: openai, anthropic, google, "
+        "gemini, or litellm (default: openai). Determines which credential "
+        "env var is checked before running LLM assertions.",
+    )
+    group.addoption(
         "--layoutlens-no-llm",
         action="store_true",
         help="Skip assert_ui checks entirely; run only the keyless "
@@ -67,7 +74,8 @@ class LayoutLensFixture:
 
         self._no_llm = bool(config.getoption("--layoutlens-no-llm"))
         model = config.getoption("--layoutlens-model") or "gpt-4o-mini"
-        self.lens = LayoutLens(model=str(model))
+        provider = str(config.getoption("--layoutlens-provider") or "openai")
+        self.lens = LayoutLens(model=str(model), provider=provider)
 
     # -- keyless deterministic assertions ---------------------------------
 
@@ -147,7 +155,7 @@ class LayoutLensFixture:
         """
         if self._no_llm:
             pytest.skip("assert_ui disabled via --layoutlens-no-llm")
-        if not (self.lens.api_key or os.getenv("OPENAI_API_KEY")):
+        if not self._llm_available():
             pytest.skip("assert_ui needs an API key; deterministic checks ran")
 
         result = _run(self.lens.analyze(source, question, viewport=viewport))
@@ -169,6 +177,23 @@ class LayoutLensFixture:
                 pytrace=False,
             )
         return result
+
+    def _llm_available(self) -> bool:
+        """True when credentials for the configured provider are resolvable.
+
+        Checks the provider's own env var (ANTHROPIC_API_KEY for anthropic,
+        GEMINI_API_KEY for google/gemini, ...), not just OPENAI_API_KEY. The
+        "litellm" passthrough provider has no single canonical var, so it is
+        treated as available and errors surface from the call itself.
+        """
+        if self.lens.api_key:
+            return True
+        from .api.core import PROVIDER_API_KEY_ENV_VARS
+
+        env_var = PROVIDER_API_KEY_ENV_VARS.get(self.lens.provider, "OPENAI_API_KEY")
+        if env_var is None:  # litellm passthrough
+            return True
+        return bool(os.getenv(env_var))
 
     # -- raw access --------------------------------------------------------
 

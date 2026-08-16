@@ -8,6 +8,8 @@ import os
 import sys
 from pathlib import Path
 
+import yaml
+
 from .api.core import BatchResult, ComparisonResult, LayoutLens
 from .exceptions import LayoutLensError
 from .sarif import to_sarif
@@ -105,7 +107,9 @@ async def _run_suite(args) -> int:
 
     try:
         suite = UITestSuite.load(Path(args.suite))
-    except (OSError, KeyError, LayoutLensError) as e:
+    except (OSError, KeyError, ValueError, yaml.YAMLError, LayoutLensError) as e:
+        # ValueError covers json.JSONDecodeError; yaml.YAMLError covers
+        # malformed YAML — a bad suite file gets a message, not a traceback.
         print(f"Error loading suite {args.suite}: {e}", file=sys.stderr)
         return 1
 
@@ -200,12 +204,19 @@ Examples:
 
     args = parser.parse_args()
 
-    # Suite mode: sources/query/compare/a11y do not apply.
+    # Suite mode: sources/query/compare/a11y/layout/sarif do not apply.
     if args.suite:
-        if args.sources or args.query or args.compare or args.a11y:
+        if args.sources or args.query or args.compare or args.a11y or args.layout:
             print(
                 "Error: --suite runs a self-contained test suite and cannot be "
-                "combined with sources, --query, --compare, or --a11y",
+                "combined with sources, --query, --compare, --a11y, or --layout",
+                file=sys.stderr,
+            )
+            return 1
+        if args.output == "sarif":
+            print(
+                "Error: --output sarif is not supported for suite runs "
+                "(use --output json)",
                 file=sys.stderr,
             )
             return 1

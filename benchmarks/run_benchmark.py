@@ -313,11 +313,25 @@ Examples:
 
     args = parser.parse_args()
 
-    # Get API key
-    api_key = args.api_key or os.getenv("OPENAI_API_KEY")
-    if not api_key:
+    # Resolve credentials for the SELECTED provider, not just OpenAI. A
+    # keyless run is fine when --api-base points at a local endpoint
+    # (Ollama/vLLM) or the provider is the litellm passthrough — the
+    # LayoutLens client defers key errors to first use anyway.
+    provider_env = {
+        "openai": "OPENAI_API_KEY",
+        "anthropic": "ANTHROPIC_API_KEY",
+        "google": "GEMINI_API_KEY",
+        "gemini": "GEMINI_API_KEY",
+        "litellm": None,
+    }
+    env_var = provider_env.get(args.provider, "OPENAI_API_KEY")
+    api_key = args.api_key or (os.getenv(env_var) if env_var else None)
+    if not api_key and not args.api_base and env_var is not None:
         print("❌ Error: API key required")
-        print("   Use --api-key YOUR_KEY or set OPENAI_API_KEY environment variable")
+        print(
+            f"   Use --api-key YOUR_KEY or set {env_var} (provider: {args.provider}),"
+        )
+        print("   or pass --api-base for a keyless local endpoint")
         return 1
 
     try:
