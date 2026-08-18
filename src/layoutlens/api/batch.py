@@ -3,9 +3,9 @@
 Bulk offline evaluation (thousands of independent judgments with no latency
 requirement) is exactly what provider *batch* APIs are for: a flat ~50% discount
 and no rate-limit juggling. This module adds :func:`judge_batch`, which sends the
-SAME per-request payload :func:`layoutlens.api.judge.judge` sends — the caller's
-prompt VERBATIM plus one image, reasoning-aware ``max_tokens``, the per-model
-parameter policy — over a batch transport, and parses every response with the
+same caller-owned prompt VERBATIM and the same image bytes as
+:func:`layoutlens.api.judge.judge`, with a reasoning-aware output budget, over a
+provider-native batch transport, and parses every response with the
 SHARED :func:`layoutlens.api.judge.parse_judge_response`. A parity test asserts
 each request's prompt is byte-identical to the synchronous path.
 
@@ -17,16 +17,19 @@ Two backends, dispatched by ``lens.model``:
   chunked under the ~20 MB inline cap, keyed back to ids via per-request
   ``metadata``. Usage output = ``total - prompt`` (Gemini bills thinking as
   output).
-* everything else (``gpt-*``/``openai/*``/``anthropic/*``/``vertex_ai/*``/
-  ``bedrock/*`` ...) -> **litellm file-based batch**: a JSONL upload
+* native OpenAI (``provider="openai"``) -> **Responses Batch API** with an
+  explicit image-detail and reasoning-effort contract.
+* everything else (``anthropic/*``/``vertex_ai/*``/``bedrock/*`` ...) ->
+  **litellm file-based batch**: a JSONL upload
   (``acreate_file``) -> ``acreate_batch`` -> poll ``aretrieve_batch`` ->
   ``afile_content``, parsed by ``custom_id``.
 
 Both backends are **resumable**: a manifest persists submitted job/batch/file
 ids immediately after submission and before polling, so a run interrupted during
 polling can collect prior work on the next call and submit only uncovered ids.
-Resume identity binds the model, token budget, exact prompt bytes, image MIME
-types, and image content; a changed request can never silently reuse stale results.
+Resume identity binds the backend, endpoint, model, token budget, reasoning
+effort, image detail, exact prompt bytes, image MIME types, and image content; a
+changed request can never silently reuse stale results.
 
 ``acompletion`` is not used here; the litellm batch helpers are imported at
 module level so tests patch them at ``layoutlens.api.batch``.
@@ -47,6 +50,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from litellm import acreate_batch, acreate_file, afile_content, aretrieve_batch
+from openai import AsyncOpenAI
 
 from ..exceptions import ValidationError
 from ..logger import get_logger
@@ -78,6 +82,10 @@ _INLINE_CHUNK_BYTES = 18 * 1024 * 1024
 _LITELLM_TERMINAL = frozenset({"completed", "failed", "cancelled", "expired"})
 # Substrings that mark a terminal google-genai batch job state.
 _GENAI_TERMINAL = ("SUCCEEDED", "FAILED", "EXPIRED", "CANCELLED")
+_OPENAI_TERMINAL = frozenset({"completed", "failed", "cancelled", "expired"})
+
+_OPENAI_REASONING_EFFORTS = frozenset({"none", "low", "medium", "high", "xhigh", "max"})
+_OPENAI_IMAGE_DETAILS = frozenset({"auto", "low", "high", "original"})
 
 _ZERO_USAGE: dict[str, int] = {
     "prompt_tokens": 0,
@@ -85,7 +93,7 @@ _ZERO_USAGE: dict[str, int] = {
     "total_tokens": 0,
 }
 
-_BATCH_FINGERPRINT_VERSION = b"layoutlens-batch-request-v2"
+_BATCH_FINGERPRINT_VERSION = b"layoutlens-batch-request-v3"
 
 
 @dataclass(slots=True)
@@ -144,7 +152,7 @@ def _mime_for(image_path: str | Path) -> str:
     )
 
 
-def _unknown_result(lens: LayoutLens, reason: str) -> JudgeResult:
+def _unknown_result(lens: LayoutLens, reason: str, prompt: str = "") -> JudgeResult:
     """An 'unknown' result for a request that never produced a verdict.
 
     Used for a missing image or a job that failed/returned nothing, so one bad
@@ -160,6 +168,9 @@ def _unknown_result(lens: LayoutLens, reason: str) -> JudgeResult:
         model=lens.model,
         parse_mode="none",
         truncated=False,
+        prompt_sha256=hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+        if prompt
+        else "",
     )
 
 
@@ -186,14 +197,29 @@ def _digest_field(digest: Any, label: str, data: bytes) -> None:
 
 
 def _batch_fingerprint(
-    lens: LayoutLens, requests: list[BatchRequest], max_tokens: int
+    lens: LayoutLens,
+    requests: list[BatchRequest],
+    max_tokens: int,
+    *,
+    backend: str | None = None,
+    reasoning_effort: str | None = None,
+    image_detail: str = "auto",
 ) -> str:
     """Hash every provider-visible input that determines a batch response."""
+    if backend is None:
+        backend = _batch_backend_name(lens)
     digest = hashlib.sha256()
     _digest_field(digest, "version", _BATCH_FINGERPRINT_VERSION)
     _digest_field(digest, "model", lens.model.encode("utf-8"))
     _digest_field(digest, "api_base", (lens.api_base or "").encode("utf-8"))
     _digest_field(digest, "max_tokens", str(max_tokens).encode("ascii"))
+    _digest_field(digest, "backend", backend.encode("ascii"))
+    _digest_field(
+        digest,
+        "reasoning_effort",
+        (reasoning_effort or "provider-default").encode("ascii"),
+    )
+    _digest_field(digest, "image_detail", image_detail.encode("ascii"))
     for request in sorted(requests, key=lambda item: item.id):
         image_path = Path(request.image_path)
         _digest_field(digest, "id", request.id.encode("utf-8"))
@@ -212,6 +238,31 @@ def _default_manifest_path(lens: LayoutLens, fingerprint: str) -> Path:
     return lens.output_dir / "batch" / f"manifest_{fingerprint}.json"
 
 
+def _overlapping_manifest_paths(
+    path: Path, lens: LayoutLens, request_ids: set[str]
+) -> list[Path]:
+    """Find prior manifests that may already have billed any requested id."""
+    overlaps: list[Path] = []
+    if not path.parent.is_dir():
+        return overlaps
+    for candidate in sorted(path.parent.glob("manifest_*.json")):
+        if candidate == path:
+            continue
+        manifest = _read_manifest(candidate)
+        if manifest is None or manifest.get("model") != lens.model:
+            continue
+        submitted_ids = {
+            request_id
+            for job in manifest.get("jobs", [])
+            if isinstance(job, dict)
+            for request_id in job.get("ids", [])
+            if isinstance(request_id, str)
+        }
+        if submitted_ids & request_ids:
+            overlaps.append(candidate)
+    return overlaps
+
+
 def _resume_manifest(
     path: Path,
     *,
@@ -220,6 +271,8 @@ def _resume_manifest(
     model: str,
     backend: str,
     max_tokens: int,
+    reasoning_effort: str | None = None,
+    image_detail: str = "auto",
 ) -> dict[str, Any]:
     """Load a manifest only when its full request identity matches."""
     if not resume:
@@ -240,12 +293,15 @@ def _resume_manifest(
         "model": model,
         "backend": backend,
         "max_tokens": max_tokens,
+        "reasoning_effort": reasoning_effort,
+        "image_detail": image_detail,
     }
     actual = {key: manifest.get(key) for key in expected}
     if actual != expected:
         raise ValidationError(
             "Batch resume manifest does not match the exact model, prompt/image payload, "
-            "backend, and token budget. Use a new manifest path; stale results will not be reused.",
+            "backend, token budget, reasoning effort, and image detail. Use a new "
+            "manifest path; stale results will not be reused.",
             field="manifest_path",
             value=str(path),
         )
@@ -337,7 +393,7 @@ def _split_missing_images(
                 req.id,
                 req.image_path,
             )
-            results[req.id] = _unknown_result(lens, "missing image")
+            results[req.id] = _unknown_result(lens, "missing image", req.prompt)
     return valid
 
 
@@ -406,7 +462,9 @@ def _litellm_jsonl(
     return ("\n".join(lines) + "\n").encode("utf-8")
 
 
-def _parse_litellm_output(lens: LayoutLens, text: str) -> dict[str, JudgeResult]:
+def _parse_litellm_output(
+    lens: LayoutLens, text: str, prompts: dict[str, str] | None = None
+) -> dict[str, JudgeResult]:
     """Parse a batch output JSONL body into ``{custom_id: JudgeResult}``."""
     out: dict[str, JudgeResult] = {}
     for line in text.splitlines():
@@ -430,7 +488,9 @@ def _parse_litellm_output(lens: LayoutLens, text: str) -> dict[str, JudgeResult]
             "completion_tokens": int(usage_raw.get("completion_tokens", 0) or 0),
             "total_tokens": int(usage_raw.get("total_tokens", 0) or 0),
         }
-        out[cid] = build_judge_result(lens, raw, usage, finish)
+        out[cid] = build_judge_result(
+            lens, raw, usage, finish, prompt=(prompts or {}).get(str(cid), "")
+        )
     return out
 
 
@@ -440,6 +500,7 @@ async def _collect_litellm_job(
     provider: str,
     poll_interval: float,
     poll_timeout: float,
+    prompts: dict[str, str],
 ) -> dict[str, JudgeResult]:
     """Poll one prior/just-submitted litellm batch to completion and parse it.
 
@@ -488,7 +549,7 @@ async def _collect_litellm_job(
     # litellm's return union includes a streaming variant this call never
     # produces; the hasattr guard handles the real (buffered) shapes.
     text = content.text if hasattr(content, "text") else content.content.decode("utf-8")  # pyright: ignore[reportAttributeAccessIssue]
-    return _parse_litellm_output(lens, text)
+    return _parse_litellm_output(lens, text, prompts)
 
 
 async def _judge_batch_litellm(
@@ -528,13 +589,19 @@ async def _judge_batch_litellm(
         model=lens.model,
         backend="litellm",
         max_tokens=max_tokens_value,
+        reasoning_effort=None,
+        image_detail="auto",
     )
     jobs: list[dict[str, Any]] = list(manifest.get("jobs", [])) if resume else []
     requested = {request.id for request in valid}
+    prompts = {request.id: request.prompt for request in valid}
     covered: set[str] = set()
     for job in jobs:
+        covered |= {
+            request_id for request_id in job.get("ids", []) if request_id in requested
+        }
         collected = await _collect_litellm_job(
-            lens, job, provider, poll_interval, poll_timeout
+            lens, job, provider, poll_interval, poll_timeout, prompts
         )
         collected = {
             request_id: result
@@ -542,7 +609,6 @@ async def _judge_batch_litellm(
             if request_id in requested
         }
         results.update(collected)
-        covered |= set(collected)
 
     remaining = [r for r in valid if r.id not in covered]
     if remaining:
@@ -577,11 +643,13 @@ async def _judge_batch_litellm(
                 "model": lens.model,
                 "backend": "litellm",
                 "max_tokens": max_tokens_value,
+                "reasoning_effort": None,
+                "image_detail": "auto",
                 "jobs": jobs,
             },
         )
         collected = await _collect_litellm_job(
-            lens, job, provider, poll_interval, poll_timeout
+            lens, job, provider, poll_interval, poll_timeout, prompts
         )
         results.update(
             {
@@ -592,7 +660,299 @@ async def _judge_batch_litellm(
         )
 
     for req in valid:
-        results.setdefault(req.id, _unknown_result(lens, "no batch response"))
+        results.setdefault(
+            req.id, _unknown_result(lens, "no batch response", req.prompt)
+        )
+    return results
+
+
+# --- native OpenAI Responses Batch backend -------------------------------
+
+
+def _openai_client(lens: LayoutLens) -> AsyncOpenAI:
+    """Build the official async OpenAI client (patchable in offline tests)."""
+    kwargs: dict[str, Any] = {"api_key": lens.api_key}
+    if lens.api_base:
+        kwargs["base_url"] = lens.api_base
+    return AsyncOpenAI(**kwargs)
+
+
+def _openai_body(
+    lens: LayoutLens,
+    request: BatchRequest,
+    max_tokens: int,
+    *,
+    reasoning_effort: str | None,
+    image_detail: str,
+) -> dict[str, Any]:
+    """Build one native Responses API body without changing the caller prompt."""
+    messages = build_judge_messages(lens, request.image_path, request.prompt)
+    data_url = messages[0]["content"][1]["image_url"]["url"]
+    body: dict[str, Any] = {
+        "model": _normalize_model(lens.model),
+        "input": [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "input_text", "text": request.prompt},
+                    {
+                        "type": "input_image",
+                        "image_url": data_url,
+                        "detail": image_detail,
+                    },
+                ],
+            }
+        ],
+        "max_output_tokens": max_tokens,
+    }
+    if reasoning_effort is not None:
+        body["reasoning"] = {"effort": reasoning_effort}
+    parameter_policy = completion_params(
+        lens.model, temperature=0.0, max_tokens=max_tokens
+    )
+    if "temperature" in parameter_policy:
+        body["temperature"] = parameter_policy["temperature"]
+    return body
+
+
+def _openai_jsonl(
+    lens: LayoutLens,
+    requests: list[BatchRequest],
+    max_tokens: int,
+    *,
+    reasoning_effort: str | None,
+    image_detail: str,
+) -> bytes:
+    """Encode native Responses Batch JSONL keyed by caller-owned ids."""
+    lines = [
+        json.dumps(
+            {
+                "custom_id": request.id,
+                "method": "POST",
+                "url": "/v1/responses",
+                "body": _openai_body(
+                    lens,
+                    request,
+                    max_tokens,
+                    reasoning_effort=reasoning_effort,
+                    image_detail=image_detail,
+                ),
+            }
+        )
+        for request in requests
+    ]
+    return ("\n".join(lines) + "\n").encode("utf-8")
+
+
+def _responses_output_text(body: dict[str, Any]) -> str:
+    """Join every Responses API ``output_text`` block in provider order."""
+    texts: list[str] = []
+    for output in body.get("output") or []:
+        if not isinstance(output, dict) or output.get("type") != "message":
+            continue
+        texts.extend(
+            str(content.get("text") or "")
+            for content in output.get("content") or []
+            if isinstance(content, dict) and content.get("type") == "output_text"
+        )
+    return "\n".join(text for text in texts if text)
+
+
+def _parse_openai_output(
+    lens: LayoutLens, text: str, prompts: dict[str, str] | None = None
+) -> dict[str, JudgeResult]:
+    """Parse a native Responses Batch output JSONL file."""
+    results: dict[str, JudgeResult] = {}
+    for line in text.splitlines():
+        if not line.strip():
+            continue
+        try:
+            record = json.loads(line)
+        except (json.JSONDecodeError, ValueError):
+            continue
+        request_id = record.get("custom_id")
+        response = record.get("response") or {}
+        body = response.get("body") or {}
+        if request_id is None or not isinstance(body, dict):
+            continue
+        error = record.get("error") or body.get("error")
+        status_code = response.get("status_code")
+        if error or (isinstance(status_code, int) and status_code >= 400):
+            message = (
+                error.get("message")
+                if isinstance(error, dict)
+                else str(error or f"HTTP {status_code}")
+            )
+            logger.warning("OpenAI batch request %s failed: %s", request_id, message)
+            results[str(request_id)] = _unknown_result(
+                lens,
+                f"OpenAI batch line error: {message}",
+                (prompts or {}).get(str(request_id), ""),
+            )
+            continue
+        usage_raw = body.get("usage") or {}
+        details = usage_raw.get("output_tokens_details") or {}
+        usage = {
+            "prompt_tokens": int(usage_raw.get("input_tokens", 0) or 0),
+            "completion_tokens": int(usage_raw.get("output_tokens", 0) or 0),
+            "total_tokens": int(usage_raw.get("total_tokens", 0) or 0),
+            "thought_tokens": int(details.get("reasoning_tokens", 0) or 0),
+        }
+        incomplete = body.get("incomplete_details") or {}
+        finish_reason = (
+            "length" if incomplete.get("reason") == "max_output_tokens" else None
+        )
+        results[str(request_id)] = build_judge_result(
+            lens,
+            _responses_output_text(body),
+            usage,
+            finish_reason,
+            prompt=(prompts or {}).get(str(request_id), ""),
+        )
+    return results
+
+
+def _file_content_text(content: Any) -> str:
+    """Read text from OpenAI SDK buffered file-content response shapes."""
+    text_value = getattr(content, "text", None)
+    if isinstance(text_value, str):
+        return text_value
+    raw = getattr(content, "content", b"")
+    if isinstance(raw, bytes):
+        return raw.decode("utf-8")
+    return str(raw or "")
+
+
+async def _collect_openai_job(
+    lens: LayoutLens,
+    client: AsyncOpenAI,
+    job: dict[str, Any],
+    poll_interval: float,
+    poll_timeout: float,
+    prompts: dict[str, str],
+) -> dict[str, JudgeResult]:
+    """Collect one submitted OpenAI batch without ever resubmitting it."""
+    batch_id = job["batch_id"]
+    deadline = time.monotonic() + poll_timeout
+    batch = await client.batches.retrieve(batch_id)
+    while str(getattr(batch, "status", "")) not in _OPENAI_TERMINAL:
+        if time.monotonic() > deadline:
+            raise TimeoutError(
+                f"OpenAI batch {batch_id} did not finish within {poll_timeout}s"
+            )
+        await asyncio.sleep(poll_interval)
+        batch = await client.batches.retrieve(batch_id)
+    if str(getattr(batch, "status", "")) != "completed":
+        logger.warning(
+            "OpenAI batch %s ended in status %s",
+            batch_id,
+            getattr(batch, "status", "?"),
+        )
+        return {}
+    output_file_id = getattr(batch, "output_file_id", None)
+    if not output_file_id:
+        return {}
+    content = await client.files.content(output_file_id)
+    return _parse_openai_output(lens, _file_content_text(content), prompts)
+
+
+async def _judge_batch_openai(
+    lens: LayoutLens,
+    requests: list[BatchRequest],
+    max_tokens_value: int,
+    resume: bool,
+    manifest_path: Path,
+    poll_interval: float,
+    poll_timeout: float,
+    fingerprint: str,
+    reasoning_effort: str | None,
+    image_detail: str,
+) -> dict[str, JudgeResult]:
+    """Official OpenAI Responses Batch backend."""
+    results: dict[str, JudgeResult] = {}
+    valid = _split_missing_images(lens, requests, results)
+    if not valid:
+        return results
+    manifest = _resume_manifest(
+        manifest_path,
+        resume=resume,
+        fingerprint=fingerprint,
+        model=lens.model,
+        backend="openai-responses",
+        max_tokens=max_tokens_value,
+        reasoning_effort=reasoning_effort,
+        image_detail=image_detail,
+    )
+    jobs: list[dict[str, Any]] = list(manifest.get("jobs", [])) if resume else []
+    requested = {request.id for request in valid}
+    prompts = {request.id: request.prompt for request in valid}
+    client = _openai_client(lens)
+    covered: set[str] = set()
+    for job in jobs:
+        covered |= {
+            request_id for request_id in job.get("ids", []) if request_id in requested
+        }
+        collected = await _collect_openai_job(
+            lens, client, job, poll_interval, poll_timeout, prompts
+        )
+        collected = {
+            request_id: result
+            for request_id, result in collected.items()
+            if request_id in requested
+        }
+        results.update(collected)
+
+    remaining = [request for request in valid if request.id not in covered]
+    if remaining:
+        jsonl = _openai_jsonl(
+            lens,
+            remaining,
+            max_tokens_value,
+            reasoning_effort=reasoning_effort,
+            image_detail=image_detail,
+        )
+        input_file = await client.files.create(
+            file=("layoutlens-batch.jsonl", jsonl, "application/jsonl"),
+            purpose="batch",
+        )
+        batch = await client.batches.create(
+            input_file_id=input_file.id,
+            endpoint="/v1/responses",
+            completion_window="24h",
+        )
+        job = {
+            "batch_id": batch.id,
+            "input_file_id": input_file.id,
+            "ids": [request.id for request in remaining],
+        }
+        jobs.append(job)
+        _write_manifest(
+            manifest_path,
+            {
+                "fingerprint": fingerprint,
+                "model": lens.model,
+                "backend": "openai-responses",
+                "max_tokens": max_tokens_value,
+                "reasoning_effort": reasoning_effort,
+                "image_detail": image_detail,
+                "jobs": jobs,
+            },
+        )
+        collected = await _collect_openai_job(
+            lens, client, job, poll_interval, poll_timeout, prompts
+        )
+        results.update(
+            {
+                request_id: result
+                for request_id, result in collected.items()
+                if request_id in requested
+            }
+        )
+
+    for request in valid:
+        results.setdefault(
+            request.id, _unknown_result(lens, "no batch response", request.prompt)
+        )
     return results
 
 
@@ -608,8 +968,8 @@ def _genai_client(lens: LayoutLens):
     import os
 
     try:
-        from google import genai  # lazy: optional dependency
-        from google.genai import types
+        from google import genai  # pyright: ignore[reportAttributeAccessIssue]
+        from google.genai import types  # pyright: ignore[reportMissingImports]
     except ImportError as exc:  # pragma: no cover - exercised only without the extra
         raise ImportError(
             "The gemini/ batch backend requires google-genai. Install it with: pip install 'layoutlens[gemini]'"
@@ -679,7 +1039,7 @@ def _submit_genai_chunk(
     Isolated so tests can patch it (bypassing the SDK type wrapping) while the
     rest of the orchestration is exercised.
     """
-    from google.genai import types  # lazy
+    from google.genai import types  # pyright: ignore[reportMissingImports]
 
     reqs = [
         types.InlinedRequest(
@@ -784,24 +1144,28 @@ async def _judge_batch_genai(
         model=lens.model,
         backend="genai",
         max_tokens=max_tokens_value,
+        reasoning_effort=None,
+        image_detail="auto",
     )
     payloads = [(req, _genai_inline_request(req, max_tokens_value)) for req in valid]
     client = _genai_client(lens)
     jobs: list[dict[str, Any]] = list(manifest.get("jobs", [])) if resume else []
     covered: set[str] = set()
     collected: dict[str, dict[str, Any]] = {}
+    requested = {request.id for request in valid}
     for job in jobs:
+        covered |= {
+            request_id for request_id in job.get("ids", []) if request_id in requested
+        }
         got = await _collect_genai_job(
             client, job["job_name"], poll_interval, poll_timeout
         )
-        requested = {request.id for request in valid}
         got = {
             request_id: result
             for request_id, result in got.items()
             if request_id in requested
         }
         collected.update(got)
-        covered |= set(got)
 
     remaining = [(req, payload) for req, payload in payloads if req.id not in covered]
     # Submit ALL remaining chunks first (each ~1 API call, flushed to the
@@ -821,6 +1185,8 @@ async def _judge_batch_genai(
                 "model": lens.model,
                 "backend": "genai",
                 "max_tokens": max_tokens_value,
+                "reasoning_effort": None,
+                "image_detail": "auto",
                 "jobs": jobs,
             },
         )
@@ -832,7 +1198,7 @@ async def _judge_batch_genai(
     for req in valid:
         got = collected.get(req.id)
         if got is None:
-            results[req.id] = _unknown_result(lens, "no batch response")
+            results[req.id] = _unknown_result(lens, "no batch response", req.prompt)
         else:
             results[req.id] = build_judge_result(
                 lens,
@@ -852,6 +1218,47 @@ def _is_gemini_studio(model: str) -> bool:
     return (model or "").strip().lower().startswith("gemini/")
 
 
+def _is_native_openai(lens: LayoutLens) -> bool:
+    """True when the official OpenAI client owns the configured provider."""
+    return (lens.provider or "").strip().lower() == "openai"
+
+
+def _batch_backend_name(lens: LayoutLens) -> str:
+    """Return the one backend selected by the model/provider contract."""
+    if _is_gemini_studio(lens.model):
+        return "genai"
+    if _is_native_openai(lens):
+        return "openai-responses"
+    return "litellm"
+
+
+def _validate_backend_configuration(lens: LayoutLens) -> None:
+    """Reject provider/model combinations that could route credentials incorrectly."""
+    provider = (lens.provider or "").strip().lower()
+    gemini_model = _is_gemini_studio(lens.model)
+    if gemini_model and provider not in {"gemini", "google"}:
+        raise ValidationError(
+            "A gemini/* Batch model requires provider='gemini' (or 'google'); refusing to "
+            "route it with credentials for another provider.",
+            field="provider",
+            value=lens.provider,
+        )
+    if not gemini_model and provider in {"gemini", "google"}:
+        raise ValidationError(
+            "The Gemini Batch provider requires a gemini/* model id.",
+            field="model",
+            value=lens.model,
+        )
+    inferred = _litellm_provider_for(lens.model)
+    if provider in {"openai", "anthropic"} and inferred != provider:
+        raise ValidationError(
+            f"provider={provider!r} conflicts with model {lens.model!r}; refusing to route "
+            "the model to the wrong provider Batch API.",
+            field="model",
+            value=lens.model,
+        )
+
+
 async def judge_batch(
     lens: LayoutLens,
     requests: list[BatchRequest],
@@ -861,6 +1268,8 @@ async def judge_batch(
     manifest_path: str | Path | None = None,
     poll_interval: float = 10.0,
     poll_timeout: float = 24 * 3600.0,
+    reasoning_effort: str | None = None,
+    image_detail: str = "auto",
 ) -> dict[str, JudgeResult]:
     """Judge every request via a batch transport (see :meth:`LayoutLens.judge_batch`).
 
@@ -871,10 +1280,41 @@ async def judge_batch(
         return {}
 
     _validate_request_ids(requests)
+    _validate_backend_configuration(lens)
+    if (
+        reasoning_effort is not None
+        and reasoning_effort not in _OPENAI_REASONING_EFFORTS
+    ):
+        raise ValidationError(
+            "OpenAI reasoning_effort must be one of none, low, medium, high, xhigh, or max.",
+            field="reasoning_effort",
+            value=reasoning_effort,
+        )
+    if image_detail not in _OPENAI_IMAGE_DETAILS:
+        raise ValidationError(
+            "OpenAI image_detail must be one of auto, low, high, or original.",
+            field="image_detail",
+            value=image_detail,
+        )
+    native_openai = _is_native_openai(lens)
+    if not native_openai and (reasoning_effort is not None or image_detail != "auto"):
+        raise ValidationError(
+            "reasoning_effort and non-default image_detail are supported only by the "
+            "native OpenAI Responses Batch backend.",
+            field="provider",
+            value=lens.provider,
+        )
     max_tokens_value = resolved_max_tokens(lens.model, max_tokens)
     lens._ensure_api_key()  # noqa: SLF001
-    fingerprint = _batch_fingerprint(lens, requests, max_tokens_value)
-    backend_name = "genai" if _is_gemini_studio(lens.model) else "litellm"
+    backend_name = _batch_backend_name(lens)
+    fingerprint = _batch_fingerprint(
+        lens,
+        requests,
+        max_tokens_value,
+        backend=backend_name,
+        reasoning_effort=reasoning_effort,
+        image_detail=image_detail,
+    )
     if manifest_path is not None:
         path = Path(manifest_path)
     else:
@@ -886,7 +1326,8 @@ async def judge_batch(
                 "Refusing to submit a possibly duplicate batch. After verifying that its provider "
                 f"jobs belong to this exact request, copy it to '{path}' and add top-level fields "
                 f"fingerprint='{fingerprint}', model='{lens.model}', backend='{backend_name}', and "
-                f"max_tokens={max_tokens_value}, preserving jobs. Otherwise pass resume=False only "
+                f"max_tokens={max_tokens_value}, reasoning_effort={reasoning_effort!r}, and "
+                f"image_detail={image_detail!r}, preserving jobs. Otherwise pass resume=False only "
                 "when a fresh billed submission is intended. No submission was made.",
                 field="manifest_path",
                 value=str(legacy_path),
@@ -900,11 +1341,48 @@ async def judge_batch(
             value=str(path),
         )
 
-    backend = (
-        _judge_batch_genai if _is_gemini_studio(lens.model) else _judge_batch_litellm
-    )
+    if resume and not path.exists():
+        overlaps = _overlapping_manifest_paths(
+            path, lens, {request.id for request in requests}
+        )
+        if overlaps:
+            raise ValidationError(
+                "A prior Batch manifest for this model records submitted request ids that "
+                "overlap this run, but it uses a different request fingerprint. Refusing a "
+                "possibly duplicate paid submission after an upgrade or input change. Inspect "
+                "and deliberately migrate/resume the prior provider jobs, or pass resume=False "
+                "with a new manifest only when another billed run is intended. No submission "
+                f"was made. Conflicting manifests: {', '.join(str(item) for item in overlaps[:5])}",
+                field="manifest_path",
+                value=str(path),
+            )
+
     with _manifest_lock(path):
-        return await backend(
+        if _is_gemini_studio(lens.model):
+            return await _judge_batch_genai(
+                lens,
+                requests,
+                max_tokens_value,
+                resume,
+                path,
+                poll_interval,
+                poll_timeout,
+                fingerprint,
+            )
+        if native_openai:
+            return await _judge_batch_openai(
+                lens,
+                requests,
+                max_tokens_value,
+                resume,
+                path,
+                poll_interval,
+                poll_timeout,
+                fingerprint,
+                reasoning_effort,
+                image_detail,
+            )
+        return await _judge_batch_litellm(
             lens,
             requests,
             max_tokens_value,

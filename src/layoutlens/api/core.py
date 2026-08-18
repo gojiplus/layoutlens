@@ -1597,20 +1597,24 @@ Focus on:
         manifest_path: str | Path | None = None,
         poll_interval: float = 10.0,
         poll_timeout: float = 24 * 3600.0,
+        reasoning_effort: str | None = None,
+        image_detail: str = "auto",
     ) -> dict[str, JudgeResult]:
         """Judge many image+prompt requests over a provider batch transport.
 
         The batched counterpart to :meth:`judge`: each request sends its prompt
-        VERBATIM with its image (byte-identical to :meth:`judge`), honors the
+        VERBATIM with the same image bytes as :meth:`judge`, honors the
         reasoning-aware ``max_tokens`` default and the per-model parameter
         policy, and is parsed into a :class:`JudgeResult`. Batch APIs are ~50%
         cheaper and the right transport for bulk offline evaluation (e.g.
         UIJudgeBench). LayoutLens is thus the reference *batched* judge.
 
-        The backend is chosen from ``self.model``: ``gemini/*`` (AI Studio) uses
-        the google-genai inline batch (optional extra ``layoutlens[gemini]``);
-        supported non-Gemini models use the litellm file-based batch. Both are
-        resumable via a manifest.
+        The backend is chosen from an explicit provider/model combination:
+        ``provider="gemini"`` with ``gemini/*`` uses the google-genai inline
+        batch (optional extra ``layoutlens[gemini]``); native OpenAI uses the
+        official Responses Batch API, and supported
+        non-Gemini/non-OpenAI providers use the litellm file-based batch. All
+        backends are resumable via a manifest.
 
         Args:
             requests: The batch items. Each ``id`` must be unique and keys its
@@ -1623,10 +1627,17 @@ Focus on:
                 selected manifest path must not already exist.
             manifest_path: Where submitted job ids persist for resume. Defaults
                 to a content-addressed path under ``output_dir/batch`` keyed by
-                the model, token budget, exact prompts, image MIME types, and
-                image bytes.
+                the backend, endpoint, model, token budget, reasoning effort,
+                image detail, exact prompts, image MIME types, and image bytes.
             poll_interval: Seconds between batch-status polls.
             poll_timeout: Max seconds to wait for a single batch job.
+            reasoning_effort: Native OpenAI reasoning effort. ``None`` retains
+                the model default; otherwise one of ``none``, ``low``,
+                ``medium``, ``high``, ``xhigh``, or ``max``. Rejected for other
+                providers so a requested setting is never silently ignored.
+            image_detail: Native OpenAI image-detail setting: ``auto``, ``low``,
+                ``high``, or ``original``. Non-default values are rejected for
+                other providers.
 
         Returns:
             ``{request_id: JudgeResult}`` for every request.
@@ -1647,6 +1658,8 @@ Focus on:
             manifest_path=manifest_path,
             poll_interval=poll_interval,
             poll_timeout=poll_timeout,
+            reasoning_effort=reasoning_effort,
+            image_detail=image_detail,
         )
 
     # Developer convenience methods
