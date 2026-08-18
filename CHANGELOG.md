@@ -4,7 +4,32 @@ All notable changes to LayoutLens are documented in this file.
 
 ## [Unreleased]
 
-_Nothing yet._
+## [2.1.0] - 2026-08-17
+
+### Added
+
+- Deterministic `text-occlusion` findings sample rendered text fragments across the
+  full document and identify the painted DOM element covering them. This includes graph
+  lines drawn over labels and general overlays; it is a visual-quality rule, not a WCAG
+  success criterion.
+- Deterministic `focus-obscured` findings exercise keyboard-focusable components and report
+  components entirely hidden by author DOM content, implementing the automatable geometric
+  core of WCAG 2.4.11 Focus Not Obscured (Minimum).
+
+### Fixed
+
+- `target-size` now checks the WCAG 2.5.8 spacing-circle, inline-target, and unmodified
+  user-agent-control exceptions instead of reporting every target below 24 by 24 CSS pixels.
+  Findings explicitly retain equivalent-control and essential-presentation as manual-review
+  exceptions rather than pretending those semantic questions are automated.
+- Occlusion checks no longer promote painted shared ancestors or translucent stacking branches
+  to foreground blockers. Focus obscuration requires one fully opaque rectangular blocker to
+  cover the component's complete visible box rather than inferring failure from sparse samples.
+
+### Documentation
+
+- Separate LayoutLens's role as a deterministic system under test from UIJudgeBench's
+  independent ownership of benchmark pages, admission oracles, gold labels, and scoring.
 
 ## [2.0.0] - 2026-08-15
 

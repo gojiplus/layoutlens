@@ -136,6 +136,12 @@ class UITestSuite:
     def from_dict(cls, data: dict[str, Any]) -> UITestSuite:
         """Create test suite from dictionary.
 
+        Args:
+            data: Serialized suite definition.
+
+        Returns:
+            Validated test suite.
+
         Raises:
             ValidationError: If any test case is missing ``expected_results``
                 (or declares neither "answer" nor "contains"). Assertions are
@@ -202,6 +208,14 @@ class UITestSuite:
         required ``expected_results`` (see the ``UITestCase`` docstring for
         schema) — validated identically to, and via the same helper as,
         :meth:`from_dict`.
+
+        Args:
+            name: Suite name.
+            description: Suite description.
+            test_cases: Serialized test-case definitions.
+
+        Returns:
+            Validated test suite.
 
         Raises:
             ValidationError: If any spec is missing ``expected_results``.

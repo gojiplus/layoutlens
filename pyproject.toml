@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "layoutlens"
-description = "AI-powered UI testing framework with natural language visual validation"
+description = "Deterministic accessibility and layout testing with optional vision-LLM analysis"
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
@@ -14,7 +14,7 @@ authors = [
 maintainers = [
     {name = "Gaurav Sood", email = "contact@gsood.com"}
 ]
-keywords = ["ui testing", "visual regression", "ai", "computer vision", "web testing", "layout testing"]
+keywords = ["ui testing", "visual regression", "accessibility", "WCAG", "playwright", "computer vision", "web testing", "layout testing"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Framework :: Pytest",
@@ -23,6 +23,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Software Development :: Testing",
     "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
     "Topic :: Multimedia :: Graphics :: Capture :: Screen Capture",
@@ -201,6 +202,8 @@ arg-type-hints-in-docstring = false
 check-return-types = false
 check-class-attributes = false
 allow-init-docstring = true
+skip-checking-private-functions = true
+skip-checking-raises = true
 exclude = '\.venv|tests|docs'
 
 [tool.hatch.version]

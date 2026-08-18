@@ -167,7 +167,7 @@ async def open_page(
     Raises:
         ValueError: If the viewport is unknown.
         FileNotFoundError: If ``source`` is a local path that does not exist.
-    """
+    """  # noqa: DOC201, DOC403 -- asynccontextmanager wraps this async generator.
     viewport_config = resolve_viewport(viewport)
 
     source_str = str(source)

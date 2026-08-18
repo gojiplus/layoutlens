@@ -1752,8 +1752,8 @@ Focus on:
 
         The deterministic scan measures contrast, sibling overlap, clipped
         content, viewport protrusion, page-level horizontal overflow, truncated
-        text, and undersized tap targets — directly off the rendered page, with
-        no LLM and no API key.
+        text, WCAG-aware target spacing, complete focus obscuration, and text
+        occlusion — directly off the rendered page, with no LLM and no API key.
 
         Args:
             source: URL or HTML file to check (images have no DOM to measure —
@@ -1780,8 +1780,9 @@ Focus on:
         scorer = scorer or LayoutScorer()
         query = (
             "Are there layout defects on this page — overlapping or clipped "
-            "content, elements extending past the viewport, truncated text, "
-            "low-contrast text, or touch targets that are too small?"
+            "content, elements extending past the viewport, truncated or "
+            "occluded text, obscured keyboard focus, low-contrast text, or "
+            "touch targets that are too small or closely spaced?"
         )
 
         if self._is_image_file(source):
@@ -1855,6 +1856,7 @@ Focus on:
                     "clip_tolerance_px": scorer.clip_tolerance_px,
                     "protrude_tolerance_px": scorer.protrude_tolerance_px,
                     "contrast_threshold": scorer.contrast_threshold,
+                    "occlusion_samples_per_axis": scorer.occlusion_samples_per_axis,
                 },
             },
             model=self._model_fingerprint(),

@@ -20,7 +20,7 @@ jobs:
     with:
       wheel-import: layoutlens
       coverage-floor: 0
-      python-versions: '["3.11", "3.12", "3.13"]'
+      python-versions: '["3.11", "3.12", "3.13", "3.14"]'
       os: '["ubuntu-latest", "windows-latest", "macos-latest"]'
       # pydoclint's docstring-parser-fork collides with the plain
       # docstring-parser module other deps install; run `uvx pydoclint

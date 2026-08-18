@@ -9,10 +9,10 @@ this file has drifted from reality before.
 LayoutLens is an AI-powered UI testing framework: it captures screenshots with
 Playwright and answers natural-language questions about them via a
 vision-capable LLM (through LiteLLM; `gpt-4o-mini` by default). It also ships
-a fully deterministic, keyless WCAG 2.1 A/AA accessibility engine built on a
-vendored axe-core bundle.
+a fully deterministic, keyless accessibility engine: vendored axe-core for
+WCAG 2.1 A/AA plus focused WCAG 2.2 geometry checks in `LayoutScorer`.
 
-## Package Structure (real, as of v2.0.0)
+## Package Structure (real, as of v2.1.0)
 
 ```
 layoutlens/
@@ -27,7 +27,7 @@ layoutlens/
 │   ├── types.py                   # A11yFinding, A11yReport
 │   └── assets/                    # Vendored axe-core bundle (axe.min.js, LICENSE-axe.txt)
 ├── layout/                        # Deterministic geometry/contrast scorers (keyless, no LLM)
-│   ├── geometry.py                # LayoutScorer: overlap/clipping/protrusion/target-size
+│   ├── geometry.py                # geometry + target exceptions + focus/text occlusion
 │   ├── contrast.py                # WCAG contrast math + check_contrast page scan
 │   ├── styles.py                  # read_computed_styles, element_geometry
 │   └── types.py                   # LayoutFinding, LayoutReport
@@ -69,8 +69,9 @@ layoutlens SOURCES... [--query TEXT] [--compare] [--suite FILE] \
   free-form query; it is an error to combine `--a11y` with `--query`.
   `--a11y axe` is fully deterministic and needs no API key.
 - `--layout {hybrid,deterministic,llm}` runs the deterministic geometry/
-  contrast scan (`check_layout`): contrast, overlap, clipping, protrusion
-  (both edges), page-level horizontal overflow, text truncation, target size.
+  contrast/occlusion scan (`check_layout`): contrast, overlap, clipping,
+  protrusion (both edges), page-level horizontal overflow, text truncation,
+  WCAG-aware target size, complete focus obscuration, and text occlusion.
   `deterministic` needs no API key; in `hybrid` the measured findings ground
   the LLM and force a "no" verdict when any defect is measured.
 - `--output sarif` (with `--a11y` or `--layout`) emits a SARIF 2.1.0 log for
@@ -145,7 +146,7 @@ is persona/instructions-free. A missing image raises `ValidationError`.
 - **Usage split** — `_read_usage` records prompt/completion/total tokens in
   analysis metadata and `JudgeResult.usage` (0 when the provider omits them).
 
-## pytest Plugin & MCP Server (v2.0.0)
+## pytest Plugin & MCP Server (v2.1.0)
 
 - `layoutlens/pytest_plugin.py` registers via the `pytest11` entry point: a
   session-scoped `layoutlens` fixture with keyless `assert_a11y`/`assert_layout`
@@ -263,13 +264,16 @@ check` audits conformance). Consequences that matter here:
   publishing, and creates the GitHub Release. `citation-sync.yml` then
   updates CITATION.cff.
 - **CI is a shim** (`.github/workflows/ci.yml`) calling py-canon's
-  reusable-ci: ruff + pyright + pydoclint lint job, a 3-OS × 3.11–3.13 test
+  reusable-ci: ruff + pyright lint, a 3-OS × 3.11–3.14 test
   matrix, a wheel install smoke test, zizmor workflow-security lint, and
-  dependency review. Do NOT add jobs to `ci.yml` — `preen update` overwrites
+  dependency review. `docstrings.yml` runs pydoclint in an isolated uv tool
+  environment to avoid its parser dependency collision. Do NOT add jobs to
+  `ci.yml` — `preen update` overwrites
   it wholesale. Repo-specific CI lives in sibling workflows:
   `browser.yml` (installs Chromium, runs `pytest -m browser` — the reusable
   CI has no pre-test hook, so browser tests skip there) and
-  `citation-sync.yml`. Pin third-party actions by SHA (zizmor gates on it).
+  `citation-sync.yml` and `docstrings.yml`. Pin third-party actions by SHA
+  (zizmor gates on it).
 - **Dependabot auto-merges** via `dependabot-auto-merge.yml` (py-canon
   reusable): GitHub-Actions updates and minor/patch Python bumps merge once
   every check is green; majors wait for a human.

@@ -14,10 +14,6 @@ class LayoutLensError(Exception):
     Provides common functionality for logging, error details storage, and
     string representation across all LayoutLens exceptions.
 
-    Args:
-        message: Human-readable description of the error.
-        details: Optional dictionary containing additional error context.
-
     Attributes:
         message: The error message string.
         details: Dictionary of additional error context information.
@@ -59,11 +55,6 @@ class ConfigurationError(LayoutLensError):
     Covers invalid configuration files, missing required settings,
     malformed YAML, and incompatible configuration values.
 
-    Args:
-        message: Description of the configuration problem.
-        config_file: Path to the configuration file with issues.
-        missing_fields: List of required fields that are missing.
-
     Attributes:
         config_file: Path to the problematic configuration file.
         missing_fields: List of missing required configuration fields.
@@ -94,11 +85,6 @@ class ValidationError(LayoutLensError):
     Occurs when user-provided inputs don't meet requirements, such as
     empty queries, invalid URLs, or malformed parameters.
 
-    Args:
-        message: Description of the validation failure.
-        field: Name of the field that failed validation.
-        value: The invalid value that was provided.
-
     Attributes:
         field: The field name that failed validation.
         value: The invalid value that was rejected.
@@ -125,12 +111,6 @@ class AnalysisError(LayoutLensError):
 
     Occurs when the AI provider fails to analyze screenshots, returns
     malformed responses, or encounters processing errors.
-
-    Args:
-        message: Description of the analysis failure.
-        query: The query that was being processed.
-        source: URL or file path being analyzed.
-        confidence: Confidence score if partial analysis occurred.
 
     Attributes:
         query: The analysis query that failed.
@@ -165,8 +145,6 @@ class AuthenticationError(LayoutLensError):
 
     Covers invalid API keys, expired tokens, and permission problems.
 
-    Args:
-        message: Description of the authentication failure.
     """
 
     def __init__(self, message: str = "Invalid or missing API key"):
@@ -183,10 +161,6 @@ class LayoutFileNotFoundError(LayoutLensError):
 
     Occurs when attempting to access screenshots, HTML files, configuration
     files, or other required resources that don't exist.
-
-    Args:
-        message: Description of the missing file error.
-        file_path: Path to the file that was not found.
 
     Attributes:
         file_path: The path to the missing file.

@@ -1,9 +1,9 @@
 """Dataclasses for deterministic layout/geometry findings and reports.
 
 These mirror the shapes in :mod:`layoutlens.a11y.types` (``A11yFinding`` /
-``A11yReport``) but model geometric and contrast defects measured directly off
-a rendered page — overlap, clipping, viewport protrusion, undersized targets,
-and low text contrast — rather than axe rule outcomes. Each finding carries the
+``A11yReport``) but model visual defects measured directly off a rendered page —
+overlap, clipping, viewport protrusion, undersized targets, low text contrast,
+focus obscuration, and text occlusion — rather than axe rule outcomes. Each finding carries the
 *measured* numbers and the *threshold* it violated (its "receipt"), so a result
 is inspectable and reproducible without an LLM or an API key.
 """
@@ -23,6 +23,8 @@ PROTRUSION = "viewport-protrusion"
 TARGET_SIZE = "target-size"
 PAGE_OVERFLOW = "page-overflow"
 TRUNCATION = "truncation"
+FOCUS_OBSCURED = "focus-obscured"
+TEXT_OCCLUSION = "text-occlusion"
 
 
 @dataclass(slots=True)
@@ -30,8 +32,9 @@ class LayoutFinding:
     """A single measured layout defect affecting one or two DOM elements.
 
     Attributes:
-        defect_class: One of ``"contrast"``, ``"overlap"``, ``"clipping"``,
-            ``"viewport-protrusion"``, ``"target-size"``.
+        defect_class: Stable finding class such as ``"contrast"``, ``"overlap"``,
+            ``"clipping"``, ``"viewport-protrusion"``, ``"target-size"``,
+            ``"focus-obscured"``, or ``"text-occlusion"``.
         selector: A best-effort CSS selector locating the offending element
             (for overlap, the primary element; the partner is in ``measured``).
         bbox: The element's rounded ``[x, y, width, height]`` in CSS pixels.

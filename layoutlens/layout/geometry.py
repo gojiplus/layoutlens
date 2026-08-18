@@ -1,16 +1,18 @@
-"""Deterministic layout/geometry scorer: overlap, clipping, protrusion, target size.
+"""Deterministic visual scorer for geometry and automatable WCAG checks.
 
 :class:`LayoutScorer` opens a page (or runs on one already open) and measures
 geometric defects with the browser's own layout engine — bounding-box
 intersection for overlapping siblings, ``scrollHeight``/``clientHeight`` for
 clipped content, right-edge vs the layout viewport for protrusion, and rendered
-size for undersized interactive targets. It also folds in the contrast scan
+size and spacing for undersized interactive targets, focus obscuration, and
+text covered by another painted element. It also folds in the contrast scan
 (:func:`layoutlens.layout.contrast.check_contrast`). No LLM, no API key.
 
-The measurement math is ported from the UIJudgeBench render-verifier
-(``uijudge/engine/verify.py``) — the same detectors the benchmark used to build
-its layout ground truth — generalized from verifying one claimed selector to
-scanning the whole page for every instance.
+Foundational geometry math was ported from the UIJudgeBench render-verifier
+(``uijudge/engine/verify.py``) and generalized from one claimed selector to a
+whole-page scan. Focus, target-exception, and text-occlusion checks are
+independent LayoutLens implementations; UIJudgeBench retains separate gold
+oracles when it evaluates them.
 """
 
 from __future__ import annotations
@@ -24,10 +26,12 @@ from ..types import Viewport, ViewportType
 from .contrast import check_contrast
 from .types import (
     CLIPPING,
+    FOCUS_OBSCURED,
     OVERLAP,
     PAGE_OVERFLOW,
     PROTRUSION,
     TARGET_SIZE,
+    TEXT_OCCLUSION,
     TRUNCATION,
     LayoutFinding,
     LayoutReport,
@@ -191,23 +195,264 @@ _JS_TRUNCATION = (
 }"""
 )
 
-# Target size: interactive/clickable elements rendered smaller than the minimum
-# (bench _JS_BBOX + the <24x24 rule; WCAG 2.5.8 Target Size (Minimum)).
+# Target size: WCAG 2.5.8 size plus its machine-measurable spacing and inline
+# exceptions. Equivalent-control and essential-presentation exceptions require
+# human judgment and are disclosed in each finding rather than guessed.
 _JS_TARGETS = (
     "(minPx) => {"
     + _JS_HELPERS
     + """
   const sel = 'a[href], button, input:not([type=hidden]), select, textarea, ' +
               '[role=button], [role=link], [role=checkbox], [role=radio], [onclick]';
+  const targets = [...document.querySelectorAll(sel)].filter(visible);
   const out = [];
-  for (const el of document.querySelectorAll(sel)) {
-    if (!visible(el)) continue;
+  function rectDistanceToPoint(r, x, y) {
+    const dx = Math.max(r.left - x, 0, x - r.right);
+    const dy = Math.max(r.top - y, 0, y - r.bottom);
+    return Math.hypot(dx, dy);
+  }
+  function isInlineException(el) {
+    const cs = getComputedStyle(el);
+    if (!cs.display.startsWith('inline')) return false;
+    const parent = el.parentElement;
+    if (!parent) return false;
+    const nonTargetText = [...parent.childNodes].some(node =>
+      node.nodeType === Node.TEXT_NODE && (node.textContent || '').trim().length > 0
+    );
+    return nonTargetText &&
+      (cs.lineHeight === 'normal' || parseFloat(cs.lineHeight) > 0);
+  }
+  function userAgentSized(el) {
+    if (!/^(BUTTON|INPUT|SELECT|TEXTAREA)$/.test(el.tagName)) return false;
+    const sizeProperties = new Set([
+      'appearance', 'block-size', 'border', 'border-bottom', 'border-left',
+      'border-right', 'border-top', 'box-sizing', 'font', 'font-size', 'height',
+      'inline-size', 'max-block-size', 'max-height', 'max-inline-size', 'max-width',
+      'min-block-size', 'min-height', 'min-inline-size', 'min-width', 'padding',
+      'padding-bottom', 'padding-left', 'padding-right', 'padding-top', 'transform',
+      'width', 'zoom'
+    ]);
+    function modifiesSize(style) {
+      return [...style].some(name => sizeProperties.has(name));
+    }
+    if (modifiesSize(el.style)) return false;
+    function rulesModify(rules) {
+      return [...rules].some(rule => {
+        if (rule.selectorText && el.matches(rule.selectorText) && modifiesSize(rule.style)) return true;
+        try { return rule.cssRules ? rulesModify(rule.cssRules) : false; }
+        catch (_) { return false; }
+      });
+    }
+    for (const sheet of document.styleSheets) {
+      let rules;
+      try { rules = sheet.cssRules; }
+      catch (_) { return false; }
+      if (rulesModify(rules)) return false;
+    }
+    return true;
+  }
+  for (const el of targets) {
     const r = el.getBoundingClientRect();
     if (r.width < minPx || r.height < minPx) {
+      const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+      const radius = minPx / 2;
+      const conflicts = [];
+      for (const other of targets) {
+        if (other === el) continue;
+        const o = other.getBoundingClientRect();
+        const otherSmall = o.width < minPx || o.height < minPx;
+        const ocx = o.left + o.width / 2, ocy = o.top + o.height / 2;
+        const distance = Math.hypot(cx - ocx, cy - ocy);
+        const intersects = otherSmall
+          ? distance < minPx
+          : rectDistanceToPoint(o, cx, cy) < radius;
+        if (intersects) conflicts.push(cssPath(other));
+      }
+      const inlineException = isInlineException(el);
+      const uaException = userAgentSized(el);
+      if (conflicts.length === 0 || inlineException || uaException) continue;
       out.push({ selector: cssPath(el), width: r.width, height: r.height,
-                 bbox: [r.x, r.y, r.width, r.height] });
+                 bbox: [r.x, r.y, r.width, r.height],
+                 spacingConflicts: conflicts,
+                 inlineException, userAgentException: uaException });
     }
   }
+  return out;
+}"""
+)
+
+# Text occlusion: sample rendered text fragments and report when another DOM
+# element is topmost over part of a fragment. This catches graph lines or
+# overlays painted across labels without treating ordinary nested markup as an
+# occluder. It is a visual-quality rule, not a WCAG success criterion.
+_JS_TEXT_OCCLUSION = (
+    "(samplesPerAxis) => {"
+    + _JS_HELPERS
+    + """
+  const out = [];
+  const seen = new Set();
+  const oldX = scrollX, oldY = scrollY;
+  function paintedElement(el, textElement) {
+    for (let node = el; node && node !== document.documentElement; node = node.parentElement) {
+      // A common ancestor paints behind both branches; it cannot occlude text
+      // merely because a transparent sibling was returned by hit testing.
+      if (node.contains(textElement)) break;
+      const cs = getComputedStyle(node);
+      if (parseFloat(cs.opacity) === 0) continue;
+      if (/^(IMG|VIDEO|CANVAS)$/.test(node.tagName)) return node;
+      const alpha = color => {
+        if (!color || color === 'transparent') return 0;
+        if (color.startsWith('rgba(')) {
+          return parseFloat(color.slice(5, -1).split(',').at(-1));
+        }
+        if (color.startsWith('rgb(') && color.includes('/')) {
+          return parseFloat(color.slice(color.lastIndexOf('/') + 1, -1));
+        }
+        return 1;
+      };
+      if (alpha(cs.backgroundColor) > 0 ||
+          (parseFloat(cs.borderTopWidth) > 0 && alpha(cs.borderTopColor) > 0) ||
+          (parseFloat(cs.borderRightWidth) > 0 && alpha(cs.borderRightColor) > 0) ||
+          (parseFloat(cs.borderBottomWidth) > 0 && alpha(cs.borderBottomColor) > 0) ||
+          (parseFloat(cs.borderLeftWidth) > 0 && alpha(cs.borderLeftColor) > 0) ||
+          (node instanceof SVGElement && (cs.fill !== 'none' || cs.stroke !== 'none'))) return node;
+    }
+    return null;
+  }
+  for (const el of document.querySelectorAll('body *')) {
+    if (!visible(el) || ![...el.childNodes].some(n => n.nodeType === Node.TEXT_NODE && (n.textContent || '').trim())) continue;
+    const before = el.getBoundingClientRect();
+    if (before.bottom <= 0 || before.top >= innerHeight || before.right <= 0 || before.left >= innerWidth) {
+      el.scrollIntoView({block: 'center', inline: 'nearest'});
+    }
+    for (const node of el.childNodes) {
+      if (node.nodeType !== Node.TEXT_NODE || !(node.textContent || '').trim()) continue;
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      for (const rect of range.getClientRects()) {
+        if (rect.width <= 0 || rect.height <= 0) continue;
+        const hits = new Map();
+        let sampled = 0;
+        for (let yi = 0; yi < samplesPerAxis; yi++) {
+          for (let xi = 0; xi < samplesPerAxis; xi++) {
+            const x = rect.left + rect.width * (xi + 0.5) / samplesPerAxis;
+            const y = rect.top + rect.height * (yi + 0.5) / samplesPerAxis;
+            if (x < 0 || y < 0 || x >= innerWidth || y >= innerHeight) continue;
+            sampled++;
+            const top = document.elementFromPoint(x, y);
+            if (top && top !== el && !el.contains(top) && !top.contains(el)) {
+              const occluder = paintedElement(top, el);
+              if (occluder) hits.set(occluder, (hits.get(occluder) || 0) + 1);
+            }
+          }
+        }
+        if (!hits.size) continue;
+        const [occluder, covered] = [...hits.entries()].sort((a, b) => b[1] - a[1])[0];
+        const key = cssPath(el) + '|' + cssPath(occluder);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const er = el.getBoundingClientRect();
+        out.push({selector: cssPath(el), occluder: cssPath(occluder),
+                  coveredSamples: covered, sampledPoints: sampled,
+                  text: (node.textContent || '').trim().slice(0, 80),
+                  bbox: [er.x, er.y, er.width, er.height]});
+      }
+    }
+  }
+  scrollTo(oldX, oldY);
+  return out;
+}"""
+)
+
+# WCAG 2.4.11: focus each keyboard-operable component, let the browser scroll
+# it into view, then determine whether any sampled point remains topmost. The
+# AA failure is complete obscuration; partial obscuration is intentionally not
+# reported. Scroll position and prior focus are restored after the scan.
+_JS_FOCUS_OBSCURED = (
+    "(samplesPerAxis) => {"
+    + _JS_HELPERS
+    + """
+  const selector = 'a[href], button, input:not([type=hidden]), select, textarea, summary, ' +
+    '[tabindex]:not([tabindex="-1"]), [contenteditable="true"]';
+  const targets = [...document.querySelectorAll(selector)].filter(el => visible(el) && !el.disabled);
+  const oldX = scrollX, oldY = scrollY, oldFocus = document.activeElement;
+  const out = [];
+  function opaqueRectangle(el) {
+    const cs = getComputedStyle(el);
+    if (cs.transform !== 'none' || cs.clipPath !== 'none' ||
+        (cs.maskImage && cs.maskImage !== 'none') ||
+        (cs.webkitMaskImage && cs.webkitMaskImage !== 'none') ||
+        cs.backgroundClip !== 'border-box') return false;
+    if ([cs.borderTopLeftRadius, cs.borderTopRightRadius,
+         cs.borderBottomRightRadius, cs.borderBottomLeftRadius]
+        .some(value => parseFloat(value) > 0)) return false;
+    const color = cs.backgroundColor;
+    if (!color.startsWith('rgb')) return false;
+    const parts = color.slice(color.indexOf('(') + 1, -1).split(',').map(value => parseFloat(value.trim()));
+    return parts.length < 4 || parts[3] >= 0.999;
+  }
+  function opaqueBlocker(hit, target) {
+    const branch = [];
+    for (let node = hit; node && node !== document.documentElement; node = node.parentElement) {
+      // Stop before the first shared ancestor. Its paint is behind the target,
+      // not part of the stacking branch hit in front of it.
+      if (node.contains(target)) break;
+      branch.push(node);
+    }
+    const effectiveOpacity = branch.reduce(
+      (product, node) => product * (parseFloat(getComputedStyle(node).opacity) || 0), 1
+    );
+    if (effectiveOpacity < 0.999) return null;
+    for (const node of branch) if (opaqueRectangle(node)) return node;
+    return null;
+  }
+  for (const el of targets) {
+    el.focus({preventScroll: false});
+    el.scrollIntoView({block: 'nearest', inline: 'nearest', behavior: 'instant'});
+    if (document.activeElement !== el) continue;
+    const r = el.getBoundingClientRect();
+    let sampled = 0, visiblePoints = 0;
+    const blockers = new Map();
+    for (let yi = 0; yi < samplesPerAxis; yi++) {
+      for (let xi = 0; xi < samplesPerAxis; xi++) {
+        const x = Math.max(0, Math.min(innerWidth - 1, r.left + r.width * (xi + 0.5) / samplesPerAxis));
+        const y = Math.max(0, Math.min(innerHeight - 1, r.top + r.height * (yi + 0.5) / samplesPerAxis));
+        if (x < Math.max(0, r.left) || x > Math.min(innerWidth, r.right) ||
+            y < Math.max(0, r.top) || y > Math.min(innerHeight, r.bottom)) continue;
+        sampled++;
+        const top = document.elementFromPoint(x, y);
+        if (top && (top === el || el.contains(top))) visiblePoints++;
+        else if (top) {
+          const blocker = opaqueBlocker(top, el);
+          if (blocker) blockers.set(blocker, (blockers.get(blocker) || 0) + 1);
+          else visiblePoints++;
+        } else visiblePoints++;
+      }
+    }
+    const visibleRect = {
+      left: Math.max(0, r.left), top: Math.max(0, r.top),
+      right: Math.min(innerWidth, r.right), bottom: Math.min(innerHeight, r.bottom)
+    };
+    const exactBlockers = [...blockers.entries()].filter(([blocker]) => {
+      const b = blocker.getBoundingClientRect();
+      return b.left <= visibleRect.left && b.top <= visibleRect.top &&
+             b.right >= visibleRect.right && b.bottom >= visibleRect.bottom;
+    }).sort((a, b) => b[1] - a[1]);
+    // Sparse interior samples can establish which stacking branch is in front,
+    // but cannot prove complete coverage. Only an opaque, axis-aligned rectangle
+    // containing the target's entire visible box is strong enough to fail 2.4.11.
+    if (sampled > 0 && visiblePoints === 0 && exactBlockers.length) {
+      const [occluder, covered] = exactBlockers[0];
+      const o = occluder.getBoundingClientRect();
+      out.push({selector: cssPath(el), occluder: cssPath(occluder), sampledPoints: sampled,
+                visiblePoints, coveredSamples: covered,
+                bbox: [r.x, r.y, r.width, r.height],
+                occluderBbox: [o.x, o.y, o.width, o.height]});
+    }
+  }
+  if (oldFocus && oldFocus instanceof HTMLElement) oldFocus.focus({preventScroll: true});
+  else if (document.activeElement && document.activeElement instanceof HTMLElement) document.activeElement.blur();
+  scrollTo(oldX, oldY);
   return out;
 }"""
 )
@@ -219,20 +464,7 @@ def _round_bbox(bbox: list[float]) -> list[int]:
 
 
 class LayoutScorer:
-    """Deterministic layout/geometry scorer over a rendered page.
-
-    Args:
-        min_target_px: Minimum interactive-target dimension in CSS px (WCAG 2.5.8
-            minimum is 24).
-        overlap_threshold_px2: Minimum sibling intersection area (px²) to report
-            as an overlap; filters sub-pixel touching.
-        clip_tolerance_px: Slack added to ``clientHeight``/``clientWidth`` before
-            calling content clipped.
-        protrude_tolerance_px: Slack added to the viewport width before calling an
-            element protruding.
-        contrast_threshold: AA normal-text contrast ratio to require in the folded
-            contrast scan.
-    """
+    """Deterministic layout/geometry scorer over a rendered page."""
 
     def __init__(
         self,
@@ -242,13 +474,29 @@ class LayoutScorer:
         clip_tolerance_px: int = 2,
         protrude_tolerance_px: int = 1,
         contrast_threshold: float = 4.5,
+        occlusion_samples_per_axis: int = 5,
     ):
-        """Initialise the scorer with detector thresholds."""
+        """Initialise the scorer with detector thresholds.
+
+        Args:
+            min_target_px: Minimum interactive-target dimension in CSS px.
+            overlap_threshold_px2: Minimum sibling intersection area to report.
+            clip_tolerance_px: Slack before calling content clipped.
+            protrude_tolerance_px: Slack before calling viewport protrusion.
+            contrast_threshold: Normal-text contrast ratio to require.
+            occlusion_samples_per_axis: Grid resolution for occlusion hit testing.
+
+        Raises:
+            ValueError: If ``occlusion_samples_per_axis`` is less than two.
+        """
         self.min_target_px = min_target_px
         self.overlap_threshold_px2 = overlap_threshold_px2
         self.clip_tolerance_px = clip_tolerance_px
         self.protrude_tolerance_px = protrude_tolerance_px
         self.contrast_threshold = contrast_threshold
+        if occlusion_samples_per_axis < 2:
+            raise ValueError("occlusion_samples_per_axis must be at least 2")
+        self.occlusion_samples_per_axis = occlusion_samples_per_axis
 
     async def detect_overlaps(self, page: Page) -> list[LayoutFinding]:
         """Return findings for visible siblings whose bounding boxes overlap."""
@@ -374,7 +622,12 @@ class LayoutScorer:
         return findings
 
     async def detect_small_targets(self, page: Page) -> list[LayoutFinding]:
-        """Return findings for interactive targets smaller than ``min_target_px``."""
+        """Return undersized targets that also fail measurable WCAG spacing exceptions.
+
+        The spacing, inline, and unmodified user-agent-control exceptions are
+        evaluated automatically. Equivalent-control and essential-presentation
+        exceptions are semantic and remain manual-review fields on every finding.
+        """
         raw = await page.evaluate(_JS_TARGETS, self.min_target_px)
         findings: list[LayoutFinding] = []
         for m in raw:
@@ -386,16 +639,84 @@ class LayoutScorer:
                     measured={
                         "width_px": round(m["width"], 1),
                         "height_px": round(m["height"], 1),
+                        "spacing_conflicts": m["spacingConflicts"],
+                        "inline_exception": m["inlineException"],
+                        "user_agent_exception": m["userAgentException"],
+                        "manual_review_exceptions": [
+                            "equivalent-control",
+                            "essential-presentation",
+                        ],
                     },
-                    threshold={"min_px": self.min_target_px},
+                    threshold={
+                        "min_px": self.min_target_px,
+                        "spacing_circle_diameter_px": self.min_target_px,
+                    },
                     description=(
                         f"target {round(m['width'])}x{round(m['height'])}px is below "
-                        f"{self.min_target_px}x{self.min_target_px}px"
+                        f"{self.min_target_px}x{self.min_target_px}px and conflicts with "
+                        f"{len(m['spacingConflicts'])} nearby target(s); equivalent-control "
+                        "and essential-presentation exceptions require review"
                     ),
                     wcag_refs=["wcag258"],
                 )
             )
         return findings
+
+    async def detect_text_occlusion(self, page: Page) -> list[LayoutFinding]:
+        """Return rendered text fragments covered by another painted DOM element."""
+        raw = await page.evaluate(_JS_TEXT_OCCLUSION, self.occlusion_samples_per_axis)
+        return [
+            LayoutFinding(
+                defect_class=TEXT_OCCLUSION,
+                selector=m["selector"],
+                bbox=_round_bbox(m["bbox"]),
+                measured={
+                    "occluder": m["occluder"],
+                    "covered_samples": m["coveredSamples"],
+                    "sampled_points": m["sampledPoints"],
+                    "text_preview": m["text"],
+                },
+                threshold={"min_covered_samples": 1},
+                description=(
+                    f"text is covered at {m['coveredSamples']} of {m['sampledPoints']} "
+                    f"sampled points by {m['occluder']}"
+                ),
+            )
+            for m in raw
+        ]
+
+    async def detect_focus_obscured(self, page: Page) -> list[LayoutFinding]:
+        """Return keyboard-focused components entirely hidden by author DOM content.
+
+        This automates the geometric core of WCAG 2.4.11. Whether an occluder
+        was user-opened and can be dismissed without advancing focus can require
+        interaction history, so each finding discloses those manual exceptions.
+        """
+        raw = await page.evaluate(_JS_FOCUS_OBSCURED, self.occlusion_samples_per_axis)
+        return [
+            LayoutFinding(
+                defect_class=FOCUS_OBSCURED,
+                selector=m["selector"],
+                bbox=_round_bbox(m["bbox"]),
+                measured={
+                    "occluder": m["occluder"],
+                    "occluder_bbox": _round_bbox(m["occluderBbox"]),
+                    "sampled_points": m["sampledPoints"],
+                    "visible_sample_points": m["visiblePoints"],
+                    "manual_review_exceptions": [
+                        "user-opened-and-revealable-without-focus-advance",
+                        "user-repositionable-configurable-interface",
+                    ],
+                },
+                threshold={"visible_sample_points": 1},
+                description=(
+                    f"focused component is entirely covered at {m['sampledPoints']} "
+                    f"sampled points by {m['occluder']}"
+                ),
+                wcag_refs=["wcag2411"],
+            )
+            for m in raw
+        ]
 
     async def scan_page(
         self, page: Page, source: str | None = None, viewport: str = "desktop"
@@ -419,6 +740,8 @@ class LayoutScorer:
         findings.extend(await self.detect_page_overflow(page))
         findings.extend(await self.detect_truncation(page))
         findings.extend(await self.detect_small_targets(page))
+        findings.extend(await self.detect_text_occlusion(page))
+        findings.extend(await self.detect_focus_obscured(page))
         return LayoutReport(
             source=source if source is not None else page.url,
             viewport=viewport,
