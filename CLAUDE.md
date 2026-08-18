@@ -12,7 +12,7 @@ vision-capable LLM (through LiteLLM; `gpt-4o-mini` by default). It also ships
 a fully deterministic, keyless accessibility engine: vendored axe-core for
 WCAG 2.1 A/AA plus focused WCAG 2.2 geometry checks in `LayoutScorer`.
 
-## Package Structure (real, as of v2.1.0)
+## Package Structure (real, as of v2.1.1)
 
 ```
 src/layoutlens/
@@ -145,6 +145,10 @@ is persona/instructions-free. A missing image raises `ValidationError`.
   every `acompletion` call (Ollama/vLLM/OpenAI-compatible).
 - **Usage split** — `_read_usage` records prompt/completion/total tokens in
   analysis metadata and `JudgeResult.usage` (0 when the provider omits them).
+- **Batch resume identity** — default manifests are content-addressed by the
+  model, token budget, exact prompt bytes, image MIME type, and image bytes.
+  Duplicate request ids and stale, legacy, corrupt, or mismatched manifests fail
+  before submission.
 
 ## pytest Plugin & MCP Server (v2.1.0)
 

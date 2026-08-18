@@ -23,8 +23,10 @@ Two backends, dispatched by ``lens.model``:
   ``afile_content``, parsed by ``custom_id``.
 
 Both backends are **resumable**: a manifest persists submitted job/batch/file
-ids BEFORE polling, so a killed run collects prior work on the next call and
-submits only uncovered ids (never re-billing recovered work).
+ids immediately after submission and before polling, so a run interrupted during
+polling can collect prior work on the next call and submit only uncovered ids.
+Resume identity binds the model, token budget, exact prompt bytes, image MIME
+types, and image content; a changed request can never silently reuse stale results.
 
 ``acompletion`` is not used here; the litellm batch helpers are imported at
 module level so tests patch them at ``layoutlens.api.batch``.
@@ -36,7 +38,10 @@ import asyncio
 import base64
 import hashlib
 import json
+import os
+import tempfile
 import time
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -60,6 +65,8 @@ from .judge import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from .core import LayoutLens
 
 logger = get_logger("api.batch")
@@ -77,6 +84,8 @@ _ZERO_USAGE: dict[str, int] = {
     "completion_tokens": 0,
     "total_tokens": 0,
 }
+
+_BATCH_FINGERPRINT_VERSION = b"layoutlens-batch-request-v2"
 
 
 @dataclass(slots=True)
@@ -154,11 +163,12 @@ def _unknown_result(lens: LayoutLens, reason: str) -> JudgeResult:
     )
 
 
-def _default_manifest_path(lens: LayoutLens, requests: list[BatchRequest]) -> Path:
-    """Deterministic manifest path keyed by the request-id set + model.
+def _legacy_manifest_path(lens: LayoutLens, requests: list[BatchRequest]) -> Path:
+    """Return the pre-2.1.1 id/model-only manifest path.
 
-    So the same batch resumes from the same manifest, but two different batches
-    (different ids or model) never collide.
+    Legacy manifests cannot be safely resumed because they do not attest the
+    prompt, image, or output budget. The path is retained only so
+    :func:`judge_batch` can detect one and fail before a duplicate submission.
     """
     digest = hashlib.sha256(
         ("|".join(sorted(r.id for r in requests)) + "::" + lens.model).encode("utf-8")
@@ -166,19 +176,147 @@ def _default_manifest_path(lens: LayoutLens, requests: list[BatchRequest]) -> Pa
     return lens.output_dir / "batch" / f"manifest_{digest}.json"
 
 
-def _read_manifest(path: Path) -> dict[str, Any]:
-    """Load a manifest, or an empty dict if absent/corrupt (corrupt => no resume)."""
-    try:
-        return json.loads(Path(path).read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError, ValueError):
+def _digest_field(digest: Any, label: str, data: bytes) -> None:
+    """Add one length-delimited field to a batch request fingerprint."""
+    label_bytes = label.encode("utf-8")
+    digest.update(len(label_bytes).to_bytes(4, "big"))
+    digest.update(label_bytes)
+    digest.update(len(data).to_bytes(8, "big"))
+    digest.update(data)
+
+
+def _batch_fingerprint(
+    lens: LayoutLens, requests: list[BatchRequest], max_tokens: int
+) -> str:
+    """Hash every provider-visible input that determines a batch response."""
+    digest = hashlib.sha256()
+    _digest_field(digest, "version", _BATCH_FINGERPRINT_VERSION)
+    _digest_field(digest, "model", lens.model.encode("utf-8"))
+    _digest_field(digest, "api_base", (lens.api_base or "").encode("utf-8"))
+    _digest_field(digest, "max_tokens", str(max_tokens).encode("ascii"))
+    for request in sorted(requests, key=lambda item: item.id):
+        image_path = Path(request.image_path)
+        _digest_field(digest, "id", request.id.encode("utf-8"))
+        _digest_field(digest, "prompt", request.prompt.encode("utf-8"))
+        _digest_field(digest, "image_mime", _mime_for(image_path).encode("ascii"))
+        try:
+            image_bytes = image_path.read_bytes()
+        except OSError:
+            image_bytes = b"<missing>"
+        _digest_field(digest, "image", image_bytes)
+    return digest.hexdigest()
+
+
+def _default_manifest_path(lens: LayoutLens, fingerprint: str) -> Path:
+    """Return the content-addressed manifest path for an exact batch request."""
+    return lens.output_dir / "batch" / f"manifest_{fingerprint}.json"
+
+
+def _resume_manifest(
+    path: Path,
+    *,
+    resume: bool,
+    fingerprint: str,
+    model: str,
+    backend: str,
+    max_tokens: int,
+) -> dict[str, Any]:
+    """Load a manifest only when its full request identity matches."""
+    if not resume:
         return {}
+    if not path.exists():
+        return {}
+    manifest = _read_manifest(path)
+    if manifest is None:
+        raise ValidationError(
+            "Batch resume manifest exists but is unreadable or invalid. Refusing to submit "
+            "a possibly duplicate batch. Inspect it for a recoverable provider job id; if it "
+            "cannot be recovered, move it aside before retrying. No submission was made.",
+            field="manifest_path",
+            value=str(path),
+        )
+    expected = {
+        "fingerprint": fingerprint,
+        "model": model,
+        "backend": backend,
+        "max_tokens": max_tokens,
+    }
+    actual = {key: manifest.get(key) for key in expected}
+    if actual != expected:
+        raise ValidationError(
+            "Batch resume manifest does not match the exact model, prompt/image payload, "
+            "backend, and token budget. Use a new manifest path; stale results will not be reused.",
+            field="manifest_path",
+            value=str(path),
+        )
+    return manifest
+
+
+def _read_manifest(path: Path) -> dict[str, Any] | None:
+    """Load a manifest, returning None when it is absent, unreadable, or invalid."""
+    try:
+        manifest = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, ValueError):
+        return None
+    return manifest if isinstance(manifest, dict) else None
 
 
 def _write_manifest(path: Path, data: dict[str, Any]) -> None:
-    """Persist a manifest atomically enough for resume (parent created as needed)."""
+    """Persist a manifest with an atomic replace in the destination directory."""
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    fd, temporary_name = tempfile.mkstemp(prefix=f".{p.name}.", dir=p.parent)
+    temporary_path = Path(temporary_name)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(json.dumps(data, indent=2) + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        temporary_path.replace(p)
+    except BaseException:
+        temporary_path.unlink(missing_ok=True)
+        raise
+
+
+@contextmanager
+def _manifest_lock(path: Path) -> Iterator[None]:
+    """Prevent concurrent submissions from sharing one manifest identity."""
+    lock_path = path.with_suffix(f"{path.suffix}.lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    except FileExistsError as exc:
+        raise ValidationError(
+            "Another process owns this Batch manifest, or a prior process stopped without "
+            "releasing its lock. Confirm no matching run is active before removing the lock; "
+            "no submission was made.",
+            field="manifest_path",
+            value=str(lock_path),
+        ) from exc
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(f"pid={os.getpid()} created_unix={time.time()}\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        yield
+    finally:
+        lock_path.unlink(missing_ok=True)
+
+
+def _validate_request_ids(requests: list[BatchRequest]) -> None:
+    """Reject ids that cannot map one-to-one onto provider responses."""
+    seen: set[str] = set()
+    duplicate_ids: set[str] = set()
+    for request in requests:
+        if request.id in seen:
+            duplicate_ids.add(request.id)
+        seen.add(request.id)
+    if duplicate_ids:
+        raise ValidationError(
+            "Batch request ids must be unique.",
+            field="requests",
+            value=", ".join(sorted(duplicate_ids)),
+        )
 
 
 def _split_missing_images(
@@ -312,14 +450,24 @@ async def _collect_litellm_job(
     deadline = time.monotonic() + poll_timeout
     # The reportArgumentType ignores on custom_llm_provider (here and below):
     # litellm's Literal understates the providers its batch API accepts.
-    batch = await aretrieve_batch(batch_id, custom_llm_provider=provider)  # pyright: ignore[reportArgumentType]
+    batch = await aretrieve_batch(
+        batch_id,
+        custom_llm_provider=provider,  # pyright: ignore[reportArgumentType]
+        api_key=lens.api_key,
+        api_base=lens.api_base,
+    )
     while str(getattr(batch, "status", "")) not in _LITELLM_TERMINAL:
         if time.monotonic() > deadline:
             raise TimeoutError(
                 f"litellm batch {batch_id} did not finish within {poll_timeout}s"
             )
         await asyncio.sleep(poll_interval)
-        batch = await aretrieve_batch(batch_id, custom_llm_provider=provider)  # pyright: ignore[reportArgumentType]
+        batch = await aretrieve_batch(
+            batch_id,
+            custom_llm_provider=provider,  # pyright: ignore[reportArgumentType]
+            api_key=lens.api_key,
+            api_base=lens.api_base,
+        )
 
     if str(getattr(batch, "status", "")) != "completed":
         logger.warning(
@@ -331,7 +479,12 @@ async def _collect_litellm_job(
     output_file_id = getattr(batch, "output_file_id", None)
     if not output_file_id:
         return {}
-    content = await afile_content(output_file_id, custom_llm_provider=provider)  # pyright: ignore[reportArgumentType]
+    content = await afile_content(
+        output_file_id,
+        custom_llm_provider=provider,  # pyright: ignore[reportArgumentType]
+        api_key=lens.api_key,
+        api_base=lens.api_base,
+    )
     # litellm's return union includes a streaming variant this call never
     # produces; the hasattr guard handles the real (buffered) shapes.
     text = content.text if hasattr(content, "text") else content.content.decode("utf-8")  # pyright: ignore[reportAttributeAccessIssue]
@@ -346,6 +499,7 @@ async def _judge_batch_litellm(
     manifest_path: Path,
     poll_interval: float,
     poll_timeout: float,
+    fingerprint: str,
 ) -> dict[str, JudgeResult]:
     """Litellm file-based batch backend (see module docstring).
 
@@ -367,19 +521,26 @@ async def _judge_batch_litellm(
     results: dict[str, JudgeResult] = {}
     valid = _split_missing_images(lens, requests, results)
 
-    manifest = _read_manifest(manifest_path) if resume else {}
+    manifest = _resume_manifest(
+        manifest_path,
+        resume=resume,
+        fingerprint=fingerprint,
+        model=lens.model,
+        backend="litellm",
+        max_tokens=max_tokens_value,
+    )
     jobs: list[dict[str, Any]] = list(manifest.get("jobs", [])) if resume else []
+    requested = {request.id for request in valid}
     covered: set[str] = set()
     for job in jobs:
-        try:
-            collected = await _collect_litellm_job(
-                lens, job, provider, poll_interval, poll_timeout
-            )
-        except Exception as exc:
-            logger.warning(
-                "Resume: skipping prior litellm batch %s: %s", job.get("batch_id"), exc
-            )
-            continue
+        collected = await _collect_litellm_job(
+            lens, job, provider, poll_interval, poll_timeout
+        )
+        collected = {
+            request_id: result
+            for request_id, result in collected.items()
+            if request_id in requested
+        }
         results.update(collected)
         covered |= set(collected)
 
@@ -390,12 +551,16 @@ async def _judge_batch_litellm(
             file=jsonl,
             purpose="batch",
             custom_llm_provider=provider,  # pyright: ignore[reportArgumentType]
+            api_key=lens.api_key,
+            api_base=lens.api_base,
         )
         batch = await acreate_batch(
             input_file_id=file_obj.id,
             endpoint="/v1/chat/completions",
             completion_window="24h",
             custom_llm_provider=provider,  # pyright: ignore[reportArgumentType]
+            api_key=lens.api_key,
+            api_base=lens.api_base,
         )
         job = {
             "batch_id": batch.id,
@@ -403,13 +568,27 @@ async def _judge_batch_litellm(
             "ids": [r.id for r in remaining],
         }
         jobs.append(job)
-        # Persist BEFORE polling so a kill during the wait leaves the batch
-        # recoverable on the next resume (never re-billed).
+        # Persist before polling so interruption during the wait leaves the
+        # submitted job recoverable on the next resume.
         _write_manifest(
-            manifest_path, {"model": lens.model, "backend": "litellm", "jobs": jobs}
+            manifest_path,
+            {
+                "fingerprint": fingerprint,
+                "model": lens.model,
+                "backend": "litellm",
+                "max_tokens": max_tokens_value,
+                "jobs": jobs,
+            },
+        )
+        collected = await _collect_litellm_job(
+            lens, job, provider, poll_interval, poll_timeout
         )
         results.update(
-            await _collect_litellm_job(lens, job, provider, poll_interval, poll_timeout)
+            {
+                request_id: result
+                for request_id, result in collected.items()
+                if request_id in requested
+            }
         )
 
     for req in valid:
@@ -430,13 +609,15 @@ def _genai_client(lens: LayoutLens):
 
     try:
         from google import genai  # lazy: optional dependency
+        from google.genai import types
     except ImportError as exc:  # pragma: no cover - exercised only without the extra
         raise ImportError(
             "The gemini/ batch backend requires google-genai. Install it with: pip install 'layoutlens[gemini]'"
         ) from exc
 
     api_key = lens.api_key or os.environ.get("GEMINI_API_KEY")
-    return genai.Client(api_key=api_key)
+    http_options = types.HttpOptions(base_url=lens.api_base) if lens.api_base else None
+    return genai.Client(api_key=api_key, http_options=http_options)
 
 
 def _genai_inline_request(req: BatchRequest, max_tokens: int) -> dict[str, Any]:
@@ -582,6 +763,7 @@ async def _judge_batch_genai(
     manifest_path: Path,
     poll_interval: float,
     poll_timeout: float,
+    fingerprint: str,
 ) -> dict[str, JudgeResult]:
     """google-genai inline batch backend (see module docstring)."""
     display_name = f"layoutlens-batch:{lens.model}"
@@ -595,24 +777,29 @@ async def _judge_batch_genai(
     results: dict[str, JudgeResult] = {}
     valid = _split_missing_images(lens, requests, results)
 
+    manifest = _resume_manifest(
+        manifest_path,
+        resume=resume,
+        fingerprint=fingerprint,
+        model=lens.model,
+        backend="genai",
+        max_tokens=max_tokens_value,
+    )
     payloads = [(req, _genai_inline_request(req, max_tokens_value)) for req in valid]
-
     client = _genai_client(lens)
-
-    manifest = _read_manifest(manifest_path) if resume else {}
     jobs: list[dict[str, Any]] = list(manifest.get("jobs", [])) if resume else []
     covered: set[str] = set()
     collected: dict[str, dict[str, Any]] = {}
     for job in jobs:
-        try:
-            got = await _collect_genai_job(
-                client, job["job_name"], poll_interval, poll_timeout
-            )
-        except Exception as exc:
-            logger.warning(
-                "Resume: skipping prior genai job %s: %s", job.get("job_name"), exc
-            )
-            continue
+        got = await _collect_genai_job(
+            client, job["job_name"], poll_interval, poll_timeout
+        )
+        requested = {request.id for request in valid}
+        got = {
+            request_id: result
+            for request_id, result in got.items()
+            if request_id in requested
+        }
         collected.update(got)
         covered |= set(got)
 
@@ -628,7 +815,14 @@ async def _judge_batch_genai(
         new_jobs.append(job_name)
         jobs.append({"job_name": job_name, "ids": [req.id for req, _ in chunk]})
         _write_manifest(
-            manifest_path, {"model": lens.model, "backend": "genai", "jobs": jobs}
+            manifest_path,
+            {
+                "fingerprint": fingerprint,
+                "model": lens.model,
+                "backend": "genai",
+                "max_tokens": max_tokens_value,
+                "jobs": jobs,
+            },
         )
     for job_name in new_jobs:
         collected.update(
@@ -676,18 +870,47 @@ async def judge_batch(
     if not requests:
         return {}
 
+    _validate_request_ids(requests)
     max_tokens_value = resolved_max_tokens(lens.model, max_tokens)
-    path = (
-        Path(manifest_path)
-        if manifest_path is not None
-        else _default_manifest_path(lens, requests)
-    )
-
     lens._ensure_api_key()  # noqa: SLF001
+    fingerprint = _batch_fingerprint(lens, requests, max_tokens_value)
+    backend_name = "genai" if _is_gemini_studio(lens.model) else "litellm"
+    if manifest_path is not None:
+        path = Path(manifest_path)
+    else:
+        path = _default_manifest_path(lens, fingerprint)
+        legacy_path = _legacy_manifest_path(lens, requests)
+        if resume and not path.exists() and legacy_path.exists():
+            raise ValidationError(
+                "A legacy Batch manifest exists but does not attest its prompt, image, or token budget. "
+                "Refusing to submit a possibly duplicate batch. After verifying that its provider "
+                f"jobs belong to this exact request, copy it to '{path}' and add top-level fields "
+                f"fingerprint='{fingerprint}', model='{lens.model}', backend='{backend_name}', and "
+                f"max_tokens={max_tokens_value}, preserving jobs. Otherwise pass resume=False only "
+                "when a fresh billed submission is intended. No submission was made.",
+                field="manifest_path",
+                value=str(legacy_path),
+            )
+
+    if not resume and path.exists():
+        raise ValidationError(
+            "resume=False requires a new manifest path; overwriting this manifest would lose "
+            "provider job ids from a paid submission. No submission was made.",
+            field="manifest_path",
+            value=str(path),
+        )
 
     backend = (
         _judge_batch_genai if _is_gemini_studio(lens.model) else _judge_batch_litellm
     )
-    return await backend(
-        lens, requests, max_tokens_value, resume, path, poll_interval, poll_timeout
-    )
+    with _manifest_lock(path):
+        return await backend(
+            lens,
+            requests,
+            max_tokens_value,
+            resume,
+            path,
+            poll_interval,
+            poll_timeout,
+            fingerprint,
+        )

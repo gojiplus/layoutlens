@@ -4,11 +4,36 @@ All notable changes to LayoutLens are documented in this file.
 
 ## [Unreleased]
 
+## [2.1.1] - 2026-08-17
+
 ### Changed
 
 - Completed the py-canon adoption: packaging now uses a static version with
   `uv_build`, the source tree uses the standard `src/` layout, and Copier records
   the exact py-canon release used to render the project.
+
+### Fixed
+
+- Batch resume manifests now bind the model, output-token budget, exact prompts,
+  image MIME types, and image bytes. Changed requests cannot silently reuse stale
+  results.
+- Corrupt, legacy, and mismatched manifests fail before provider submission;
+  duplicate request ids are rejected; and manifest updates use atomic file
+  replacement.
+- Concurrent calls with the same Batch identity cannot submit duplicate work,
+  and `resume=False` cannot overwrite the only record of a paid provider job.
+- Resume now fails closed on a timeout or transient error while collecting a
+  recorded job instead of resubmitting its ids while it may still be running.
+- Batch helpers honor constructor-supplied API keys and `api_base`; the endpoint
+  is part of resume identity, preventing cross-endpoint manifest reuse.
+
+### Upgrading
+
+- LayoutLens cannot automatically trust a resume manifest written before 2.1.1
+  because it does not identify the prompts, images, or token budget. The error
+  now reports the exact destination and identity fields needed for deliberate
+  migration after the user verifies the provider job. No migration or new
+  submission happens automatically.
 
 ## [2.1.0] - 2026-08-17
 

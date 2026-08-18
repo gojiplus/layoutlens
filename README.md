@@ -450,6 +450,19 @@ result.usage  # {"prompt_tokens": ..., "completion_tokens": ..., "total_tokens":
 result.parse_mode  # "json" | "fallback" | "none"
 ```
 
+For bulk evaluation, `judge_batch()` uses provider-native asynchronous Batch
+APIs. `gemini/*` models use the Google Gen AI inline Batch API; supported
+non-Gemini models use LiteLLM's file-based Batch API. Resume manifests are
+content-addressed by the exact prompts, images, model, and token budget, so a
+changed request cannot reuse a stale response. A per-manifest lock prevents two
+processes from submitting the same exact batch concurrently. Manifests created
+before 2.1.1 fail closed with explicit migration details because they cannot
+attest their original prompts, images, or token budget. Changing any request
+creates a new exact batch and therefore resubmits every request; the old manifest
+remains available under its prior identity. An ungraceful process stop can leave
+a `.json.lock` file: confirm no matching run is active, then remove only that
+lock file to resume from the preserved manifest.
+
 Key guarantees:
 
 - **Verbatim prompt** — LayoutLens adds nothing to the text you provide.

@@ -2,7 +2,7 @@ cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
 type: software
 title: "LayoutLens: AI-Powered UI Testing Framework"
-version: 2.1.0
+version: 2.1.1
 date-released: "2026-08-17"
 url: "https://github.com/gojiplus/layoutlens"
 repository-code: "https://github.com/gojiplus/layoutlens"
@@ -30,6 +30,6 @@ preferred-citation:
     - family-names: "Sood"
       given-names: "Gaurav"
       email: "contact@gsood.com"
-  version: 2.1.0
+  version: 2.1.1
   url: "https://github.com/gojiplus/layoutlens"
   year: 2026

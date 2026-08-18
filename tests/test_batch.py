@@ -17,8 +17,9 @@ from __future__ import annotations
 
 import base64
 import json
-from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+import sys
+from types import ModuleType, SimpleNamespace
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
@@ -309,11 +310,15 @@ async def test_resume_litellm_skips_covered_ids(lens, png, png2):
     # output only has 'a'). Simpler: seed the manifest directly.
     import layoutlens.api.batch as bm
 
+    requests = [BatchRequest("a", png, "p1"), BatchRequest("b", png2, "p2")]
+    fingerprint = bm._batch_fingerprint(lens, requests, 300)
     bm._write_manifest(
         bm.Path(manifest),
         {
+            "fingerprint": fingerprint,
             "model": "gpt-4o-mini",
             "backend": "litellm",
+            "max_tokens": 300,
             "jobs": [{"batch_id": "prior", "input_file_id": "f", "ids": ["a"]}],
         },
     )
@@ -343,11 +348,7 @@ async def test_resume_litellm_skips_covered_ids(lens, png, png2):
         patch.object(batch_mod, "aretrieve_batch", arb),
         patch.object(batch_mod, "afile_content", afc),
     ):
-        results = await lens.judge_batch(
-            [BatchRequest("a", png, "p1"), BatchRequest("b", png2, "p2")],
-            resume=True,
-            manifest_path=manifest,
-        )
+        results = await lens.judge_batch(requests, resume=True, manifest_path=manifest)
 
     assert results["a"].answer == "A"
     assert results["b"].answer == "B"
@@ -358,6 +359,217 @@ async def test_resume_litellm_skips_covered_ids(lens, png, png2):
         for x in acf.await_args.kwargs["file"].decode("utf-8").strip().splitlines()
     }
     assert submitted_ids == {"b"}
+
+
+def test_batch_fingerprint_binds_prompt_image_model_budget_and_order(lens, png, png2):
+    requests = [BatchRequest("a", png, "p1"), BatchRequest("b", png2, "p2")]
+    baseline = batch_mod._batch_fingerprint(lens, requests, 300)
+
+    assert batch_mod._batch_fingerprint(lens, list(reversed(requests)), 300) == baseline
+    assert batch_mod._batch_fingerprint(lens, requests, 301) != baseline
+    assert (
+        batch_mod._batch_fingerprint(
+            lens, [BatchRequest("a", png, "changed"), requests[1]], 300
+        )
+        != baseline
+    )
+
+    original = batch_mod.Path(png2).read_bytes()
+    batch_mod.Path(png2).write_bytes(original + b"changed")
+    assert batch_mod._batch_fingerprint(lens, requests, 300) != baseline
+
+    other_model = LayoutLens(
+        api_key="sk", model="gpt-4o", output_dir=str(lens.output_dir)
+    )
+    assert batch_mod._batch_fingerprint(other_model, requests, 300) != baseline
+
+    other_endpoint = LayoutLens(
+        api_key="sk",
+        model=lens.model,
+        api_base="https://example.com",
+        output_dir=str(lens.output_dir),
+    )
+    assert batch_mod._batch_fingerprint(other_endpoint, requests, 300) != baseline
+
+
+@pytest.mark.asyncio
+async def test_explicit_resume_manifest_mismatch_fails_before_submission(lens, png):
+    manifest = lens.output_dir / "mismatch.json"
+    batch_mod._write_manifest(
+        manifest,
+        {
+            "fingerprint": "wrong",
+            "model": lens.model,
+            "backend": "litellm",
+            "max_tokens": 300,
+            "jobs": [],
+        },
+    )
+    acf, acb, arb, afc = _make_litellm_mocks("")
+    with (
+        patch.object(batch_mod, "acreate_file", acf),
+        patch.object(batch_mod, "acreate_batch", acb),
+        patch.object(batch_mod, "aretrieve_batch", arb),
+        patch.object(batch_mod, "afile_content", afc),
+        pytest.raises(ValidationError, match="does not match the exact"),
+    ):
+        await lens.judge_batch([BatchRequest("r1", png, "p")], manifest_path=manifest)
+    acf.assert_not_awaited()
+    acb.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_corrupt_resume_manifest_fails_before_submission(lens, png):
+    manifest = lens.output_dir / "corrupt.json"
+    manifest.write_text("{", encoding="utf-8")
+    acf, acb, arb, afc = _make_litellm_mocks("")
+    with (
+        patch.object(batch_mod, "acreate_file", acf),
+        patch.object(batch_mod, "acreate_batch", acb),
+        patch.object(batch_mod, "aretrieve_batch", arb),
+        patch.object(batch_mod, "afile_content", afc),
+        pytest.raises(ValidationError, match="unreadable or invalid"),
+    ):
+        await lens.judge_batch([BatchRequest("r1", png, "p")], manifest_path=manifest)
+    acf.assert_not_awaited()
+    acb.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_duplicate_request_ids_fail_before_submission(lens, png):
+    acf, acb, arb, afc = _make_litellm_mocks("")
+    with (
+        patch.object(batch_mod, "acreate_file", acf),
+        patch.object(batch_mod, "acreate_batch", acb),
+        patch.object(batch_mod, "aretrieve_batch", arb),
+        patch.object(batch_mod, "afile_content", afc),
+        pytest.raises(ValidationError, match="ids must be unique"),
+    ):
+        await lens.judge_batch(
+            [BatchRequest("r1", png, "p1"), BatchRequest("r1", png, "p2")]
+        )
+    acf.assert_not_awaited()
+    acb.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_legacy_default_manifest_blocks_possible_duplicate(lens, png):
+    requests = [BatchRequest("r1", png, "p")]
+    legacy = batch_mod._legacy_manifest_path(lens, requests)
+    batch_mod._write_manifest(
+        legacy,
+        {"model": lens.model, "backend": "litellm", "jobs": [{"batch_id": "paid"}]},
+    )
+    fingerprint = batch_mod._batch_fingerprint(lens, requests, 300)
+    destination = batch_mod._default_manifest_path(lens, fingerprint)
+    with pytest.raises(ValidationError, match="legacy Batch manifest") as exc_info:
+        await lens.judge_batch(requests)
+    assert fingerprint in str(exc_info.value)
+    assert str(destination) in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+async def test_resume_false_allows_intentional_fresh_batch_with_legacy_manifest(
+    lens, png
+):
+    requests = [BatchRequest("r1", png, "p")]
+    legacy = batch_mod._legacy_manifest_path(lens, requests)
+    batch_mod._write_manifest(
+        legacy,
+        {"model": lens.model, "backend": "litellm", "jobs": [{"batch_id": "paid"}]},
+    )
+    output = _openai_batch_line("r1", '{"answer": "fresh"}') + "\n"
+    acf, acb, arb, afc = _make_litellm_mocks(output)
+    with (
+        patch.object(batch_mod, "acreate_file", acf),
+        patch.object(batch_mod, "acreate_batch", acb),
+        patch.object(batch_mod, "aretrieve_batch", arb),
+        patch.object(batch_mod, "afile_content", afc),
+    ):
+        results = await lens.judge_batch(requests, resume=False)
+
+    assert results["r1"].answer == "fresh"
+    acb.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_resume_false_cannot_overwrite_paid_job_manifest(lens, png):
+    requests = [BatchRequest("r1", png, "p")]
+    fingerprint = batch_mod._batch_fingerprint(lens, requests, 300)
+    manifest = batch_mod._default_manifest_path(lens, fingerprint)
+    batch_mod._write_manifest(
+        manifest,
+        {
+            "fingerprint": fingerprint,
+            "model": lens.model,
+            "backend": "litellm",
+            "max_tokens": 300,
+            "jobs": [{"batch_id": "paid"}],
+        },
+    )
+    acf, acb, arb, afc = _make_litellm_mocks("")
+    with (
+        patch.object(batch_mod, "acreate_file", acf),
+        patch.object(batch_mod, "acreate_batch", acb),
+        patch.object(batch_mod, "aretrieve_batch", arb),
+        patch.object(batch_mod, "afile_content", afc),
+        pytest.raises(ValidationError, match="requires a new manifest path"),
+    ):
+        await lens.judge_batch(requests, resume=False)
+    acf.assert_not_awaited()
+    acb.assert_not_awaited()
+    assert batch_mod._read_manifest(manifest)["jobs"] == [{"batch_id": "paid"}]
+
+
+@pytest.mark.asyncio
+async def test_manifest_lock_blocks_concurrent_duplicate_submission(lens, png):
+    requests = [BatchRequest("r1", png, "p")]
+    fingerprint = batch_mod._batch_fingerprint(lens, requests, 300)
+    manifest = batch_mod._default_manifest_path(lens, fingerprint)
+    lock = manifest.with_suffix(f"{manifest.suffix}.lock")
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    lock.write_text("active", encoding="utf-8")
+    acf, acb, arb, afc = _make_litellm_mocks("")
+    with (
+        patch.object(batch_mod, "acreate_file", acf),
+        patch.object(batch_mod, "acreate_batch", acb),
+        patch.object(batch_mod, "aretrieve_batch", arb),
+        patch.object(batch_mod, "afile_content", afc),
+        pytest.raises(ValidationError, match="Another process owns"),
+    ):
+        await lens.judge_batch(requests)
+    acf.assert_not_awaited()
+    acb.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_litellm_resume_collection_error_never_resubmits(lens, png):
+    requests = [BatchRequest("r1", png, "p")]
+    fingerprint = batch_mod._batch_fingerprint(lens, requests, 300)
+    manifest = batch_mod._default_manifest_path(lens, fingerprint)
+    batch_mod._write_manifest(
+        manifest,
+        {
+            "fingerprint": fingerprint,
+            "model": lens.model,
+            "backend": "litellm",
+            "max_tokens": 300,
+            "jobs": [{"batch_id": "paid", "ids": ["r1"]}],
+        },
+    )
+    acf, acb, _arb, afc = _make_litellm_mocks("")
+    retrieve = AsyncMock(side_effect=TimeoutError("transient retrieval failure"))
+    with (
+        patch.object(batch_mod, "acreate_file", acf),
+        patch.object(batch_mod, "acreate_batch", acb),
+        patch.object(batch_mod, "aretrieve_batch", retrieve),
+        patch.object(batch_mod, "afile_content", afc),
+        pytest.raises(TimeoutError, match="transient retrieval"),
+    ):
+        await lens.judge_batch(requests)
+    acf.assert_not_awaited()
+    acb.assert_not_awaited()
+    assert not manifest.with_suffix(f"{manifest.suffix}.lock").exists()
 
 
 # --- genai backend with a fake client -------------------------------------
@@ -469,6 +681,115 @@ async def test_genai_end_to_end_keyed_by_metadata(gemini_lens, png, png2):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("manifest_text", ['{"fingerprint": "wrong"}', "{"])
+async def test_genai_invalid_resume_manifest_fails_before_client_or_submission(
+    gemini_lens, png, manifest_text
+):
+    manifest = gemini_lens.output_dir / "invalid.json"
+    manifest.write_text(manifest_text, encoding="utf-8")
+    with (
+        patch.object(batch_mod, "_genai_client") as client,
+        patch.object(batch_mod, "_submit_genai_chunk") as submit,
+        pytest.raises(ValidationError),
+    ):
+        await gemini_lens.judge_batch(
+            [BatchRequest("r1", png, "p")], manifest_path=manifest
+        )
+    client.assert_not_called()
+    submit.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_genai_resume_collects_prior_job_and_submits_only_uncovered(
+    gemini_lens, png, png2
+):
+    requests = [BatchRequest("a", png, "p1"), BatchRequest("b", png2, "p2")]
+    fingerprint = batch_mod._batch_fingerprint(gemini_lens, requests, 8000)
+    manifest = gemini_lens.output_dir / "resume-genai.json"
+    batch_mod._write_manifest(
+        manifest,
+        {
+            "fingerprint": fingerprint,
+            "model": gemini_lens.model,
+            "backend": "genai",
+            "max_tokens": 8000,
+            "jobs": [{"job_name": "batches/prior", "ids": ["a"]}],
+        },
+    )
+    client = _FakeGenaiClient({"a": '{"answer": "yes"}', "b": '{"answer": "no"}'})
+    client.batches._submitted = ["a"]
+
+    def _submit(client_, model, chunk, max_tokens, display_name):
+        src = [{"metadata": {"req_id": req.id}} for req, _payload in chunk]
+        return client_.batches.create(model=model, src=src, config={}).name
+
+    with (
+        patch.object(batch_mod, "_genai_client", return_value=client),
+        patch.object(batch_mod, "_submit_genai_chunk", _submit),
+    ):
+        results = await gemini_lens.judge_batch(requests, manifest_path=manifest)
+
+    assert set(results) == {"a", "b"}
+    assert results["a"].answer == "yes"
+    assert results["b"].answer == "no"
+    assert client.batches._submitted == ["b"]
+
+
+@pytest.mark.asyncio
+async def test_genai_resume_collection_error_never_resubmits(gemini_lens, png):
+    requests = [BatchRequest("r1", png, "p")]
+    fingerprint = batch_mod._batch_fingerprint(gemini_lens, requests, 8000)
+    manifest = batch_mod._default_manifest_path(gemini_lens, fingerprint)
+    batch_mod._write_manifest(
+        manifest,
+        {
+            "fingerprint": fingerprint,
+            "model": gemini_lens.model,
+            "backend": "genai",
+            "max_tokens": 8000,
+            "jobs": [{"job_name": "batches/paid", "ids": ["r1"]}],
+        },
+    )
+    collect = AsyncMock(side_effect=TimeoutError("transient retrieval failure"))
+    with (
+        patch.object(batch_mod, "_genai_client", return_value=_FakeGenaiClient({})),
+        patch.object(batch_mod, "_collect_genai_job", collect),
+        patch.object(batch_mod, "_submit_genai_chunk") as submit,
+        pytest.raises(TimeoutError, match="transient retrieval"),
+    ):
+        await gemini_lens.judge_batch(requests)
+    submit.assert_not_called()
+    assert not manifest.with_suffix(f"{manifest.suffix}.lock").exists()
+
+
+def test_genai_client_forwards_api_base_without_network(tmp_path):
+    client_constructor = Mock(return_value=object())
+    fake_types = SimpleNamespace(HttpOptions=lambda **kwargs: SimpleNamespace(**kwargs))
+    fake_genai = ModuleType("google.genai")
+    fake_genai.Client = client_constructor
+    fake_genai.types = fake_types
+    fake_google = ModuleType("google")
+    fake_google.genai = fake_genai
+    lens = LayoutLens(
+        api_key="secret",
+        model="gemini/gemini-3-flash-preview",
+        provider="gemini",
+        api_base="https://example.com",
+        output_dir=str(tmp_path / "out"),
+    )
+
+    with patch.dict(
+        sys.modules,
+        {"google": fake_google, "google.genai": fake_genai},
+    ):
+        batch_mod._genai_client(lens)
+
+    kwargs = client_constructor.call_args.kwargs
+    assert kwargs["api_key"] == "secret"
+    assert kwargs["http_options"].base_url == "https://example.com"
+
+
+@pytest.mark.asyncio
 async def test_genai_missing_image_unknown(gemini_lens, png, tmp_path):
     missing = str(tmp_path / "nope.png")
     with _fake_genai(batch_mod, {"ok": '{"answer": "yes", "confidence": 0.9}'}):
@@ -537,3 +858,48 @@ async def test_litellm_malformed_line_yields_unknown(lens, png, png2):
     # Malformed line: parsed into an unknown result (empty raw, no crash).
     assert results["bad"].answer == "unknown"
     assert results["bad"].parse_mode == "none"
+
+
+@pytest.mark.asyncio
+async def test_litellm_ignores_unrequested_custom_ids(lens, png):
+    output = "\n".join(
+        [
+            _openai_batch_line("r1", '{"answer": "yes"}'),
+            _openai_batch_line("ghost", '{"answer": "no"}'),
+            "",
+        ]
+    )
+    acf, acb, arb, afc = _make_litellm_mocks(output)
+    with (
+        patch.object(batch_mod, "acreate_file", acf),
+        patch.object(batch_mod, "acreate_batch", acb),
+        patch.object(batch_mod, "aretrieve_batch", arb),
+        patch.object(batch_mod, "afile_content", afc),
+    ):
+        results = await lens.judge_batch([BatchRequest("r1", png, "p")])
+
+    assert set(results) == {"r1"}
+    assert results["r1"].answer == "yes"
+
+
+@pytest.mark.asyncio
+async def test_litellm_batch_forwards_constructor_key_and_api_base(tmp_path, png):
+    lens = LayoutLens(
+        api_key="secret",
+        model="gpt-4o-mini",
+        api_base="https://example.com",
+        output_dir=str(tmp_path / "out"),
+    )
+    output = _openai_batch_line("r1", '{"answer": "yes"}') + "\n"
+    acf, acb, arb, afc = _make_litellm_mocks(output)
+    with (
+        patch.object(batch_mod, "acreate_file", acf),
+        patch.object(batch_mod, "acreate_batch", acb),
+        patch.object(batch_mod, "aretrieve_batch", arb),
+        patch.object(batch_mod, "afile_content", afc),
+    ):
+        await lens.judge_batch([BatchRequest("r1", png, "p")])
+
+    for helper in (acf, acb, arb, afc):
+        assert helper.await_args.kwargs["api_key"] == "secret"
+        assert helper.await_args.kwargs["api_base"] == "https://example.com"
