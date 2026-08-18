@@ -292,9 +292,9 @@ class LayoutLens:
         self.output_dir.mkdir(exist_ok=True)
 
         self.logger.info(
-            f"Initialized LayoutLens with {provider} provider using {model} model"
+            "Initialized LayoutLens with %s provider using %s model", provider, model
         )
-        self.logger.debug(f"Output directory: {self.output_dir}")
+        self.logger.debug("Output directory: %s", self.output_dir)
 
         # Components will be created as needed (no persistent instances)
         self.logger.debug("LayoutLens core initialized - components created on demand")
@@ -309,10 +309,10 @@ class LayoutLens:
                 enabled=cache_enabled,
             )
             self.logger.info(
-                f"Initialized {cache_type} cache (enabled: {cache_enabled})"
+                "Initialized %s cache (enabled: %s)", cache_type, cache_enabled
             )
         except Exception as e:
-            self.logger.error(f"Failed to initialize cache: {e}")
+            self.logger.error("Failed to initialize cache: %s", e)
             raise
 
     def _get_api_key_for_provider(self, provider: str) -> str | None:
@@ -344,7 +344,7 @@ class LayoutLens:
             return
         if not self.api_key:
             env_var = PROVIDER_API_KEY_ENV_VARS.get(self.provider, "OPENAI_API_KEY")
-            self.logger.error(f"No API key found for {self.provider} provider")
+            self.logger.error("No API key found for %s provider", self.provider)
             raise AuthenticationError(
                 f"API key required for {self.provider} provider. Set {env_var} env var or pass api_key parameter."
             )
@@ -354,7 +354,7 @@ class LayoutLens:
         image_path = Path(image_path)
         if not image_path.exists():
             raise FileNotFoundError(f"Image not found: {image_path}")
-        with open(image_path, "rb") as image_file:
+        with image_path.open("rb") as image_file:
             return base64.b64encode(image_file.read()).decode("utf-8")
 
     def _model_fingerprint(self) -> str:
@@ -495,9 +495,9 @@ Focus on:
         paths = [image_path] if isinstance(image_path, str) else list(image_path)
         try:
             image_parts = [self._image_content_part(p) for p in paths]
-            self.logger.debug(f"Encoded {len(image_parts)} image(s)")
+            self.logger.debug("Encoded %d image(s)", len(image_parts))
         except Exception as e:
-            self.logger.error(f"Image encoding failed: {e}")
+            self.logger.error("Image encoding failed: %s", e)
             return {
                 "answer": f"Error during analysis: Image encoding failed: {e}",
                 "confidence": 0.0,
@@ -509,7 +509,7 @@ Focus on:
         prompt = self._format_query_prompt(query, context, instructions)
 
         try:
-            self.logger.debug(f"Making API call with LiteLLM to model: {self.model}")
+            self.logger.debug("Making API call with LiteLLM to model: %s", self.model)
 
             # Resolve temperature: honor the constructor override when set,
             # otherwise keep the historical analyze default of 0.1. The policy
@@ -537,7 +537,7 @@ Focus on:
 
             response = await acompletion(**completion_kwargs)
 
-            self.logger.debug(f"API call successful")
+            self.logger.debug("API call successful")
 
             # Extract content. stream is never enabled here, so the response is
             # a plain ModelResponse despite litellm's broader union.
@@ -547,7 +547,7 @@ Focus on:
             # Parse structured response
             answer, confidence, reasoning = self._parse_structured_response(content)
 
-            self.logger.debug(f"Parsed response - confidence: {confidence:.2f}")
+            self.logger.debug("Parsed response - confidence: %.2f", confidence)
 
             return {
                 "answer": answer,
@@ -564,7 +564,7 @@ Focus on:
             }
 
         except Exception as e:
-            self.logger.error(f"LiteLLM API call failed: {e}")
+            self.logger.error("LiteLLM API call failed: %s", e)
             return {
                 "answer": f"Error during analysis: API call failed: {e}",
                 "confidence": 0.0,
@@ -667,7 +667,7 @@ Focus on:
         # Input validation for all queries
         for q in queries:
             if not q or not q.strip():
-                self.logger.error(f"Empty query provided: '{q}'")
+                self.logger.error("Empty query provided: %r", q)
                 raise ValidationError("Query cannot be empty", field="query", value=q)
 
         # Use unified batch processing logic for all cases
@@ -700,14 +700,16 @@ Focus on:
                     cached_result.execution_time = time.time() - combination_start_time
                     cached_result.metadata["cache_hit"] = True
                     self.logger.info(
-                        f"Cache hit for {str(source)[:50]}... - confidence: {cached_result.confidence}"
+                        "Cache hit for %s... - confidence: %s",
+                        str(source)[:50],
+                        cached_result.confidence,
                     )
                     return cached_result
 
                 try:
                     # Determine if source is URL, HTML file, or image file
                     if self._is_url(source):
-                        self.logger.debug(f"Capturing screenshot from URL: {source}")
+                        self.logger.debug("Capturing screenshot from URL: %s", source)
                         capture_engine = Capture(
                             output_dir=self.output_dir / "screenshots"
                         )
@@ -716,35 +718,36 @@ Focus on:
                         )
                         screenshot_path = screenshot_paths[0]
                         self.logger.info(
-                            f"Successfully captured screenshot: {screenshot_path}"
+                            "Successfully captured screenshot: %s", screenshot_path
                         )
                     elif self._is_html_file(source):
                         self.logger.debug(
-                            f"Capturing screenshot from HTML file: {source}"
+                            "Capturing screenshot from HTML file: %s", source
                         )
                         screenshot_path = await self.capture(source, viewport=viewport)
                         self.logger.info(
-                            f"Successfully captured HTML file screenshot: {screenshot_path}"
+                            "Successfully captured HTML file screenshot: %s",
+                            screenshot_path,
                         )
                     else:
                         # Use existing image file
                         screenshot_path = str(source)
                         if not Path(screenshot_path).exists():
                             self.logger.error(
-                                f"Screenshot file not found: {screenshot_path}"
+                                "Screenshot file not found: %s", screenshot_path
                             )
                             raise LayoutFileNotFoundError(
                                 f"Screenshot file not found: {screenshot_path}",
                                 file_path=screenshot_path,
                             )
                         self.logger.debug(
-                            f"Using existing screenshot: {screenshot_path}"
+                            "Using existing screenshot: %s", screenshot_path
                         )
 
                     # Analyze with direct API call
 
                     self.logger.debug(
-                        f"Starting vision analysis for query: {query[:50]}..."
+                        "Starting vision analysis for query: %s...", query[:50]
                     )
                     vision_response = await self._call_vision_api(
                         image_path=screenshot_path,
@@ -753,7 +756,8 @@ Focus on:
                         instructions=instructions,
                     )
                     self.logger.debug(
-                        f"Vision analysis completed with confidence: {vision_response['confidence']}"
+                        "Vision analysis completed with confidence: %s",
+                        vision_response["confidence"],
                     )
 
                     combination_execution_time = time.time() - combination_start_time
@@ -784,7 +788,10 @@ Focus on:
                     if isinstance(e, LayoutLensError):
                         raise
                     self.logger.warning(
-                        f"Analysis failed for {source} + query '{query[:50]}...': {e}"
+                        "Analysis failed for %s + query '%s...': %s",
+                        source,
+                        query[:50],
+                        e,
                     )
                     return AnalysisResult(
                         source=str(source),
@@ -823,7 +830,7 @@ Focus on:
                 # source never sinks the rest.
                 if is_single_result and isinstance(result, LayoutLensError):
                     raise result
-                self.logger.warning(f"Unexpected error for {source}: {result}")
+                self.logger.warning("Unexpected error for %s: %s", source, result)
                 error_result = AnalysisResult(
                     source=str(source),
                     query=query,
@@ -843,37 +850,34 @@ Focus on:
         if is_single_result:
             # Single source + single query: return AnalysisResult directly
             return processed_results[0]
-        else:
-            # Multiple combinations: return BatchResult
-            successful_results = [r for r in processed_results if r.confidence > 0]
-            total_execution_time = time.time() - start_time
-            average_confidence = (
-                sum(r.confidence for r in successful_results) / len(successful_results)
-                if successful_results
-                else 0.0
-            )
+        # Multiple combinations: return BatchResult
+        successful_results = [r for r in processed_results if r.confidence > 0]
+        total_execution_time = time.time() - start_time
+        average_confidence = (
+            sum(r.confidence for r in successful_results) / len(successful_results)
+            if successful_results
+            else 0.0
+        )
 
-            # Cache hits keep their original token metadata for transparency,
-            # but this run made no model request for them — exclude them from
-            # the per-run usage/cost totals.
-            billed = [r for r in processed_results if not r.metadata.get("cache_hit")]
-            prompt_tokens = sum(r.metadata.get("prompt_tokens", 0) for r in billed)
-            completion_tokens = sum(
-                r.metadata.get("completion_tokens", 0) for r in billed
-            )
-            return BatchResult(
-                results=processed_results,
-                total_queries=len(processed_results),
-                successful_queries=len(successful_results),
-                average_confidence=average_confidence,
-                total_execution_time=total_execution_time,
-                total_prompt_tokens=prompt_tokens,
-                total_completion_tokens=completion_tokens,
-                total_tokens=sum(r.metadata.get("tokens_used", 0) for r in billed),
-                estimated_cost_usd=_estimate_cost(
-                    self.model, prompt_tokens, completion_tokens
-                ),
-            )
+        # Cache hits keep their original token metadata for transparency,
+        # but this run made no model request for them — exclude them from
+        # the per-run usage/cost totals.
+        billed = [r for r in processed_results if not r.metadata.get("cache_hit")]
+        prompt_tokens = sum(r.metadata.get("prompt_tokens", 0) for r in billed)
+        completion_tokens = sum(r.metadata.get("completion_tokens", 0) for r in billed)
+        return BatchResult(
+            results=processed_results,
+            total_queries=len(processed_results),
+            successful_queries=len(successful_results),
+            average_confidence=average_confidence,
+            total_execution_time=total_execution_time,
+            total_prompt_tokens=prompt_tokens,
+            total_completion_tokens=completion_tokens,
+            total_tokens=sum(r.metadata.get("tokens_used", 0) for r in billed),
+            estimated_cost_usd=_estimate_cost(
+                self.model, prompt_tokens, completion_tokens
+            ),
+        )
 
     async def compare(
         self,
@@ -917,7 +921,7 @@ Focus on:
             viewport=viewport_value,
         )
 
-        self.logger.info(f"Starting comparison of {len(sources)} sources")
+        self.logger.info("Starting comparison of %d sources", len(sources))
 
         try:
             # Analyze each source individually first
@@ -926,7 +930,10 @@ Focus on:
 
             for i, source in enumerate(sources):
                 self.logger.debug(
-                    f"Processing source {i + 1}/{len(sources)}: {str(source)[:50]}..."
+                    "Processing source %d/%d: %s...",
+                    i + 1,
+                    len(sources),
+                    str(source)[:50],
                 )
                 if self._is_url(source):
                     capture_engine = Capture(output_dir=self.output_dir / "screenshots")
@@ -1008,7 +1015,10 @@ Focus on:
             )
 
             self.logger.info(
-                f"Comparison completed for {len(sources)} sources - confidence: {confidence:.2f}, time: {execution_time:.2f}s"
+                "Comparison completed for %d sources - confidence: %.2f, time: %.2fs",
+                len(sources),
+                confidence,
+                execution_time,
             )
 
             return ComparisonResult(
@@ -1024,7 +1034,7 @@ Focus on:
             )
 
         except Exception as e:
-            self.logger.error(f"Comparison failed for {len(sources)} sources: {e}")
+            self.logger.error("Comparison failed for %d sources: %s", len(sources), e)
             execution_time = time.time() - start_time
             return ComparisonResult(
                 sources=[str(s) for s in sources],
@@ -1100,7 +1110,7 @@ Focus on:
             wait_time=wait_time,
         )
         screenshot_path = screenshot_paths[0]
-        self.logger.info(f"Successfully captured HTML file: {html_file_path.name}")
+        self.logger.info("Successfully captured HTML file: %s", html_file_path.name)
         return screenshot_path
 
     # Unified Capture Method
@@ -1181,7 +1191,7 @@ Focus on:
             max_concurrent=max_concurrent,
         )
 
-        self.logger.info(f"Starting capture of {len(sources)} source(s)")
+        self.logger.info("Starting capture of %d source(s)", len(sources))
 
         results = {}
         failed_count = 0
@@ -1198,11 +1208,11 @@ Focus on:
             file_path_obj = Path(file_path)
             if file_path_obj.exists():
                 results[str(file_path)] = str(file_path)
-                self.logger.debug(f"Using existing file: {file_path}")
+                self.logger.debug("Using existing file: %s", file_path)
             else:
                 failed_count += 1
                 results[str(file_path)] = f"Error: File not found"
-                self.logger.warning(f"File not found: {file_path}")
+                self.logger.warning("File not found: %s", file_path)
 
         # Capture URLs using efficient batch processing
         if urls_to_capture:
@@ -1224,10 +1234,10 @@ Focus on:
                         failed_count += 1
                     results[str(url)] = screenshot_path
 
-                self.logger.info(f"Captured {len(urls_to_capture)} URL screenshots")
+                self.logger.info("Captured %d URL screenshots", len(urls_to_capture))
 
             except Exception as e:
-                self.logger.error(f"URL capture failed: {e}")
+                self.logger.error("URL capture failed: %s", e)
                 for url in urls_to_capture:
                     failed_count += 1
                     results[str(url)] = f"Error: {e!s}"
@@ -1243,7 +1253,9 @@ Focus on:
                             html_path, viewport_value, wait_for_selector, wait_time
                         )
                     except Exception as e:
-                        self.logger.warning(f"HTML capture failed for {html_path}: {e}")
+                        self.logger.warning(
+                            "HTML capture failed for %s: %s", html_path, e
+                        )
                         return f"Error: {e!s}"
 
             # Process HTML files concurrently
@@ -1264,7 +1276,7 @@ Focus on:
                 else:
                     results[str(html_path)] = result
 
-            self.logger.info(f"Captured {len(html_files)} HTML file screenshots")
+            self.logger.info("Captured %d HTML file screenshots", len(html_files))
 
         execution_time = time.time() - start_time
         successful_count = len(sources) - failed_count
@@ -1281,16 +1293,18 @@ Focus on:
         )
 
         self.logger.info(
-            f"Capture completed: {successful_count}/{len(sources)} successful, time: {execution_time:.2f}s"
+            "Capture completed: %d/%d successful, time: %.2fs",
+            successful_count,
+            len(sources),
+            execution_time,
         )
 
         # Return format based on input type
         if is_single_source:
             # Single source: return the path directly
             return results[str(sources[0])]
-        else:
-            # Multiple sources: return the full mapping
-            return results
+        # Multiple sources: return the full mapping
+        return results
 
     # Deterministic accessibility helpers
 
@@ -1426,7 +1440,8 @@ Focus on:
                 )
             # hybrid: fall back to vision-only and record why axe was skipped.
             self.logger.warning(
-                f"Image source {source} has no DOM; falling back to llm-only for hybrid accessibility check."
+                "Image source %s has no DOM; falling back to llm-only for hybrid accessibility check.",
+                source,
             )
             result = await self.analyze(
                 source, query, viewport=viewport_value, instructions=instructions
@@ -1479,7 +1494,7 @@ Focus on:
 
         start_time = time.time()
         capture_engine = Capture(output_dir=self.output_dir / "screenshots")
-        screenshot_path = capture_engine.output_dir / capture_engine._generate_filename(
+        screenshot_path = capture_engine.output_dir / capture_engine._generate_filename(  # noqa: SLF001
             str(source), viewport_value
         )
 
@@ -1494,7 +1509,7 @@ Focus on:
             except Exception as e:
                 axe_error = str(e)
                 self.logger.warning(
-                    f"axe audit failed in hybrid mode; proceeding LLM-only: {e}"
+                    "axe audit failed in hybrid mode; proceeding LLM-only: %s", e
                 )
 
         llm_query = (
@@ -1794,7 +1809,8 @@ Focus on:
                     value=str(source),
                 )
             self.logger.warning(
-                f"Image source {source} has no DOM; falling back to llm-only for layout check."
+                "Image source %s has no DOM; falling back to llm-only for layout check.",
+                source,
             )
             result = await self.analyze(source, query, viewport=viewport_value)
             result.metadata["mode"] = "llm"
@@ -1868,7 +1884,7 @@ Focus on:
 
         start_time = time.time()
         capture_engine = Capture(output_dir=self.output_dir / "screenshots")
-        screenshot_path = capture_engine.output_dir / capture_engine._generate_filename(
+        screenshot_path = capture_engine.output_dir / capture_engine._generate_filename(  # noqa: SLF001
             str(source), viewport_value
         )
 
@@ -1883,7 +1899,7 @@ Focus on:
             except Exception as e:
                 layout_error = str(e)
                 self.logger.warning(
-                    f"layout scan failed in hybrid mode; proceeding LLM-only: {e}"
+                    "layout scan failed in hybrid mode; proceeding LLM-only: %s", e
                 )
 
         llm_query = (

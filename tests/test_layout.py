@@ -10,7 +10,7 @@ finding fires with the right measured value — and that a clean page yields non
 from __future__ import annotations
 
 import asyncio
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -24,6 +24,9 @@ from layoutlens.layout import (
     parse_css_color,
     relative_luminance,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 # ---------------------------------------------------------------------------
 # Unit tests: pure WCAG contrast math (no browser).

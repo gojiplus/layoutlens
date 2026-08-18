@@ -89,18 +89,17 @@ class TestAsyncCore:
             sources = [source] if not isinstance(source, list) else source
             queries = [query] if not isinstance(query, list) else query
 
-            results = []
-            for s in sources:
-                for q in queries:
-                    results.append(
-                        AnalysisResult(
-                            source=s,
-                            query=q,
-                            answer=f"Answer for {s}",
-                            confidence=0.8,
-                            reasoning="Test reasoning",
-                        )
-                    )
+            results = [
+                AnalysisResult(
+                    source=s,
+                    query=q,
+                    answer=f"Answer for {s}",
+                    confidence=0.8,
+                    reasoning="Test reasoning",
+                )
+                for s in sources
+                for q in queries
+            ]
 
             return BatchResult(
                 results=results,
@@ -223,18 +222,17 @@ class TestAsyncCore:
             sources = [source] if not isinstance(source, list) else source
             queries = [query] if not isinstance(query, list) else query
 
-            results = []
-            for s in sources:
-                for q in queries:
-                    results.append(
-                        AnalysisResult(
-                            source=s,
-                            query=q,
-                            answer="Answer",
-                            confidence=0.8,
-                            reasoning="Test",
-                        )
-                    )
+            results = [
+                AnalysisResult(
+                    source=s,
+                    query=q,
+                    answer="Answer",
+                    confidence=0.8,
+                    reasoning="Test",
+                )
+                for s in sources
+                for q in queries
+            ]
 
             return BatchResult(
                 results=results,
@@ -308,18 +306,17 @@ async def test_async_performance_comparison():
         sources = [source] if not isinstance(source, list) else source
         queries = [query] if not isinstance(query, list) else query
 
-        results = []
-        for s in sources:
-            for q in queries:
-                results.append(
-                    AnalysisResult(
-                        source=s,
-                        query=q,
-                        answer="Test answer",
-                        confidence=0.8,
-                        reasoning="Test reasoning",
-                    )
-                )
+        results = [
+            AnalysisResult(
+                source=s,
+                query=q,
+                answer="Test answer",
+                confidence=0.8,
+                reasoning="Test reasoning",
+            )
+            for s in sources
+            for q in queries
+        ]
 
         return BatchResult(
             results=results,

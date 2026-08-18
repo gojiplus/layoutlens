@@ -182,7 +182,7 @@ async def test_litellm_body_prompt_verbatim(lens, png):
 async def test_genai_inline_text_verbatim(gemini_lens, png):
     prompt = 'Referring: click the primary CTA. Reply {"answer": ...}.'
     req = BatchRequest("r1", png, prompt)
-    payload = batch_mod._genai_inline_request(gemini_lens, req, 8000)
+    payload = batch_mod._genai_inline_request(req, 8000)
     parts = payload["contents"][0]["parts"]
     # Text part equals the prompt verbatim (parity with judge()).
     assert parts[0]["text"] == prompt

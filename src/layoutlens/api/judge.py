@@ -239,7 +239,7 @@ def _image_data_url(lens: LayoutLens, image_path: str | Path) -> str:
             value=str(path),
         )
     mime = "image/jpeg" if path.suffix.lower() in _JPEG_SUFFIXES else "image/png"
-    image_b64 = lens._encode_image(path)
+    image_b64 = lens._encode_image(path)  # noqa: SLF001
     return f"data:{mime};base64,{image_b64}"
 
 
@@ -352,7 +352,7 @@ async def judge(
     # ``build_judge_messages`` performs the existence check while encoding.
     messages = build_judge_messages(lens, image_path, prompt)
 
-    lens._ensure_api_key()
+    lens._ensure_api_key()  # noqa: SLF001
 
     # Resolve AUTO to a reasoning-aware budget (8000 for thinking models, else
     # 300); an explicit integer passes through unchanged.

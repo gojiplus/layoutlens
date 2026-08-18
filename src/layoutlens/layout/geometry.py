@@ -17,9 +17,7 @@ oracles when it evaluates them.
 
 from __future__ import annotations
 
-from pathlib import Path
-
-from playwright.async_api import Page
+from typing import TYPE_CHECKING
 
 from ..browser import open_page
 from ..types import Viewport, ViewportType
@@ -36,6 +34,11 @@ from .types import (
     LayoutFinding,
     LayoutReport,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from playwright.async_api import Page
 
 # Shared JS helpers injected into every detector snippet.
 _JS_HELPERS = """
@@ -501,23 +504,21 @@ class LayoutScorer:
     async def detect_overlaps(self, page: Page) -> list[LayoutFinding]:
         """Return findings for visible siblings whose bounding boxes overlap."""
         raw = await page.evaluate(_JS_OVERLAP, self.overlap_threshold_px2)
-        findings: list[LayoutFinding] = []
-        for m in raw:
-            findings.append(
-                LayoutFinding(
-                    defect_class=OVERLAP,
-                    selector=m["a"],
-                    bbox=_round_bbox(m["bbox_a"]),
-                    measured={
-                        "partner": m["b"],
-                        "intersection_px2": round(m["intersection"]),
-                        "bbox_partner": _round_bbox(m["bbox_b"]),
-                    },
-                    threshold={"min_intersection_px2": self.overlap_threshold_px2},
-                    description=f"overlaps {m['b']} by {round(m['intersection'])}px²",
-                )
+        return [
+            LayoutFinding(
+                defect_class=OVERLAP,
+                selector=m["a"],
+                bbox=_round_bbox(m["bbox_a"]),
+                measured={
+                    "partner": m["b"],
+                    "intersection_px2": round(m["intersection"]),
+                    "bbox_partner": _round_bbox(m["bbox_b"]),
+                },
+                threshold={"min_intersection_px2": self.overlap_threshold_px2},
+                description=f"overlaps {m['b']} by {round(m['intersection'])}px²",
             )
-        return findings
+            for m in raw
+        ]
 
     async def detect_clipping(self, page: Page) -> list[LayoutFinding]:
         """Return findings for elements whose content is clipped by hidden overflow."""
@@ -552,51 +553,47 @@ class LayoutScorer:
     async def detect_protrusion(self, page: Page) -> list[LayoutFinding]:
         """Return findings for elements protruding past either horizontal viewport edge."""
         raw = await page.evaluate(_JS_PROTRUDE, self.protrude_tolerance_px)
-        findings: list[LayoutFinding] = []
-        for m in raw:
-            findings.append(
-                LayoutFinding(
-                    defect_class=PROTRUSION,
-                    selector=m["selector"],
-                    bbox=_round_bbox(m["bbox"]),
-                    measured={
-                        "edge": m["edge"],
-                        "edge_px": round(m["coord"]),
-                        "viewport_width_px": round(m["viewportWidth"]),
-                        "overflow_px": round(m["overflow"]),
-                    },
-                    threshold={"viewport_width_px": round(m["viewportWidth"])},
-                    description=(
-                        f"extends {round(m['overflow'])}px past the {m['edge']} edge "
-                        f"of the {round(m['viewportWidth'])}px viewport"
-                    ),
-                )
+        return [
+            LayoutFinding(
+                defect_class=PROTRUSION,
+                selector=m["selector"],
+                bbox=_round_bbox(m["bbox"]),
+                measured={
+                    "edge": m["edge"],
+                    "edge_px": round(m["coord"]),
+                    "viewport_width_px": round(m["viewportWidth"]),
+                    "overflow_px": round(m["overflow"]),
+                },
+                threshold={"viewport_width_px": round(m["viewportWidth"])},
+                description=(
+                    f"extends {round(m['overflow'])}px past the {m['edge']} edge "
+                    f"of the {round(m['viewportWidth'])}px viewport"
+                ),
             )
-        return findings
+            for m in raw
+        ]
 
     async def detect_page_overflow(self, page: Page) -> list[LayoutFinding]:
         """Return a finding if the whole document scrolls horizontally."""
         raw = await page.evaluate(_JS_PAGE_OVERFLOW, self.protrude_tolerance_px)
-        findings: list[LayoutFinding] = []
-        for m in raw:
-            findings.append(
-                LayoutFinding(
-                    defect_class=PAGE_OVERFLOW,
-                    selector="html",
-                    bbox=[0, 0, round(m["scrollWidth"]), 0],
-                    measured={
-                        "scroll_width_px": round(m["scrollWidth"]),
-                        "viewport_width_px": round(m["viewportWidth"]),
-                        "overflow_px": round(m["overflow"]),
-                    },
-                    threshold={"viewport_width_px": round(m["viewportWidth"])},
-                    description=(
-                        f"page scrolls horizontally: content is {round(m['scrollWidth'])}px "
-                        f"wide in a {round(m['viewportWidth'])}px viewport"
-                    ),
-                )
+        return [
+            LayoutFinding(
+                defect_class=PAGE_OVERFLOW,
+                selector="html",
+                bbox=[0, 0, round(m["scrollWidth"]), 0],
+                measured={
+                    "scroll_width_px": round(m["scrollWidth"]),
+                    "viewport_width_px": round(m["viewportWidth"]),
+                    "overflow_px": round(m["overflow"]),
+                },
+                threshold={"viewport_width_px": round(m["viewportWidth"])},
+                description=(
+                    f"page scrolls horizontally: content is {round(m['scrollWidth'])}px "
+                    f"wide in a {round(m['viewportWidth'])}px viewport"
+                ),
             )
-        return findings
+            for m in raw
+        ]
 
     async def detect_truncation(self, page: Page) -> list[LayoutFinding]:
         """Return findings for single-line text actually cut off by an ellipsis."""
@@ -629,38 +626,36 @@ class LayoutScorer:
         exceptions are semantic and remain manual-review fields on every finding.
         """
         raw = await page.evaluate(_JS_TARGETS, self.min_target_px)
-        findings: list[LayoutFinding] = []
-        for m in raw:
-            findings.append(
-                LayoutFinding(
-                    defect_class=TARGET_SIZE,
-                    selector=m["selector"],
-                    bbox=_round_bbox(m["bbox"]),
-                    measured={
-                        "width_px": round(m["width"], 1),
-                        "height_px": round(m["height"], 1),
-                        "spacing_conflicts": m["spacingConflicts"],
-                        "inline_exception": m["inlineException"],
-                        "user_agent_exception": m["userAgentException"],
-                        "manual_review_exceptions": [
-                            "equivalent-control",
-                            "essential-presentation",
-                        ],
-                    },
-                    threshold={
-                        "min_px": self.min_target_px,
-                        "spacing_circle_diameter_px": self.min_target_px,
-                    },
-                    description=(
-                        f"target {round(m['width'])}x{round(m['height'])}px is below "
-                        f"{self.min_target_px}x{self.min_target_px}px and conflicts with "
-                        f"{len(m['spacingConflicts'])} nearby target(s); equivalent-control "
-                        "and essential-presentation exceptions require review"
-                    ),
-                    wcag_refs=["wcag258"],
-                )
+        return [
+            LayoutFinding(
+                defect_class=TARGET_SIZE,
+                selector=m["selector"],
+                bbox=_round_bbox(m["bbox"]),
+                measured={
+                    "width_px": round(m["width"], 1),
+                    "height_px": round(m["height"], 1),
+                    "spacing_conflicts": m["spacingConflicts"],
+                    "inline_exception": m["inlineException"],
+                    "user_agent_exception": m["userAgentException"],
+                    "manual_review_exceptions": [
+                        "equivalent-control",
+                        "essential-presentation",
+                    ],
+                },
+                threshold={
+                    "min_px": self.min_target_px,
+                    "spacing_circle_diameter_px": self.min_target_px,
+                },
+                description=(
+                    f"target {round(m['width'])}x{round(m['height'])}px is below "
+                    f"{self.min_target_px}x{self.min_target_px}px and conflicts with "
+                    f"{len(m['spacingConflicts'])} nearby target(s); equivalent-control "
+                    "and essential-presentation exceptions require review"
+                ),
+                wcag_refs=["wcag258"],
             )
-        return findings
+            for m in raw
+        ]
 
     async def detect_text_occlusion(self, page: Page) -> list[LayoutFinding]:
         """Return rendered text fragments covered by another painted DOM element."""

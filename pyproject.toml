@@ -1,6 +1,6 @@
 [build-system]
-requires = ["hatchling", "uv-dynamic-versioning"]
-build-backend = "hatchling.build"
+requires = ["uv_build>=0.12.5,<0.13"]
+build-backend = "uv_build"
 
 [project]
 name = "layoutlens"
@@ -40,7 +40,7 @@ dependencies = [
     "rich>=13.0.0",
     "pydantic>=2.0.0",
 ]
-dynamic = ["version"]
+version = "2.1.0"
 
 [project.optional-dependencies]
 # Optional extra for the google-genai inline batch backend (AI-Studio Gemini,
@@ -61,10 +61,7 @@ dev = [
     "rich>=14.2.0",
     "pyright>=1.1.390",
     "pytest-asyncio>=0.21.0",
-    # pydoclint is deliberately absent: its docstring-parser-fork dependency
-    # installs the same `docstring_parser` module path as the plain
-    # docstring-parser wheel other deps pull in, and whichever loses the race
-    # crashes. Run it out-of-env: `uvx pydoclint layoutlens/`.
+    "pydoclint>=0.5",
 ]
 test = [
     "pytest>=7.0.0",
@@ -115,6 +112,10 @@ override-dependencies = [
     "pillow>=12.3.0",
     "pypdf>=6.15.0",
 ]
+
+[tool.uv.build-backend]
+module-name = "layoutlens"
+module-root = "src"
 
 [tool.pytest.ini_options]
 minversion = "7.0"
@@ -173,27 +174,31 @@ target-version = "py311"
 
 [tool.ruff.lint]
 external = ["DOC"]
-select = ["E", "W", "F", "I", "B", "C4", "UP", "N", "D", "S", "SIM", "T20", "PT", "RUF"]
-ignore = ["D203", "D213", "E203", "E501", "F541"]
-# × in viewport-size strings and ℹ in UI labels are intentional typography.
+select = [
+    "E", "W", "F", "I", "B", "C4", "UP", "N", "D", "S", "SIM", "T20", "PT", "RUF",
+    "PTH", "RET", "PIE", "FURB", "PERF", "DTZ", "LOG", "G", "TC", "FLY",
+    "RSE", "SLOT", "FA", "A", "EXE", "ICN", "PGH", "PLE", "ARG", "SLF",
+]
+# D203/D213: the google convention the fleet standard picks. W191/D206/D300:
+# ruff's own docs list these as always incompatible with `ruff format`, which
+# the standard also runs.
+ignore = ["D203", "D213", "W191", "D206", "D300", "E203", "E501", "F541"]
 allowed-confusables = ["×", "ℹ"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
-"**/__init__.py" = ["F401"]
-"tests/**" = ["S101", "D", "T20", "F401"]
+"tests/**" = ["S101", "D", "ARG", "SLF", "F401", "T20"]
 "docs/**" = ["D"]
-# Demo scripts and benchmark harnesses talk to a terminal; printing is their job.
+"**/__init__.py" = ["F401"]
 "examples/**" = ["T20", "D", "S", "F841"]
 "benchmarks/**" = ["T20", "D", "S"]
-"layoutlens/cli.py" = ["T20"]
-# test_prompt/test_queries are library API names, not pytest items.
-"layoutlens/prompts/utils.py" = ["PT"]
+"src/layoutlens/cli.py" = ["T20"]
+"src/layoutlens/prompts/utils.py" = ["PT"]
 
 [tool.pyright]
-include = ["layoutlens"]
+include = ["src"]
 typeCheckingMode = "standard"
 
 [tool.pydoclint]
@@ -202,19 +207,9 @@ arg-type-hints-in-docstring = false
 check-return-types = false
 check-class-attributes = false
 allow-init-docstring = true
+exclude = '\.venv|tests|docs'
 skip-checking-private-functions = true
 skip-checking-raises = true
-exclude = '\.venv|tests|docs'
-
-[tool.hatch.version]
-source = "uv-dynamic-versioning"
-
-[tool.hatch.build.targets.wheel]
-packages = ["layoutlens"]
-
-[tool.uv-dynamic-versioning]
-vcs = "git"
-style = "pep440"
 
 [tool.codespell]
 # assets holds the vendored axe.min.js; benchmarks/results are frozen records

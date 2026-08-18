@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from .base import ExpertPrompt
+from typing import TYPE_CHECKING
+
 from .experts import (
     AccessibilityExpert,
     ConversionExpert,
@@ -11,6 +12,9 @@ from .experts import (
     HealthcareExpert,
     MobileExpert,
 )
+
+if TYPE_CHECKING:
+    from .base import ExpertPrompt
 
 EXPERT_REGISTRY = {
     "accessibility_expert": AccessibilityExpert(),

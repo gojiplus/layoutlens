@@ -113,8 +113,8 @@ __all__ = [
     "setup_logging",
 ]
 
-# Version comes from git tags via hatchling + uv-dynamic-versioning; installed
-# metadata is the only source of truth.
+# Installed package metadata, generated from the static pyproject version, is the
+# runtime source of truth.
 import importlib.metadata
 
 try:

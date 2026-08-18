@@ -18,7 +18,7 @@ ANSWER_KEYS_DIR = BENCHMARKS_DIR / "answer_keys"
 def load_template(template_name: str = "base_template.html") -> str:
     """Load the specified HTML template."""
     template_path = TEMPLATES_DIR / template_name
-    with open(template_path) as f:
+    with template_path.open() as f:
         return f.read()
 
 
@@ -32,8 +32,7 @@ def generate_html(
     template = load_template(template_name)
     html = template.replace("{{TITLE}}", title)
     html = html.replace("{{CUSTOM_STYLES}}", custom_styles)
-    html = html.replace("{{CONTENT}}", content)
-    return html
+    return html.replace("{{CONTENT}}", content)
 
 
 # Available templates for testing different UI patterns
@@ -158,7 +157,7 @@ def create_layout_alignment_tests():
         )
         filename = f"{test['name']}_{template_type.lower()}.html"
 
-        with open(category_dir / filename, "w") as f:
+        with (category_dir / filename).open("w") as f:
             f.write(
                 generate_html(
                     test["title"], test["styles"], test["content"], template_file
@@ -208,7 +207,7 @@ def create_layout_alignment_tests():
     </main>
     """
 
-    with open(category_dir / "nav_misaligned.html", "w") as f:
+    with (category_dir / "nav_misaligned.html").open("w") as f:
         f.write(
             generate_html(
                 "Misaligned Navigation Test",
@@ -251,7 +250,7 @@ def create_layout_alignment_tests():
     </div>
     """
 
-    with open(category_dir / "flexbox_center_correct.html", "w") as f:
+    with (category_dir / "flexbox_center_correct.html").open("w") as f:
         f.write(
             generate_html(
                 "Flexbox Centering Test (Correct)",
@@ -294,7 +293,7 @@ def create_layout_alignment_tests():
     </div>
     """
 
-    with open(category_dir / "flexbox_center_broken.html", "w") as f:
+    with (category_dir / "flexbox_center_broken.html").open("w") as f:
         f.write(
             generate_html(
                 "Flexbox Centering Test (Broken)",
@@ -384,7 +383,7 @@ def create_layout_alignment_tests():
     </div>
     """
 
-    with open(category_dir / "grid_layout_correct.html", "w") as f:
+    with (category_dir / "grid_layout_correct.html").open("w") as f:
         f.write(
             generate_html(
                 "CSS Grid Layout Test (Correct)",
@@ -475,7 +474,7 @@ def create_layout_alignment_tests():
     </div>
     """
 
-    with open(category_dir / "grid_layout_broken.html", "w") as f:
+    with (category_dir / "grid_layout_broken.html").open("w") as f:
         f.write(
             generate_html(
                 "CSS Grid Layout Test (Broken)", grid_broken_styles, grid_broken_content
@@ -609,7 +608,7 @@ def create_accessibility_tests():
     </script>
     """
 
-    with open(category_dir / "focus_management_good.html", "w") as f:
+    with (category_dir / "focus_management_good.html").open("w") as f:
         f.write(
             generate_html(
                 "Focus Management Test (Good)", focus_good_styles, focus_good_content
@@ -637,7 +636,7 @@ def create_accessibility_tests():
     </div>
     """
 
-    with open(category_dir / "focus_management_broken.html", "w") as f:
+    with (category_dir / "focus_management_broken.html").open("w") as f:
         f.write(
             generate_html(
                 "Focus Management Test (Broken)",
@@ -716,7 +715,7 @@ def create_responsive_tests():
     </main>
     """
 
-    with open(category_dir / "container_queries_good.html", "w") as f:
+    with (category_dir / "container_queries_good.html").open("w") as f:
         f.write(
             generate_html(
                 "Container Queries Test",
@@ -776,7 +775,7 @@ def create_responsive_tests():
     </section>
     """
 
-    with open(category_dir / "viewport_units_broken.html", "w") as f:
+    with (category_dir / "viewport_units_broken.html").open("w") as f:
         f.write(
             generate_html(
                 "Viewport Units Test (Broken)",
@@ -838,7 +837,7 @@ def create_responsive_tests():
     </main>
     """
 
-    with open(category_dir / "fluid_typography_good.html", "w") as f:
+    with (category_dir / "fluid_typography_good.html").open("w") as f:
         f.write(
             generate_html(
                 "Fluid Typography Test",
@@ -1002,7 +1001,7 @@ def create_ui_components_tests():
     </div>
     """
 
-    with open(category_dir / "form_well_designed.html", "w") as f:
+    with (category_dir / "form_well_designed.html").open("w") as f:
         f.write(
             generate_html(
                 "Well-Designed Form Test", form_good_styles, form_good_content

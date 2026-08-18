@@ -195,7 +195,7 @@ class TestValidationReportGenerator:
 
             assert report_path.exists()
 
-            with open(report_path) as f:
+            with report_path.open() as f:
                 data = json.load(f)
 
             assert data["session_id"] == "test_session"

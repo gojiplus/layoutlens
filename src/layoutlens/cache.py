@@ -52,27 +52,22 @@ class CacheBackend(ABC):
     @abstractmethod
     def get(self, key: str) -> CacheEntry | None:
         """Retrieve a cache entry by key."""
-        pass
 
     @abstractmethod
     def set(self, key: str, entry: CacheEntry) -> None:
         """Store a cache entry."""
-        pass
 
     @abstractmethod
     def delete(self, key: str) -> bool:
         """Delete a cache entry."""
-        pass
 
     @abstractmethod
     def clear(self) -> None:
         """Clear all cache entries."""
-        pass
 
     @abstractmethod
     def size(self) -> int:
         """Get the number of cached entries."""
-        pass
 
 
 class InMemoryCache(CacheBackend):
@@ -144,7 +139,7 @@ class FileCache(CacheBackend):
             return None
 
         try:
-            with open(file_path, "rb") as f:
+            with file_path.open("rb") as f:
                 entry = pickle.load(f)  # noqa: S301 - internal cache file, not user input
 
             if entry.is_expired:
@@ -169,7 +164,7 @@ class FileCache(CacheBackend):
 
         file_path = self._get_file_path(key)
         try:
-            with open(file_path, "wb") as f:
+            with file_path.open("wb") as f:
                 pickle.dump(entry, f)
         except (pickle.PickleError, OSError) as e:
             raise ConfigurationError(f"Failed to write cache file: {e}") from e
@@ -203,7 +198,7 @@ class FileCache(CacheBackend):
         """Remove expired cache files."""
         for file_path in self.cache_dir.glob("*.cache"):
             try:
-                with open(file_path, "rb") as f:
+                with file_path.open("rb") as f:
                     entry = pickle.load(f)  # noqa: S301 - internal cache file, not user input
                 if entry.is_expired:
                     file_path.unlink()
@@ -351,7 +346,7 @@ class AnalysisCache:
         # For local files, hash the content
         if source_path.exists():
             try:
-                with open(source_path, "rb") as f:
+                with source_path.open("rb") as f:
                     content = f.read()
                 return hashlib.sha256(content).hexdigest()[:16]
             except OSError:

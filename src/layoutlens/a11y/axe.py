@@ -11,16 +11,18 @@ from __future__ import annotations
 
 from functools import lru_cache
 from importlib import resources
-from pathlib import Path
-from typing import Any
-
-from playwright.async_api import Page
+from typing import TYPE_CHECKING, Any
 
 from ..browser import open_page
 from ..exceptions import AnalysisError
 from ..logger import get_logger
 from ..types import Viewport, ViewportType
 from .types import A11yFinding, A11yReport
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from playwright.async_api import Page
 
 logger = get_logger("a11y.axe")
 

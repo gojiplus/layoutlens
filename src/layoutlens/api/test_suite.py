@@ -178,7 +178,7 @@ class UITestSuite:
         filepath = Path(filepath)
         filepath.parent.mkdir(parents=True, exist_ok=True)
 
-        with open(filepath, "w") as f:
+        with filepath.open("w") as f:
             json.dump(self.to_dict(), f, indent=2)
 
     @classmethod
@@ -187,14 +187,14 @@ class UITestSuite:
         filepath = Path(filepath)
         if filepath.suffix.lower() in {".yaml", ".yml"}:
             return cls.from_yaml(filepath)
-        with open(filepath) as f:
+        with filepath.open() as f:
             data = json.load(f)
         return cls.from_dict(data)
 
     @classmethod
     def from_yaml(cls, filepath: str | Path) -> UITestSuite:
         """Load a test suite from a YAML file."""
-        with open(filepath) as f:
+        with Path(filepath).open() as f:
             data = yaml.safe_load(f)
         return cls.from_dict(data)
 

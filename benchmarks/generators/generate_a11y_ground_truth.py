@@ -117,7 +117,7 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    with open(ANSWER_KEY) as f:
+    with ANSWER_KEY.open() as f:
         answer_key = json.load(f)
 
     filenames = list(answer_key["test_cases"].keys())
@@ -150,7 +150,7 @@ def main() -> int:
         return 0
 
     if would_change:
-        with open(ANSWER_KEY, "w") as f:
+        with ANSWER_KEY.open("w") as f:
             json.dump(answer_key, f, indent=2)
             f.write("\n")
         print(f"\nWrote axe_ground_truth blocks to {ANSWER_KEY}")

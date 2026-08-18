@@ -30,7 +30,7 @@ class Capture:
         self.logger = get_logger("vision.capture")
 
         self.logger.info(
-            f"Capture initialized - output_dir: {output_dir}, timeout: {timeout}ms"
+            "Capture initialized - output_dir: %s, timeout: %dms", output_dir, timeout
         )
 
     async def screenshots(
@@ -69,7 +69,7 @@ class Capture:
             available = list(self.VIEWPORTS.keys())
             raise ValueError(f"Unknown viewport: {viewport}. Available: {available}")
 
-        self.logger.info(f"Capturing {len(urls)} URLs with {viewport} viewport")
+        self.logger.info("Capturing %d URLs with %s viewport", len(urls), viewport)
         start_time = time.time()
 
         semaphore = asyncio.Semaphore(max_concurrent)
@@ -81,7 +81,7 @@ class Capture:
                         url, viewport, wait_for_selector, wait_time, browser=browser
                     )
                 except Exception as e:
-                    self.logger.warning(f"Failed to capture {url}: {e}")
+                    self.logger.warning("Failed to capture %s: %s", url, e)
                     return f"Error: {e!s}"
 
         if len(urls) > 1:
@@ -105,7 +105,7 @@ class Capture:
             success=all(not result.startswith("Error:") for result in results),
         )
 
-        self.logger.info(f"Captured {len(urls)} screenshots in {duration:.2f}s")
+        self.logger.info("Captured %d screenshots in %.2fs", len(urls), duration)
         return results
 
     async def _capture_url(
@@ -136,7 +136,7 @@ class Capture:
             await page.screenshot(path=screenshot_path, full_page=True)
 
             duration = time.time() - start_time
-            self.logger.debug(f"Screenshot saved: {screenshot_path} ({duration:.2f}s)")
+            self.logger.debug("Screenshot saved: %s (%.2fs)", screenshot_path, duration)
             return str(screenshot_path)
 
     def _generate_filename(self, url: str, viewport: str) -> str:
@@ -157,5 +157,4 @@ class Capture:
         filename = f"{domain}_{path}_{viewport}_{timestamp}_{url_hash}.png"
 
         # Clean filename
-        filename = "".join(c if c.isalnum() or c in "._-" else "_" for c in filename)
-        return filename
+        return "".join(c if c.isalnum() or c in "._-" else "_" for c in filename)

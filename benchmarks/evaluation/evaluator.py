@@ -19,7 +19,7 @@ that traced to nothing.
 import argparse
 import json
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -63,7 +63,7 @@ class BenchmarkResults:
     low_confidence_correct: int = 0
     avg_ai_confidence: float = 0.0
     results: list[EvaluationResult] = field(default_factory=list)
-    timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
+    timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
 
 class BenchmarkEvaluator:
@@ -82,7 +82,7 @@ class BenchmarkEvaluator:
         answer_keys = {}
         for json_file in sorted(self.answer_keys_dir.glob("*.json")):
             category = json_file.stem
-            with open(json_file) as f:
+            with json_file.open() as f:
                 answer_keys[category] = json.load(f)
             print(f"[loaded] answer key: {category}")
         return answer_keys
@@ -148,7 +148,7 @@ class BenchmarkEvaluator:
 
         for result_file in sorted(results_path.glob("*.json")):
             print(f"\n[evaluating] {result_file.name}")
-            with open(result_file) as f:
+            with result_file.open() as f:
                 ll_data = json.load(f)
 
             if not ("benchmark_info" in ll_data and "results" in ll_data):
@@ -215,8 +215,8 @@ class BenchmarkEvaluator:
 
         report: dict[str, Any] = {
             "evaluation_summary": {
-                "timestamp": datetime.now().isoformat(),
-                "date": date.today().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
+                "date": datetime.now(UTC).date().isoformat(),
                 "model": self.model_used or "unknown",
                 "total_queries": total_tests,
                 "total_correct": total_correct,
@@ -242,27 +242,26 @@ class BenchmarkEvaluator:
                 "avg_ai_confidence": results.avg_ai_confidence,
             }
 
-            detailed: list[dict[str, Any]] = []
-            for result in results.results:
-                detailed.append(
-                    {
-                        "html_file": result.html_file,
-                        "query": result.query,
-                        "expected": result.expected,
-                        "parsed_answer": result.parsed_answer,
-                        "ai_answer": (
-                            result.ai_answer[:200] + "..."
-                            if len(result.ai_answer) > 200
-                            else result.ai_answer
-                        ),
-                        "is_correct": result.is_correct,
-                        "ai_confidence": result.ai_confidence,
-                        "reasoning": result.reasoning,
-                    }
-                )
+            detailed: list[dict[str, Any]] = [
+                {
+                    "html_file": result.html_file,
+                    "query": result.query,
+                    "expected": result.expected,
+                    "parsed_answer": result.parsed_answer,
+                    "ai_answer": (
+                        result.ai_answer[:200] + "..."
+                        if len(result.ai_answer) > 200
+                        else result.ai_answer
+                    ),
+                    "is_correct": result.is_correct,
+                    "ai_confidence": result.ai_confidence,
+                    "reasoning": result.reasoning,
+                }
+                for result in results.results
+            ]
             report["detailed_results"][category] = detailed
 
-        with open(output_file, "w") as f:
+        with Path(output_file).open("w") as f:
             json.dump(report, f, indent=2)
 
         print(f"\n{'=' * 60}")

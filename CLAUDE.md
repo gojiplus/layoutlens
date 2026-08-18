@@ -15,7 +15,7 @@ WCAG 2.1 A/AA plus focused WCAG 2.2 geometry checks in `LayoutScorer`.
 ## Package Structure (real, as of v2.1.0)
 
 ```
-layoutlens/
+src/layoutlens/
 ├── __init__.py                    # Public exports
 ├── api/
 │   ├── core.py                    # LayoutLens class (analyze/compare/capture/checks)
@@ -75,7 +75,7 @@ layoutlens SOURCES... [--query TEXT] [--compare] [--suite FILE] \
   `deterministic` needs no API key; in `hybrid` the measured findings ground
   the LLM and force a "no" verdict when any defect is measured.
 - `--output sarif` (with `--a11y` or `--layout`) emits a SARIF 2.1.0 log for
-  GitHub Code Scanning (`layoutlens/sarif.py`; validated against the official
+  GitHub Code Scanning (`src/layoutlens/sarif.py`; validated against the official
   OASIS schema).
 - `--compare` compares the first two sources; `compare()` (CLI and Python)
   accepts URLs, local HTML files, or screenshot images. Every source is
@@ -131,12 +131,12 @@ reference-judge surface for external eval harnesses (UIJudgeBench). Unlike
 (`[text=prompt, image]`). It bypasses the cache (every call hits the model) and
 is persona/instructions-free. A missing image raises `ValidationError`.
 
-- **`layoutlens/api/judge.py`** — `JudgeResult` (answer/confidence/rationale/raw/
+- **`src/layoutlens/api/judge.py`** — `JudgeResult` (answer/confidence/rationale/raw/
   refused/usage/model/parse_mode), `judge()`, `parse_judge_response()`
   (strict JSON → yes/no fallback → `"unknown"`; `reasoning` aliases `rationale`),
   `detect_refusal()`. In tests, `acompletion` is patched at
   `layoutlens.api.judge.acompletion` (mirroring `layoutlens.api.core.acompletion`).
-- **`layoutlens/param_policy.py`** — `completion_params(model, *, temperature,
+- **`src/layoutlens/param_policy.py`** — `completion_params(model, *, temperature,
   max_tokens)` + `model_omits_temperature(model)`. Ordered `fnmatch` registry;
   first match wins. **Claude Sonnet 5 / Opus 4.6-4.8 return HTTP 400 on any
   non-default sampling param, so those patterns omit `temperature`.** Wired into
@@ -148,21 +148,21 @@ is persona/instructions-free. A missing image raises `ValidationError`.
 
 ## pytest Plugin & MCP Server (v2.1.0)
 
-- `layoutlens/pytest_plugin.py` registers via the `pytest11` entry point: a
+- `src/layoutlens/pytest_plugin.py` registers via the `pytest11` entry point: a
   session-scoped `layoutlens` fixture with keyless `assert_a11y`/`assert_layout`
   and LLM-backed `assert_ui` (skips without a key / with `--layoutlens-no-llm`).
   Tested via pytester in `tests/test_pytest_plugin.py`.
-- `layoutlens/mcp_server.py` (extra `layoutlens[mcp]`, script `layoutlens-mcp`,
+- `src/layoutlens/mcp_server.py` (extra `layoutlens[mcp]`, script `layoutlens-mcp`,
   FastMCP): tools `audit_accessibility`/`scan_layout` (keyless, compact
   summaries — never raw axe JSON) and `check_ui`/`compare_ui` (LLM).
-- `layoutlens/sarif.py` emits SARIF 2.1.0 for both deterministic engines
+- `src/layoutlens/sarif.py` emits SARIF 2.1.0 for both deterministic engines
   (validated against the official OASIS schema).
 
 ## Deterministic Accessibility (axe-core)
 
-`layoutlens/a11y/` wraps a vendored axe-core bundle
-(`layoutlens/a11y/assets/axe.min.js` + `LICENSE-axe.txt`, version pinned in
-`AXE_VERSION` in `layoutlens/a11y/axe.py`), injected into a live Playwright
+`src/layoutlens/a11y/` wraps a vendored axe-core bundle
+(`src/layoutlens/a11y/assets/axe.min.js` + `LICENSE-axe.txt`, version pinned in
+`AXE_VERSION` in `src/layoutlens/a11y/axe.py`), injected into a live Playwright
 page via `AxeAuditor`.
 
 ```python
@@ -187,8 +187,8 @@ and optional `standards`/`instructions`):
 
 **To update the vendored axe-core version:** download the new
 `axe.min.js`/license from the [axe-core releases](https://github.com/dequelabs/axe-core/releases),
-replace the files in `layoutlens/a11y/assets/`, and bump `AXE_VERSION` in
-`layoutlens/a11y/axe.py` to match. Re-run
+replace the files in `src/layoutlens/a11y/assets/`, and bump `AXE_VERSION` in
+`src/layoutlens/a11y/axe.py` to match. Re-run
 `uv run python benchmarks/generators/generate_a11y_ground_truth.py --check`
 (see Benchmarks below) to confirm the accessibility fixtures' ground truth
 still matches.
@@ -205,7 +205,7 @@ on `LayoutLens` as of v2.0.0 — no more monkey-patching), or from the CLI with
 (`answer: "yes"|"no"` and/or `contains: [...]`) — a case with neither raises
 `ValidationError` at load time. There is no confidence-only fallback anymore.
 See `examples/sample_test_suite.yaml` for a complete example, and
-`layoutlens/api/test_suite.py` (`_evaluate_case_assertions`) for exactly how
+`src/layoutlens/api/test_suite.py` (`_evaluate_case_assertions`) for exactly how
 assertions are graded (`assertion_detail` is attached to each result's
 metadata and included in `UITestResult.to_json()`).
 
@@ -240,7 +240,7 @@ the same commit, from an actual run.
 
 ```bash
 uv run ruff check --fix && uv run ruff format   # Lint + format, zero tolerance for failures
-uv run pyright                                   # Type check (CI gate, standard mode over layoutlens/)
+uv run pyright                                   # Type check (CI gate, standard mode over src/)
 uv run pytest tests/ -v                          # Full suite
 uv run pytest tests/ -v -m "not browser"         # Skip tests that launch a real Chromium browser
 uv build                                         # Build the wheel/sdist
@@ -257,17 +257,15 @@ This repo is adopted into the [py-canon](https://github.com/gojiplus/py-canon)
 fleet standard (`.copier-answers.yml` tracks the template version; `preen
 check` audits conformance). Consequences that matter here:
 
-- **Version comes from git tags** (hatchling + uv-dynamic-versioning). There
-  is no static `version` in `pyproject.toml`; do not add one. A release is
-  `git tag vX.Y.Z && git push --tags` (or `preen release X.Y.Z`) — the tag
-  triggers `release.yml`, which tests, builds, publishes to PyPI via trusted
-  publishing, and creates the GitHub Release. `citation-sync.yml` then
-  updates CITATION.cff.
+- **Version is static in `pyproject.toml`** and must match a release tag.
+  `preen release X.Y.Z` updates the version and changelog, runs the release
+  checks, and creates the tag. The tag triggers `release.yml`, which tests,
+  builds, publishes to PyPI via trusted publishing, and creates the GitHub
+  Release. `citation-sync.yml` then updates CITATION.cff.
 - **CI is a shim** (`.github/workflows/ci.yml`) calling py-canon's
-  reusable-ci: ruff + pyright lint, a 3-OS × 3.11–3.14 test
-  matrix, a wheel install smoke test, zizmor workflow-security lint, and
-  dependency review. `docstrings.yml` runs pydoclint in an isolated uv tool
-  environment to avoid its parser dependency collision. Do NOT add jobs to
+  reusable-ci: Ruff, Pyright, and pydoclint; a 3-OS × 3.11–3.14 test matrix;
+  a wheel install smoke test; zizmor workflow-security lint; and dependency
+  review. Do NOT add jobs to
   `ci.yml` — `preen update` overwrites
   it wholesale. Repo-specific CI lives in sibling workflows:
   `browser.yml` (installs Chromium, runs `pytest -m browser` — the reusable

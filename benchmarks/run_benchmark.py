@@ -68,7 +68,7 @@ class BenchmarkRunner:
         answer_keys = {}
 
         for answer_file in self.answer_keys_path.glob("*.json"):
-            with open(answer_file) as f:
+            with answer_file.open() as f:
                 data = json.load(f)
                 answer_keys.update(data.get("test_cases", {}))
 
@@ -121,42 +121,36 @@ class BenchmarkRunner:
             )
 
             # Convert batch result to structured format
-            results = []
-            for result in batch_result.results:
-                results.append(
-                    {
-                        "html_file": Path(result.source).name,
-                        "query": result.query,
-                        "answer": result.answer,
-                        "confidence": result.confidence,
-                        "reasoning": result.reasoning,
-                        "success": True,
-                        "error": None,
-                        "metadata": result.metadata,
-                    }
-                )
-
-            return results
+            return [
+                {
+                    "html_file": Path(result.source).name,
+                    "query": result.query,
+                    "answer": result.answer,
+                    "confidence": result.confidence,
+                    "reasoning": result.reasoning,
+                    "success": True,
+                    "error": None,
+                    "metadata": result.metadata,
+                }
+                for result in batch_result.results
+            ]
 
         except Exception as e:
             # Return error results for all combinations
-            error_results = []
-            for html_file in html_files:
-                for query in queries:
-                    error_results.append(
-                        {
-                            "html_file": html_file.name,
-                            "query": query,
-                            "answer": f"Batch error: {e!s}",
-                            "confidence": 0.0,
-                            "reasoning": f"Batch test failed: {type(e).__name__}",
-                            "success": False,
-                            "error": str(e),
-                            "metadata": {"error_type": type(e).__name__},
-                        }
-                    )
-
-            return error_results
+            return [
+                {
+                    "html_file": html_file.name,
+                    "query": query,
+                    "answer": f"Batch error: {e!s}",
+                    "confidence": 0.0,
+                    "reasoning": f"Batch test failed: {type(e).__name__}",
+                    "success": False,
+                    "error": str(e),
+                    "metadata": {"error_type": type(e).__name__},
+                }
+                for html_file in html_files
+                for query in queries
+            ]
 
     async def run_benchmark(self, use_batch: bool = True) -> dict[str, Any]:
         """Run complete benchmark suite."""
@@ -259,7 +253,7 @@ class BenchmarkRunner:
         """Save benchmark results to JSON file."""
         output_file = self.output_dir / filename
 
-        with open(output_file, "w", encoding="utf-8") as f:
+        with output_file.open("w", encoding="utf-8") as f:
             json.dump(results, f, indent=2, ensure_ascii=False)
 
         print(f"💾 Results saved to: {output_file}")
