@@ -219,7 +219,8 @@ _JS_TARGETS = (
     const nonTargetText = [...parent.childNodes].some(node =>
       node.nodeType === Node.TEXT_NODE && (node.textContent || '').trim().length > 0
     );
-    return nonTargetText && parseFloat(cs.lineHeight) > 0;
+    return nonTargetText &&
+      (cs.lineHeight === 'normal' || parseFloat(cs.lineHeight) > 0);
   }
   function userAgentSized(el) {
     if (!/^(BUTTON|INPUT|SELECT|TEXTAREA)$/.test(el.tagName)) return false;
@@ -242,10 +243,13 @@ _JS_TARGETS = (
         catch (_) { return false; }
       });
     }
-    return ![...document.styleSheets].some(sheet => {
-      try { return rulesModify(sheet.cssRules); }
+    for (const sheet of document.styleSheets) {
+      let rules;
+      try { rules = sheet.cssRules; }
       catch (_) { return false; }
-    });
+      if (rulesModify(rules)) return false;
+    }
+    return true;
   }
   for (const el of targets) {
     const r = el.getBoundingClientRect();
@@ -288,8 +292,11 @@ _JS_TEXT_OCCLUSION = (
   const out = [];
   const seen = new Set();
   const oldX = scrollX, oldY = scrollY;
-  function paintedElement(el) {
+  function paintedElement(el, textElement) {
     for (let node = el; node && node !== document.documentElement; node = node.parentElement) {
+      // A common ancestor paints behind both branches; it cannot occlude text
+      // merely because a transparent sibling was returned by hit testing.
+      if (node.contains(textElement)) break;
       const cs = getComputedStyle(node);
       if (parseFloat(cs.opacity) === 0) continue;
       if (/^(IMG|VIDEO|CANVAS)$/.test(node.tagName)) return node;
@@ -334,7 +341,7 @@ _JS_TEXT_OCCLUSION = (
             sampled++;
             const top = document.elementFromPoint(x, y);
             if (top && top !== el && !el.contains(top) && !top.contains(el)) {
-              const occluder = paintedElement(top);
+              const occluder = paintedElement(top, el);
               if (occluder) hits.set(occluder, (hits.get(occluder) || 0) + 1);
             }
           }
@@ -370,19 +377,33 @@ _JS_FOCUS_OBSCURED = (
   const targets = [...document.querySelectorAll(selector)].filter(el => visible(el) && !el.disabled);
   const oldX = scrollX, oldY = scrollY, oldFocus = document.activeElement;
   const out = [];
-  function fullyOpaque(el) {
+  function opaqueRectangle(el) {
     const cs = getComputedStyle(el);
-    if (parseFloat(cs.opacity) < 0.999) return false;
-    if (/^(IMG|VIDEO|CANVAS|SVG)$/.test(el.tagName)) return true;
+    if (cs.transform !== 'none' || cs.clipPath !== 'none' ||
+        (cs.maskImage && cs.maskImage !== 'none') ||
+        (cs.webkitMaskImage && cs.webkitMaskImage !== 'none') ||
+        cs.backgroundClip !== 'border-box') return false;
+    if ([cs.borderTopLeftRadius, cs.borderTopRightRadius,
+         cs.borderBottomRightRadius, cs.borderBottomLeftRadius]
+        .some(value => parseFloat(value) > 0)) return false;
     const color = cs.backgroundColor;
     if (!color.startsWith('rgb')) return false;
     const parts = color.slice(color.indexOf('(') + 1, -1).split(',').map(value => parseFloat(value.trim()));
     return parts.length < 4 || parts[3] >= 0.999;
   }
-  function opaqueBlocker(el) {
-    for (let node = el; node && node !== document.documentElement; node = node.parentElement) {
-      if (fullyOpaque(node)) return node;
+  function opaqueBlocker(hit, target) {
+    const branch = [];
+    for (let node = hit; node && node !== document.documentElement; node = node.parentElement) {
+      // Stop before the first shared ancestor. Its paint is behind the target,
+      // not part of the stacking branch hit in front of it.
+      if (node.contains(target)) break;
+      branch.push(node);
     }
+    const effectiveOpacity = branch.reduce(
+      (product, node) => product * (parseFloat(getComputedStyle(node).opacity) || 0), 1
+    );
+    if (effectiveOpacity < 0.999) return null;
+    for (const node of branch) if (opaqueRectangle(node)) return node;
     return null;
   }
   for (const el of targets) {
@@ -402,14 +423,26 @@ _JS_FOCUS_OBSCURED = (
         const top = document.elementFromPoint(x, y);
         if (top && (top === el || el.contains(top))) visiblePoints++;
         else if (top) {
-          const blocker = opaqueBlocker(top);
+          const blocker = opaqueBlocker(top, el);
           if (blocker) blockers.set(blocker, (blockers.get(blocker) || 0) + 1);
           else visiblePoints++;
         } else visiblePoints++;
       }
     }
-    if (sampled > 0 && visiblePoints === 0 && blockers.size) {
-      const [occluder, covered] = [...blockers.entries()].sort((a, b) => b[1] - a[1])[0];
+    const visibleRect = {
+      left: Math.max(0, r.left), top: Math.max(0, r.top),
+      right: Math.min(innerWidth, r.right), bottom: Math.min(innerHeight, r.bottom)
+    };
+    const exactBlockers = [...blockers.entries()].filter(([blocker]) => {
+      const b = blocker.getBoundingClientRect();
+      return b.left <= visibleRect.left && b.top <= visibleRect.top &&
+             b.right >= visibleRect.right && b.bottom >= visibleRect.bottom;
+    }).sort((a, b) => b[1] - a[1]);
+    // Sparse interior samples can establish which stacking branch is in front,
+    // but cannot prove complete coverage. Only an opaque, axis-aligned rectangle
+    // containing the target's entire visible box is strong enough to fail 2.4.11.
+    if (sampled > 0 && visiblePoints === 0 && exactBlockers.length) {
+      const [occluder, covered] = exactBlockers[0];
       const o = occluder.getBoundingClientRect();
       out.push({selector: cssPath(el), occluder: cssPath(occluder), sampledPoints: sampled,
                 visiblePoints, coveredSamples: covered,

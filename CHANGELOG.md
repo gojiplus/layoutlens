@@ -22,6 +22,9 @@ All notable changes to LayoutLens are documented in this file.
   user-agent-control exceptions instead of reporting every target below 24 by 24 CSS pixels.
   Findings explicitly retain equivalent-control and essential-presentation as manual-review
   exceptions rather than pretending those semantic questions are automated.
+- Occlusion checks no longer promote painted shared ancestors or translucent stacking branches
+  to foreground blockers. Focus obscuration requires one fully opaque rectangular blocker to
+  cover the component's complete visible box rather than inferring failure from sparse samples.
 
 ### Documentation
 

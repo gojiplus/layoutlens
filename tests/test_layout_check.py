@@ -213,10 +213,13 @@ class TestScorerCacheKey:
             # Same source, stricter custom scorer: must re-scan, not replay.
             strict = LayoutScorer(min_target_px=48, contrast_threshold=7.0)
             second = await lens.check_layout("page.html", mode="hybrid", scorer=strict)
+            dense = LayoutScorer(occlusion_samples_per_axis=7)
+            third = await lens.check_layout("page.html", mode="hybrid", scorer=dense)
             # And an identical rerun with the default scorer IS a cache hit.
-            third = await lens.check_layout("page.html", mode="hybrid")
+            fourth = await lens.check_layout("page.html", mode="hybrid")
 
-        assert mock_scan.await_count == 2
+        assert mock_scan.await_count == 3
         assert not first.metadata.get("cache_hit")
         assert not second.metadata.get("cache_hit")
-        assert third.metadata.get("cache_hit") is True
+        assert not third.metadata.get("cache_hit")
+        assert fourth.metadata.get("cache_hit") is True

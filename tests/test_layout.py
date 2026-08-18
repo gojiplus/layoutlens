@@ -295,6 +295,20 @@ class TestLayoutBrowser:
         targets = [f for f in report.findings if f.defect_class == "target-size"]
         assert not any(f.selector in {"#isolated", "#inline"} for f in targets)
 
+    def test_target_size_inline_exception_accepts_normal_line_height(self, tmp_path):
+        path = _write(
+            tmp_path,
+            "target_inline_normal",
+            '<p>Choose <a id="one" href="#" style="font-size:10px">one</a> or '
+            '<a id="two" href="#" style="font-size:10px">two</a>.</p>',
+        )
+        targets = [
+            finding
+            for finding in _scan(path).findings
+            if finding.defect_class == "target-size"
+        ]
+        assert not any(finding.selector in {"#one", "#two"} for finding in targets)
+
     def test_target_size_unmodified_user_agent_control_exception(self, tmp_path):
         path = _write(
             tmp_path,
@@ -307,6 +321,34 @@ class TestLayoutBrowser:
         targets = [f for f in report.findings if f.defect_class == "target-size"]
         assert not any(f.selector == "#native" for f in targets)
         assert any(f.selector == "#authored" for f in targets)
+
+    def test_target_size_unreadable_stylesheet_disables_user_agent_exception(
+        self, tmp_path
+    ):
+        from layoutlens.browser import open_page
+
+        path = _write(
+            tmp_path,
+            "target_unreadable_stylesheet",
+            '<style id="remote">button { color: navy }</style>'
+            '<button id="one">x</button><button id="two">y</button>',
+        )
+
+        async def _run():
+            async with open_page(path) as page:
+                await page.evaluate(
+                    """() => {
+                      const sheet = document.querySelector('#remote').sheet;
+                      Object.defineProperty(sheet, 'cssRules', {
+                        get() { throw new DOMException('cross-origin', 'SecurityError'); }
+                      });
+                    }"""
+                )
+                return await LayoutScorer().detect_small_targets(page)
+
+        targets = asyncio.run(_run())
+        assert any(finding.selector == "#one" for finding in targets)
+        assert any(finding.selector == "#two" for finding in targets)
 
     def test_text_occlusion_defect(self, tmp_path):
         path = _write(
@@ -344,6 +386,22 @@ class TestLayoutBrowser:
             finding.measured for finding in findings
         ]
 
+    def test_text_occlusion_does_not_promote_shared_painted_ancestor(self, tmp_path):
+        path = _write(
+            tmp_path,
+            "text_occlusion_shared_ancestor",
+            '<div id="card" style="position:relative;width:300px;height:100px;background:white">'
+            '<span id="label" style="position:absolute;left:80px;top:30px">72% target</span>'
+            '<div id="overlay" style="position:absolute;inset:0;z-index:2"></div>'
+            "</div>",
+        )
+        findings = [
+            finding
+            for finding in _scan(path).findings
+            if finding.defect_class == "text-occlusion"
+        ]
+        assert not any(finding.selector == "#label" for finding in findings)
+
     def test_focus_not_obscured_defect(self, tmp_path):
         path = _write(
             tmp_path,
@@ -377,13 +435,57 @@ class TestLayoutBrowser:
             '<div id="banner" style="position:fixed;left:0;right:0;bottom:0;'
             'height:160px;background:#222;opacity:.5;z-index:10"></div>',
         )
-        for path in (partial, translucent):
+        nested_translucent = _write(
+            tmp_path,
+            "focus_nested_translucent",
+            '<div style="height:1200px"></div>'
+            '<button id="submit" style="height:40px;width:140px">Submit</button>'
+            '<div id="banner" style="position:fixed;left:0;right:0;bottom:0;'
+            'height:160px;opacity:.5;z-index:10">'
+            '<div style="width:100%;height:100%;background:#222"></div></div>',
+        )
+        for path in (partial, translucent, nested_translucent):
             findings = [
                 finding
                 for finding in _scan(path).findings
                 if finding.defect_class == "focus-obscured"
             ]
             assert not any(finding.selector == "#submit" for finding in findings)
+
+    def test_focus_not_obscured_allows_narrow_visible_edge(self, tmp_path):
+        path = _write(
+            tmp_path,
+            "focus_visible_edge",
+            '<div style="height:1200px"></div>'
+            '<button id="submit" style="height:100px;width:140px">Submit</button>'
+            '<div id="banner" style="position:fixed;left:0;right:0;bottom:0;'
+            'height:95px;background:#222;z-index:10"></div>',
+        )
+        findings = [
+            finding
+            for finding in _scan(path).findings
+            if finding.defect_class == "focus-obscured"
+        ]
+        assert not any(finding.selector == "#submit" for finding in findings)
+
+    def test_focus_not_obscured_does_not_promote_shared_painted_ancestor(
+        self, tmp_path
+    ):
+        path = _write(
+            tmp_path,
+            "focus_shared_ancestor",
+            '<div id="card" style="position:relative;background:white">'
+            '<div style="height:1200px"></div>'
+            '<button id="submit" style="height:40px;width:140px">Submit</button>'
+            '<div id="overlay" style="position:fixed;inset:0;z-index:10"></div>'
+            "</div>",
+        )
+        findings = [
+            finding
+            for finding in _scan(path).findings
+            if finding.defect_class == "focus-obscured"
+        ]
+        assert not any(finding.selector == "#submit" for finding in findings)
 
     def test_clean_page_is_ok(self, tmp_path):
         path = _write(

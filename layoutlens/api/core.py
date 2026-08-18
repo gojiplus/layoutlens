@@ -1856,6 +1856,7 @@ Focus on:
                     "clip_tolerance_px": scorer.clip_tolerance_px,
                     "protrude_tolerance_px": scorer.protrude_tolerance_px,
                     "contrast_threshold": scorer.contrast_threshold,
+                    "occlusion_samples_per_axis": scorer.occlusion_samples_per_axis,
                 },
             },
             model=self._model_fingerprint(),
