@@ -4,11 +4,22 @@ All notable changes to LayoutLens are documented in this file.
 
 ## [Unreleased]
 
+## [2.1.1] - 2026-08-17
+
 ### Changed
 
 - Completed the py-canon adoption: packaging now uses a static version with
   `uv_build`, the source tree uses the standard `src/` layout, and Copier records
   the exact py-canon release used to render the project.
+
+### Fixed
+
+- Batch resume manifests now bind the model, output-token budget, exact prompts,
+  image MIME types, and image bytes. Changed requests cannot silently reuse stale
+  results.
+- Corrupt, legacy, and mismatched manifests fail before provider submission;
+  duplicate request ids are rejected; and manifest updates use atomic file
+  replacement.
 
 ## [2.1.0] - 2026-08-17
 

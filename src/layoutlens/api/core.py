@@ -1609,20 +1609,21 @@ Focus on:
 
         The backend is chosen from ``self.model``: ``gemini/*`` (AI Studio) uses
         the google-genai inline batch (optional extra ``layoutlens[gemini]``);
-        every other model uses the litellm file-based batch (OpenAI, Anthropic,
-        Vertex, Bedrock, ...). Both are resumable via a manifest.
+        supported non-Gemini models use the litellm file-based batch. Both are
+        resumable via a manifest.
 
         Args:
-            requests: The batch items. Each ``id`` keys its result. A request
-                whose image is missing yields an ``"unknown"`` result rather
-                than aborting the batch.
+            requests: The batch items. Each ``id`` must be unique and keys its
+                result. A request whose image is missing yields an ``"unknown"``
+                result rather than aborting the batch.
             max_tokens: Per-request token budget. Defaults to ``AUTO`` (8000 for
                 reasoning models, else 300); an explicit integer overrides.
             resume: When True (default), collect any prior jobs from the
                 manifest first and submit only uncovered ids.
             manifest_path: Where submitted job ids persist for resume. Defaults
-                to a path under ``output_dir/batch`` keyed by the request-id set
-                and model.
+                to a content-addressed path under ``output_dir/batch`` keyed by
+                the model, token budget, exact prompts, image MIME types, and
+                image bytes.
             poll_interval: Seconds between batch-status polls.
             poll_timeout: Max seconds to wait for a single batch job.
 
@@ -1632,6 +1633,8 @@ Focus on:
         Raises:
             AuthenticationError: If no API key is configured for a mapped provider.
             ImportError: If a ``gemini/*`` model is used without ``google-genai``.
+            ValidationError: If request ids repeat or an existing resume manifest
+                does not match the exact request.
         """
         from .batch import judge_batch as _judge_batch
 

@@ -309,11 +309,15 @@ async def test_resume_litellm_skips_covered_ids(lens, png, png2):
     # output only has 'a'). Simpler: seed the manifest directly.
     import layoutlens.api.batch as bm
 
+    requests = [BatchRequest("a", png, "p1"), BatchRequest("b", png2, "p2")]
+    fingerprint = bm._batch_fingerprint(lens, requests, 300)
     bm._write_manifest(
         bm.Path(manifest),
         {
+            "fingerprint": fingerprint,
             "model": "gpt-4o-mini",
             "backend": "litellm",
+            "max_tokens": 300,
             "jobs": [{"batch_id": "prior", "input_file_id": "f", "ids": ["a"]}],
         },
     )
@@ -343,11 +347,7 @@ async def test_resume_litellm_skips_covered_ids(lens, png, png2):
         patch.object(batch_mod, "aretrieve_batch", arb),
         patch.object(batch_mod, "afile_content", afc),
     ):
-        results = await lens.judge_batch(
-            [BatchRequest("a", png, "p1"), BatchRequest("b", png2, "p2")],
-            resume=True,
-            manifest_path=manifest,
-        )
+        results = await lens.judge_batch(requests, resume=True, manifest_path=manifest)
 
     assert results["a"].answer == "A"
     assert results["b"].answer == "B"
@@ -358,6 +358,125 @@ async def test_resume_litellm_skips_covered_ids(lens, png, png2):
         for x in acf.await_args.kwargs["file"].decode("utf-8").strip().splitlines()
     }
     assert submitted_ids == {"b"}
+
+
+def test_batch_fingerprint_binds_prompt_image_model_budget_and_order(lens, png, png2):
+    requests = [BatchRequest("a", png, "p1"), BatchRequest("b", png2, "p2")]
+    baseline = batch_mod._batch_fingerprint(lens, requests, 300)
+
+    assert batch_mod._batch_fingerprint(lens, list(reversed(requests)), 300) == baseline
+    assert batch_mod._batch_fingerprint(lens, requests, 301) != baseline
+    assert (
+        batch_mod._batch_fingerprint(
+            lens, [BatchRequest("a", png, "changed"), requests[1]], 300
+        )
+        != baseline
+    )
+
+    original = batch_mod.Path(png2).read_bytes()
+    batch_mod.Path(png2).write_bytes(original + b"changed")
+    assert batch_mod._batch_fingerprint(lens, requests, 300) != baseline
+
+    other_model = LayoutLens(
+        api_key="sk", model="gpt-4o", output_dir=str(lens.output_dir)
+    )
+    assert batch_mod._batch_fingerprint(other_model, requests, 300) != baseline
+
+
+@pytest.mark.asyncio
+async def test_explicit_resume_manifest_mismatch_fails_before_submission(lens, png):
+    manifest = lens.output_dir / "mismatch.json"
+    batch_mod._write_manifest(
+        manifest,
+        {
+            "fingerprint": "wrong",
+            "model": lens.model,
+            "backend": "litellm",
+            "max_tokens": 300,
+            "jobs": [],
+        },
+    )
+    acf, acb, arb, afc = _make_litellm_mocks("")
+    with (
+        patch.object(batch_mod, "acreate_file", acf),
+        patch.object(batch_mod, "acreate_batch", acb),
+        patch.object(batch_mod, "aretrieve_batch", arb),
+        patch.object(batch_mod, "afile_content", afc),
+        pytest.raises(ValidationError, match="does not match the exact"),
+    ):
+        await lens.judge_batch([BatchRequest("r1", png, "p")], manifest_path=manifest)
+    acf.assert_not_awaited()
+    acb.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_corrupt_resume_manifest_fails_before_submission(lens, png):
+    manifest = lens.output_dir / "corrupt.json"
+    manifest.write_text("{", encoding="utf-8")
+    acf, acb, arb, afc = _make_litellm_mocks("")
+    with (
+        patch.object(batch_mod, "acreate_file", acf),
+        patch.object(batch_mod, "acreate_batch", acb),
+        patch.object(batch_mod, "aretrieve_batch", arb),
+        patch.object(batch_mod, "afile_content", afc),
+        pytest.raises(ValidationError, match="unreadable or invalid"),
+    ):
+        await lens.judge_batch([BatchRequest("r1", png, "p")], manifest_path=manifest)
+    acf.assert_not_awaited()
+    acb.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_duplicate_request_ids_fail_before_submission(lens, png):
+    acf, acb, arb, afc = _make_litellm_mocks("")
+    with (
+        patch.object(batch_mod, "acreate_file", acf),
+        patch.object(batch_mod, "acreate_batch", acb),
+        patch.object(batch_mod, "aretrieve_batch", arb),
+        patch.object(batch_mod, "afile_content", afc),
+        pytest.raises(ValidationError, match="ids must be unique"),
+    ):
+        await lens.judge_batch(
+            [BatchRequest("r1", png, "p1"), BatchRequest("r1", png, "p2")]
+        )
+    acf.assert_not_awaited()
+    acb.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_legacy_default_manifest_blocks_possible_duplicate(lens, png):
+    requests = [BatchRequest("r1", png, "p")]
+    legacy = batch_mod._legacy_manifest_path(lens, requests)
+    batch_mod._write_manifest(
+        legacy,
+        {"model": lens.model, "backend": "litellm", "jobs": [{"batch_id": "paid"}]},
+    )
+    with pytest.raises(ValidationError, match="legacy Batch manifest"):
+        await lens.judge_batch(requests)
+
+
+@pytest.mark.asyncio
+async def test_resume_false_allows_intentional_fresh_batch_with_legacy_manifest(
+    lens, png
+):
+    requests = [BatchRequest("r1", png, "p")]
+    legacy = batch_mod._legacy_manifest_path(lens, requests)
+    batch_mod._write_manifest(
+        legacy,
+        {"model": lens.model, "backend": "litellm", "jobs": [{"batch_id": "paid"}]},
+    )
+    output = _openai_batch_line("r1", '{"answer": "fresh"}') + "\n"
+    acf, acb, arb, afc = _make_litellm_mocks(output)
+    with (
+        patch.object(batch_mod, "acreate_file", acf),
+        patch.object(batch_mod, "acreate_batch", acb),
+        patch.object(batch_mod, "aretrieve_batch", arb),
+        patch.object(batch_mod, "afile_content", afc),
+    ):
+        results = await lens.judge_batch(requests, resume=False)
+
+    assert results["r1"].answer == "fresh"
+    acb.assert_awaited_once()
 
 
 # --- genai backend with a fake client -------------------------------------

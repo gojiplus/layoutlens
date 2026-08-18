@@ -450,6 +450,12 @@ result.usage  # {"prompt_tokens": ..., "completion_tokens": ..., "total_tokens":
 result.parse_mode  # "json" | "fallback" | "none"
 ```
 
+For bulk evaluation, `judge_batch()` uses provider-native asynchronous Batch
+APIs. `gemini/*` models use the Google Gen AI inline Batch API; supported
+non-Gemini models use LiteLLM's file-based Batch API. Resume manifests are
+content-addressed by the exact prompts, images, model, and token budget, so a
+changed request cannot reuse a stale response.
+
 Key guarantees:
 
 - **Verbatim prompt** — LayoutLens adds nothing to the text you provide.
