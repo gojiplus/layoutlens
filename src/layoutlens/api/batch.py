@@ -439,9 +439,7 @@ def _genai_client(lens: LayoutLens):
     return genai.Client(api_key=api_key)
 
 
-def _genai_inline_request(
-    lens: LayoutLens, req: BatchRequest, max_tokens: int
-) -> dict[str, Any]:
+def _genai_inline_request(req: BatchRequest, max_tokens: int) -> dict[str, Any]:
     """Build the InlinedRequest kwargs for ``req`` as a plain dict.
 
     Plain dict (not a google-genai type) so payload construction is pure and
@@ -597,9 +595,7 @@ async def _judge_batch_genai(
     results: dict[str, JudgeResult] = {}
     valid = _split_missing_images(lens, requests, results)
 
-    payloads = [
-        (req, _genai_inline_request(lens, req, max_tokens_value)) for req in valid
-    ]
+    payloads = [(req, _genai_inline_request(req, max_tokens_value)) for req in valid]
 
     client = _genai_client(lens)
 
@@ -687,7 +683,7 @@ async def judge_batch(
         else _default_manifest_path(lens, requests)
     )
 
-    lens._ensure_api_key()
+    lens._ensure_api_key()  # noqa: SLF001
 
     backend = (
         _judge_batch_genai if _is_gemini_studio(lens.model) else _judge_batch_litellm

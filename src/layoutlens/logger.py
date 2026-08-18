@@ -33,9 +33,7 @@ def get_logger(name: str) -> logging.Logger:
     Returns:
         Configured logger instance.
     """
-    logger = logging.getLogger(f"layoutlens.{name}")
-
-    return logger
+    return logging.getLogger(f"layoutlens.{name}")
 
 
 def setup_logging(
@@ -46,7 +44,7 @@ def setup_logging(
     format_type: str = "default",
     max_bytes: int = 10 * 1024 * 1024,  # 10MB
     backup_count: int = 5,
-    **kwargs,
+    **_kwargs,
 ) -> None:
     """Configure logging for LayoutLens.
 
@@ -221,7 +219,7 @@ def log_function_call(func_name: str, **kwargs) -> None:
         else:
             safe_kwargs[key] = str(value)[:100]  # Truncate long values
 
-    logger.debug(f"Calling {func_name} with parameters: {safe_kwargs}")
+    logger.debug("Calling %s with parameters: %s", func_name, safe_kwargs)
 
 
 def log_performance_metric(operation: str, duration: float, **metadata) -> None:
@@ -244,7 +242,7 @@ def log_performance_metric(operation: str, duration: float, **metadata) -> None:
         **metadata,
     }
 
-    perf_logger.info(f"Performance: {metric_data}")
+    perf_logger.info("Performance: %s", metric_data)
 
 
 # Initialize default logging configuration

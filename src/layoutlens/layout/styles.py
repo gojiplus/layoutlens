@@ -10,7 +10,10 @@ the rendered ``text-align`` of ``#hero``?" deterministically, no LLM involved.
 
 from __future__ import annotations
 
-from playwright.async_api import Page
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from playwright.async_api import Page
 
 _JS_READ_STYLES = """([sel, props]) => {
   const el = document.querySelector(sel);

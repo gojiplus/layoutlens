@@ -17,10 +17,12 @@ to build its contrast ground truth.
 from __future__ import annotations
 
 import re
-
-from playwright.async_api import Page
+from typing import TYPE_CHECKING
 
 from .types import CONTRAST, LayoutFinding
+
+if TYPE_CHECKING:
+    from playwright.async_api import Page
 
 RGB = tuple[int, int, int]
 

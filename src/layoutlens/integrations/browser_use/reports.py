@@ -43,7 +43,7 @@ class ValidationReportGenerator:
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.logger.info(
-            f"ValidationReportGenerator initialized - output_dir: {self.output_dir}"
+            "ValidationReportGenerator initialized - output_dir: %s", self.output_dir
         )
 
     def generate_html_report(
@@ -77,10 +77,10 @@ class ValidationReportGenerator:
             embed_images,
         )
 
-        with open(output_path, "w", encoding="utf-8") as f:
+        with output_path.open("w", encoding="utf-8") as f:
             f.write(html_content)
 
-        self.logger.info(f"Generated HTML report: {output_path}")
+        self.logger.info("Generated HTML report: %s", output_path)
         return output_path
 
     def generate_json_report(
@@ -106,10 +106,10 @@ class ValidationReportGenerator:
 
         report_data = self._session_to_dict(session)
 
-        with open(output_path, "w", encoding="utf-8") as f:
+        with output_path.open("w", encoding="utf-8") as f:
             json.dump(report_data, f, indent=2, default=str)
 
-        self.logger.info(f"Generated JSON report: {output_path}")
+        self.logger.info("Generated JSON report: %s", output_path)
         return output_path
 
     def _session_to_dict(self, session: ValidationSession) -> dict[str, Any]:
@@ -194,7 +194,7 @@ class ValidationReportGenerator:
                     import base64
 
                     try:
-                        with open(step.screenshot_path, "rb") as f:
+                        with Path(step.screenshot_path).open("rb") as f:
                             img_data = base64.b64encode(f.read()).decode()
                         screenshot_html = f'<img src="data:image/png;base64,{img_data}" class="screenshot" />'
                     except Exception:
@@ -243,7 +243,7 @@ class ValidationReportGenerator:
                     <p><strong>Findings:</strong> {len(step.findings)}</p>
                 </div>
                 <div class="findings">
-                    {findings_html if findings_html else '<p class="no-findings">No issues found</p>'}
+                    {findings_html or '<p class="no-findings">No issues found</p>'}
                 </div>
                 <details class="reasoning">
                     <summary>Detailed Reasoning</summary>
@@ -259,7 +259,7 @@ class ValidationReportGenerator:
             for sev, count in findings_summary.items()
         )
 
-        html = f"""<!DOCTYPE html>
+        return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -420,8 +420,6 @@ class ValidationReportGenerator:
     </div>
 </body>
 </html>"""
-
-        return html
 
     def generate_timeline_data(self, session: ValidationSession) -> dict[str, Any]:
         """Generate timeline visualization data for the session.

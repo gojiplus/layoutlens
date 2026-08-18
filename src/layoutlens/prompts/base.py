@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from .context import Instructions
+if TYPE_CHECKING:
+    from .context import Instructions
 
 
 @dataclass
@@ -98,24 +99,20 @@ class ExpertPrompt(ABC):
     @abstractmethod
     def name(self) -> str:
         """Expert name/identifier."""
-        pass
 
     @property
     @abstractmethod
     def description(self) -> str:
         """Description of expert's specialty."""
-        pass
 
     @property
     @abstractmethod
     def domain_knowledge(self) -> list[str]:
         """List of domain knowledge areas."""
-        pass
 
     @abstractmethod
     def get_template(self) -> PromptTemplate:
         """Get the expert's prompt template."""
-        pass
 
     def analyze(
         self, query: str, instructions: Instructions | None = None

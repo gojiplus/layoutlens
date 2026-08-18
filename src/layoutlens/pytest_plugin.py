@@ -142,11 +142,11 @@ class LayoutLensFixture:
         findings = result.metadata["layout"]["findings"]
         if findings:
             lines = [f"Layout defects on {source} [{viewport}]:"]
-            for f in findings:
-                lines.append(
-                    f"  - {f['defect_class']} at {f['selector']}: "
-                    f"{f['description']} (measured: {f['measured']})"
-                )
+            lines.extend(
+                f"  - {finding['defect_class']} at {finding['selector']}: "
+                f"{finding['description']} (measured: {finding['measured']})"
+                for finding in findings
+            )
             pytest.fail("\n".join(lines), pytrace=False)
         return result
 

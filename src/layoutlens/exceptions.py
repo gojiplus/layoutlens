@@ -33,7 +33,10 @@ class LayoutLensError(Exception):
         # Log the exception when it's created
         logger = get_logger("exceptions")
         logger.error(
-            f"{self.__class__.__name__}: {message}", extra={"details": self.details}
+            "%s: %s",
+            self.__class__.__name__,
+            message,
+            extra={"details": self.details},
         )
 
     def __str__(self):

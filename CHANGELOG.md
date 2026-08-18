@@ -4,6 +4,12 @@ All notable changes to LayoutLens are documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Completed the py-canon adoption: packaging now uses a static version with
+  `uv_build`, the source tree uses the standard `src/` layout, and Copier records
+  the exact py-canon release used to render the project.
+
 ## [2.1.0] - 2026-08-17
 
 ### Added

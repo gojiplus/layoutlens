@@ -95,40 +95,36 @@ def _steps_from_dir(screenshot_dir: str | Path) -> list[tuple[str, str | None]]:
 
 def _findings_from_a11y(report: Any) -> list[ValidationFinding]:
     """Convert an ``A11yReport``'s violations to validation findings."""
-    findings = []
-    for v in report.violations:
-        findings.append(
-            ValidationFinding(
-                issue=f"axe: {v.rule_id} — {v.description}",
-                severity=_AXE_SEVERITY.get(v.impact, ValidationSeverity.MEDIUM),
-                expert="axe-core",
-                confidence=1.0,
-                location=", ".join(",".join(n.get("target", [])) for n in v.nodes[:3]),
-                wcag_reference=", ".join(v.wcag_refs) or None,
-                verified=True,
-                metadata={"rule_id": v.rule_id, "impact": v.impact},
-            )
+    return [
+        ValidationFinding(
+            issue=f"axe: {v.rule_id} — {v.description}",
+            severity=_AXE_SEVERITY.get(v.impact, ValidationSeverity.MEDIUM),
+            expert="axe-core",
+            confidence=1.0,
+            location=", ".join(",".join(n.get("target", [])) for n in v.nodes[:3]),
+            wcag_reference=", ".join(v.wcag_refs) or None,
+            verified=True,
+            metadata={"rule_id": v.rule_id, "impact": v.impact},
         )
-    return findings
+        for v in report.violations
+    ]
 
 
 def _findings_from_layout(report: Any) -> list[ValidationFinding]:
     """Convert a ``LayoutReport``'s findings to validation findings."""
-    findings = []
-    for f in report.findings:
-        findings.append(
-            ValidationFinding(
-                issue=f"layout: {f.defect_class} at {f.selector}",
-                severity=ValidationSeverity.MEDIUM,
-                expert="layout-scorer",
-                confidence=1.0,
-                location=f.selector,
-                wcag_reference=", ".join(getattr(f, "wcag_refs", []) or []) or None,
-                verified=True,
-                metadata={"measured": f.measured, "threshold": f.threshold},
-            )
+    return [
+        ValidationFinding(
+            issue=f"layout: {f.defect_class} at {f.selector}",
+            severity=ValidationSeverity.MEDIUM,
+            expert="layout-scorer",
+            confidence=1.0,
+            location=f.selector,
+            wcag_reference=", ".join(getattr(f, "wcag_refs", []) or []) or None,
+            verified=True,
+            metadata={"measured": f.measured, "threshold": f.threshold},
         )
-    return findings
+        for f in report.findings
+    ]
 
 
 async def validate_agent_run(
@@ -194,7 +190,7 @@ async def validate_agent_run(
                     findings.extend(_findings_from_a11y(report))
                     notes.append(f"axe: {len(report.violations)} violation(s)")
                 except Exception as e:
-                    logger.warning(f"axe re-audit failed for {url}: {e}")
+                    logger.warning("axe re-audit failed for %s: %s", url, e)
                     notes.append(f"axe failed: {e}")
             if "layout" in checks:
                 try:
@@ -202,7 +198,7 @@ async def validate_agent_run(
                     findings.extend(_findings_from_layout(report))
                     notes.append(f"layout: {len(report.findings)} defect(s)")
                 except Exception as e:
-                    logger.warning(f"layout re-audit failed for {url}: {e}")
+                    logger.warning("layout re-audit failed for %s: %s", url, e)
                     notes.append(f"layout failed: {e}")
 
             session.steps.append(

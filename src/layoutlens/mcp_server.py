@@ -94,8 +94,10 @@ async def scan_layout(url: str, viewport: str = "desktop") -> str:
     )
     report = result.metadata["layout"]
     lines = [result.answer + f" [{viewport}]"]
-    for f in report["findings"]:
-        lines.append(f"- {f['defect_class']} at {f['selector']}: {f['description']}")
+    lines.extend(
+        f"- {finding['defect_class']} at {finding['selector']}: {finding['description']}"
+        for finding in report["findings"]
+    )
     return "\n".join(lines)
 
 

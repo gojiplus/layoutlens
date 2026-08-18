@@ -16,16 +16,19 @@ import http.server
 import socket
 import socketserver
 import threading
-from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 from playwright.async_api import Browser, Page, async_playwright
 
 from .logger import get_logger
 from .types import Viewport, ViewportType
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
 
 logger = get_logger("browser")
 
@@ -110,12 +113,12 @@ def _make_server(html_file_path: Path) -> socketserver.TCPServer:
                     self.send_response(200)
                     self.send_header("Content-type", "text/html")
                     self.end_headers()
-                    with open(html_file_path, "rb") as f:
+                    with html_file_path.open("rb") as f:
                         self.wfile.write(f.read())
                 case _:
                     super().do_GET()
 
-        def log_message(self, format, *args):
+        def log_message(self, format, *args):  # noqa: A002, ARG002
             # Suppress default HTTP server logging.
             return
 
@@ -187,7 +190,7 @@ async def open_page(
         # Give the server a moment to start accepting connections.
         await asyncio.sleep(0.5)
         target_url = f"http://localhost:{port}/"
-        logger.debug(f"Serving {html_file_path} at {target_url}")
+        logger.debug("Serving %s at %s", html_file_path, target_url)
 
     context_options = {
         "viewport": {
