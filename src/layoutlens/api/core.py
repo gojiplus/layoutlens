@@ -1619,7 +1619,8 @@ Focus on:
             max_tokens: Per-request token budget. Defaults to ``AUTO`` (8000 for
                 reasoning models, else 300); an explicit integer overrides.
             resume: When True (default), collect any prior jobs from the
-                manifest first and submit only uncovered ids.
+                manifest first and submit only uncovered ids. When False, the
+                selected manifest path must not already exist.
             manifest_path: Where submitted job ids persist for resume. Defaults
                 to a content-addressed path under ``output_dir/batch`` keyed by
                 the model, token budget, exact prompts, image MIME types, and

@@ -454,7 +454,10 @@ For bulk evaluation, `judge_batch()` uses provider-native asynchronous Batch
 APIs. `gemini/*` models use the Google Gen AI inline Batch API; supported
 non-Gemini models use LiteLLM's file-based Batch API. Resume manifests are
 content-addressed by the exact prompts, images, model, and token budget, so a
-changed request cannot reuse a stale response.
+changed request cannot reuse a stale response. A per-manifest lock prevents two
+processes from submitting the same exact batch concurrently. Manifests created
+before 2.1.1 fail closed with explicit migration details because they cannot
+attest their original prompts, images, or token budget.
 
 Key guarantees:
 

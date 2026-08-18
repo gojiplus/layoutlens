@@ -20,6 +20,16 @@ All notable changes to LayoutLens are documented in this file.
 - Corrupt, legacy, and mismatched manifests fail before provider submission;
   duplicate request ids are rejected; and manifest updates use atomic file
   replacement.
+- Concurrent calls with the same Batch identity cannot submit duplicate work,
+  and `resume=False` cannot overwrite the only record of a paid provider job.
+
+### Upgrading
+
+- LayoutLens cannot automatically trust a resume manifest written before 2.1.1
+  because it does not identify the prompts, images, or token budget. The error
+  now reports the exact destination and identity fields needed for deliberate
+  migration after the user verifies the provider job. No migration or new
+  submission happens automatically.
 
 ## [2.1.0] - 2026-08-17
 

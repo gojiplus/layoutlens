@@ -41,6 +41,7 @@ import json
 import os
 import tempfile
 import time
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -64,6 +65,8 @@ from .judge import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from .core import LayoutLens
 
 logger = get_logger("api.batch")
@@ -226,7 +229,8 @@ def _resume_manifest(
     if manifest is None:
         raise ValidationError(
             "Batch resume manifest exists but is unreadable or invalid. Refusing to submit "
-            "a possibly duplicate batch.",
+            "a possibly duplicate batch. Inspect it for a recoverable provider job id; if it "
+            "cannot be recovered, move it aside before retrying. No submission was made.",
             field="manifest_path",
             value=str(path),
         )
@@ -271,6 +275,31 @@ def _write_manifest(path: Path, data: dict[str, Any]) -> None:
     except BaseException:
         temporary_path.unlink(missing_ok=True)
         raise
+
+
+@contextmanager
+def _manifest_lock(path: Path) -> Iterator[None]:
+    """Prevent concurrent submissions from sharing one manifest identity."""
+    lock_path = path.with_suffix(f"{path.suffix}.lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    except FileExistsError as exc:
+        raise ValidationError(
+            "Another process owns this Batch manifest, or a prior process stopped without "
+            "releasing its lock. Confirm no matching run is active before removing the lock; "
+            "no submission was made.",
+            field="manifest_path",
+            value=str(lock_path),
+        ) from exc
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(f"pid={os.getpid()} created_unix={time.time()}\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        yield
+    finally:
+        lock_path.unlink(missing_ok=True)
 
 
 def _validate_request_ids(requests: list[BatchRequest]) -> None:
@@ -485,6 +514,7 @@ async def _judge_batch_litellm(
         max_tokens=max_tokens_value,
     )
     jobs: list[dict[str, Any]] = list(manifest.get("jobs", [])) if resume else []
+    requested = {request.id for request in valid}
     covered: set[str] = set()
     for job in jobs:
         try:
@@ -496,6 +526,11 @@ async def _judge_batch_litellm(
                 "Resume: skipping prior litellm batch %s: %s", job.get("batch_id"), exc
             )
             continue
+        collected = {
+            request_id: result
+            for request_id, result in collected.items()
+            if request_id in requested
+        }
         results.update(collected)
         covered |= set(collected)
 
@@ -531,8 +566,15 @@ async def _judge_batch_litellm(
                 "jobs": jobs,
             },
         )
+        collected = await _collect_litellm_job(
+            lens, job, provider, poll_interval, poll_timeout
+        )
         results.update(
-            await _collect_litellm_job(lens, job, provider, poll_interval, poll_timeout)
+            {
+                request_id: result
+                for request_id, result in collected.items()
+                if request_id in requested
+            }
         )
 
     for req in valid:
@@ -719,10 +761,6 @@ async def _judge_batch_genai(
     results: dict[str, JudgeResult] = {}
     valid = _split_missing_images(lens, requests, results)
 
-    payloads = [(req, _genai_inline_request(req, max_tokens_value)) for req in valid]
-
-    client = _genai_client(lens)
-
     manifest = _resume_manifest(
         manifest_path,
         resume=resume,
@@ -731,6 +769,8 @@ async def _judge_batch_genai(
         backend="genai",
         max_tokens=max_tokens_value,
     )
+    payloads = [(req, _genai_inline_request(req, max_tokens_value)) for req in valid]
+    client = _genai_client(lens)
     jobs: list[dict[str, Any]] = list(manifest.get("jobs", [])) if resume else []
     covered: set[str] = set()
     collected: dict[str, dict[str, Any]] = {}
@@ -744,6 +784,12 @@ async def _judge_batch_genai(
                 "Resume: skipping prior genai job %s: %s", job.get("job_name"), exc
             )
             continue
+        requested = {request.id for request in valid}
+        got = {
+            request_id: result
+            for request_id, result in got.items()
+            if request_id in requested
+        }
         collected.update(got)
         covered |= set(got)
 
@@ -816,7 +862,9 @@ async def judge_batch(
 
     _validate_request_ids(requests)
     max_tokens_value = resolved_max_tokens(lens.model, max_tokens)
+    lens._ensure_api_key()  # noqa: SLF001
     fingerprint = _batch_fingerprint(lens, requests, max_tokens_value)
+    backend_name = "genai" if _is_gemini_studio(lens.model) else "litellm"
     if manifest_path is not None:
         path = Path(manifest_path)
     else:
@@ -825,24 +873,34 @@ async def judge_batch(
         if resume and not path.exists() and legacy_path.exists():
             raise ValidationError(
                 "A legacy Batch manifest exists but does not attest its prompt, image, or token budget. "
-                "Refusing to submit a possibly duplicate batch. Pass resume=False only when a fresh "
-                "billed submission is intended.",
+                "Refusing to submit a possibly duplicate batch. After verifying that its provider "
+                f"jobs belong to this exact request, copy it to '{path}' and add top-level fields "
+                f"fingerprint='{fingerprint}', model='{lens.model}', backend='{backend_name}', and "
+                f"max_tokens={max_tokens_value}, preserving jobs. Otherwise pass resume=False only "
+                "when a fresh billed submission is intended. No submission was made.",
                 field="manifest_path",
                 value=str(legacy_path),
             )
 
-    lens._ensure_api_key()  # noqa: SLF001
+    if not resume and path.exists():
+        raise ValidationError(
+            "resume=False requires a new manifest path; overwriting this manifest would lose "
+            "provider job ids from a paid submission. No submission was made.",
+            field="manifest_path",
+            value=str(path),
+        )
 
     backend = (
         _judge_batch_genai if _is_gemini_studio(lens.model) else _judge_batch_litellm
     )
-    return await backend(
-        lens,
-        requests,
-        max_tokens_value,
-        resume,
-        path,
-        poll_interval,
-        poll_timeout,
-        fingerprint,
-    )
+    with _manifest_lock(path):
+        return await backend(
+            lens,
+            requests,
+            max_tokens_value,
+            resume,
+            path,
+            poll_interval,
+            poll_timeout,
+            fingerprint,
+        )

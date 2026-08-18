@@ -451,8 +451,12 @@ async def test_legacy_default_manifest_blocks_possible_duplicate(lens, png):
         legacy,
         {"model": lens.model, "backend": "litellm", "jobs": [{"batch_id": "paid"}]},
     )
-    with pytest.raises(ValidationError, match="legacy Batch manifest"):
+    fingerprint = batch_mod._batch_fingerprint(lens, requests, 300)
+    destination = batch_mod._default_manifest_path(lens, fingerprint)
+    with pytest.raises(ValidationError, match="legacy Batch manifest") as exc_info:
         await lens.judge_batch(requests)
+    assert fingerprint in str(exc_info.value)
+    assert str(destination) in str(exc_info.value)
 
 
 @pytest.mark.asyncio
@@ -477,6 +481,56 @@ async def test_resume_false_allows_intentional_fresh_batch_with_legacy_manifest(
 
     assert results["r1"].answer == "fresh"
     acb.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_resume_false_cannot_overwrite_paid_job_manifest(lens, png):
+    requests = [BatchRequest("r1", png, "p")]
+    fingerprint = batch_mod._batch_fingerprint(lens, requests, 300)
+    manifest = batch_mod._default_manifest_path(lens, fingerprint)
+    batch_mod._write_manifest(
+        manifest,
+        {
+            "fingerprint": fingerprint,
+            "model": lens.model,
+            "backend": "litellm",
+            "max_tokens": 300,
+            "jobs": [{"batch_id": "paid"}],
+        },
+    )
+    acf, acb, arb, afc = _make_litellm_mocks("")
+    with (
+        patch.object(batch_mod, "acreate_file", acf),
+        patch.object(batch_mod, "acreate_batch", acb),
+        patch.object(batch_mod, "aretrieve_batch", arb),
+        patch.object(batch_mod, "afile_content", afc),
+        pytest.raises(ValidationError, match="requires a new manifest path"),
+    ):
+        await lens.judge_batch(requests, resume=False)
+    acf.assert_not_awaited()
+    acb.assert_not_awaited()
+    assert batch_mod._read_manifest(manifest)["jobs"] == [{"batch_id": "paid"}]
+
+
+@pytest.mark.asyncio
+async def test_manifest_lock_blocks_concurrent_duplicate_submission(lens, png):
+    requests = [BatchRequest("r1", png, "p")]
+    fingerprint = batch_mod._batch_fingerprint(lens, requests, 300)
+    manifest = batch_mod._default_manifest_path(lens, fingerprint)
+    lock = manifest.with_suffix(f"{manifest.suffix}.lock")
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    lock.write_text("active", encoding="utf-8")
+    acf, acb, arb, afc = _make_litellm_mocks("")
+    with (
+        patch.object(batch_mod, "acreate_file", acf),
+        patch.object(batch_mod, "acreate_batch", acb),
+        patch.object(batch_mod, "aretrieve_batch", arb),
+        patch.object(batch_mod, "afile_content", afc),
+        pytest.raises(ValidationError, match="Another process owns"),
+    ):
+        await lens.judge_batch(requests)
+    acf.assert_not_awaited()
+    acb.assert_not_awaited()
 
 
 # --- genai backend with a fake client -------------------------------------
@@ -588,6 +642,61 @@ async def test_genai_end_to_end_keyed_by_metadata(gemini_lens, png, png2):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("manifest_text", ['{"fingerprint": "wrong"}', "{"])
+async def test_genai_invalid_resume_manifest_fails_before_client_or_submission(
+    gemini_lens, png, manifest_text
+):
+    manifest = gemini_lens.output_dir / "invalid.json"
+    manifest.write_text(manifest_text, encoding="utf-8")
+    with (
+        patch.object(batch_mod, "_genai_client") as client,
+        patch.object(batch_mod, "_submit_genai_chunk") as submit,
+        pytest.raises(ValidationError),
+    ):
+        await gemini_lens.judge_batch(
+            [BatchRequest("r1", png, "p")], manifest_path=manifest
+        )
+    client.assert_not_called()
+    submit.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_genai_resume_collects_prior_job_and_submits_only_uncovered(
+    gemini_lens, png, png2
+):
+    requests = [BatchRequest("a", png, "p1"), BatchRequest("b", png2, "p2")]
+    fingerprint = batch_mod._batch_fingerprint(gemini_lens, requests, 8000)
+    manifest = gemini_lens.output_dir / "resume-genai.json"
+    batch_mod._write_manifest(
+        manifest,
+        {
+            "fingerprint": fingerprint,
+            "model": gemini_lens.model,
+            "backend": "genai",
+            "max_tokens": 8000,
+            "jobs": [{"job_name": "batches/prior", "ids": ["a"]}],
+        },
+    )
+    client = _FakeGenaiClient({"a": '{"answer": "yes"}', "b": '{"answer": "no"}'})
+    client.batches._submitted = ["a"]
+
+    def _submit(client_, model, chunk, max_tokens, display_name):
+        src = [{"metadata": {"req_id": req.id}} for req, _payload in chunk]
+        return client_.batches.create(model=model, src=src, config={}).name
+
+    with (
+        patch.object(batch_mod, "_genai_client", return_value=client),
+        patch.object(batch_mod, "_submit_genai_chunk", _submit),
+    ):
+        results = await gemini_lens.judge_batch(requests, manifest_path=manifest)
+
+    assert set(results) == {"a", "b"}
+    assert results["a"].answer == "yes"
+    assert results["b"].answer == "no"
+    assert client.batches._submitted == ["b"]
+
+
+@pytest.mark.asyncio
 async def test_genai_missing_image_unknown(gemini_lens, png, tmp_path):
     missing = str(tmp_path / "nope.png")
     with _fake_genai(batch_mod, {"ok": '{"answer": "yes", "confidence": 0.9}'}):
@@ -656,3 +765,25 @@ async def test_litellm_malformed_line_yields_unknown(lens, png, png2):
     # Malformed line: parsed into an unknown result (empty raw, no crash).
     assert results["bad"].answer == "unknown"
     assert results["bad"].parse_mode == "none"
+
+
+@pytest.mark.asyncio
+async def test_litellm_ignores_unrequested_custom_ids(lens, png):
+    output = "\n".join(
+        [
+            _openai_batch_line("r1", '{"answer": "yes"}'),
+            _openai_batch_line("ghost", '{"answer": "no"}'),
+            "",
+        ]
+    )
+    acf, acb, arb, afc = _make_litellm_mocks(output)
+    with (
+        patch.object(batch_mod, "acreate_file", acf),
+        patch.object(batch_mod, "acreate_batch", acb),
+        patch.object(batch_mod, "aretrieve_batch", arb),
+        patch.object(batch_mod, "afile_content", afc),
+    ):
+        results = await lens.judge_batch([BatchRequest("r1", png, "p")])
+
+    assert set(results) == {"r1"}
+    assert results["r1"].answer == "yes"
