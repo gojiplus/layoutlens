@@ -73,14 +73,14 @@ class JudgeResult:
         rationale: Parsed rationale/reasoning field, else "".
         raw: Full raw model text (always populated, even on refusal).
         refused: True if the response matched a refusal pattern.
-        usage: Token counts with keys prompt_tokens/completion_tokens/total_tokens.
+        usage: Token counts with keys prompt_tokens/completion_tokens/total_tokens;
+            reasoning-capable backends may also report thought_tokens.
         model: The model that produced the response.
         parse_mode: "json", "fallback", or "none".
         truncated: True if the model stopped because it hit the token budget
             (``finish_reason == "length"``) — the verdict may be incomplete.
         prompt_sha256: SHA-256 of the exact prompt sent (judge-contract
-            pinning: model + prompt hash make a result auditable). Empty when
-            the transport could not supply the prompt (litellm file batches).
+            pinning: model + prompt hash make a result auditable).
     """
 
     answer: str

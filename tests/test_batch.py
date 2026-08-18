@@ -1,12 +1,11 @@
 """Offline tests for multi-provider batch judging (``LayoutLens.judge_batch``).
 
-No network, no keys, and google-genai is NOT installed — the genai backend is
-exercised with a fake client (its SDK import is lazy and patched away). The
-load-bearing tests are:
+No network or real keys are used. Provider clients are replaced with offline
+fakes. The load-bearing tests are:
 
-* **Parity**: each request's prompt is byte-identical to what :func:`judge`
-  sends, for BOTH backends (litellm messages + genai inline text).
-* **Backend dispatch**: ``gemini/*`` -> genai path; everything else -> litellm.
+* **Parity**: each request's prompt and image bytes match :func:`judge` across
+  native OpenAI, Gemini, and LiteLLM transports.
+* **Backend dispatch**: explicit, credential-safe provider/model combinations.
 * **Resume**: a prior job covering a request is collected; only uncovered ids
   are re-submitted.
 
@@ -16,6 +15,7 @@ litellm batch helpers are patched at ``layoutlens.api.batch``.
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import sys
 from types import ModuleType, SimpleNamespace
@@ -52,7 +52,20 @@ def png2(tmp_path):
 @pytest.fixture
 def lens(tmp_path):
     return LayoutLens(
-        api_key="sk-test", model="gpt-4o-mini", output_dir=str(tmp_path / "out")
+        api_key="sk-test",
+        model="gpt-4o-mini",
+        provider="litellm",
+        output_dir=str(tmp_path / "out"),
+    )
+
+
+@pytest.fixture
+def openai_lens(tmp_path):
+    return LayoutLens(
+        api_key="sk-test",
+        model="gpt-5.6-luna",
+        provider="openai",
+        output_dir=str(tmp_path / "out"),
     )
 
 
@@ -111,6 +124,55 @@ def _make_litellm_mocks(
     return acreate_file, acreate_batch, aretrieve_batch, afile_content
 
 
+def _responses_batch_line(
+    custom_id: str,
+    content: str,
+    *,
+    status: str = "completed",
+    incomplete_reason: str | None = None,
+) -> str:
+    body = {
+        "status": status,
+        "output": [
+            {
+                "type": "message",
+                "content": [{"type": "output_text", "text": content}],
+            }
+        ],
+        "usage": {
+            "input_tokens": 80,
+            "output_tokens": 25,
+            "total_tokens": 105,
+            "output_tokens_details": {"reasoning_tokens": 7},
+        },
+    }
+    if incomplete_reason:
+        body["incomplete_details"] = {"reason": incomplete_reason}
+    return json.dumps(
+        {
+            "custom_id": custom_id,
+            "response": {"status_code": 200, "body": body},
+        }
+    )
+
+
+def _fake_openai_client(output_text: str):
+    return SimpleNamespace(
+        files=SimpleNamespace(
+            create=AsyncMock(return_value=SimpleNamespace(id="file-in")),
+            content=AsyncMock(return_value=SimpleNamespace(text=output_text)),
+        ),
+        batches=SimpleNamespace(
+            create=AsyncMock(return_value=SimpleNamespace(id="batch-1")),
+            retrieve=AsyncMock(
+                return_value=SimpleNamespace(
+                    status="completed", output_file_id="file-out"
+                )
+            ),
+        ),
+    )
+
+
 # --- Backend dispatch -----------------------------------------------------
 
 
@@ -129,6 +191,7 @@ async def test_dispatch_litellm_for_gpt(lens, png):
     acf.assert_awaited()  # litellm path used
     genai_client.assert_not_called()  # genai path NOT used
     assert results["r1"].answer == "A"
+    assert results["r1"].prompt_sha256 == hashlib.sha256(b"Is it good?").hexdigest()
 
 
 @pytest.mark.asyncio
@@ -142,6 +205,135 @@ async def test_dispatch_genai_for_gemini_studio(gemini_lens, png):
         )
     acf.assert_not_awaited()  # litellm path NOT used
     assert results["r1"].answer == "no"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("provider", "model"),
+    [
+        ("openai", "gemini/gemini-3-flash-preview"),
+        ("openai", "anthropic/claude-sonnet-5"),
+        ("gemini", "gpt-5.6-luna"),
+    ],
+)
+async def test_provider_model_mismatch_fails_before_client(
+    tmp_path, png, provider, model
+):
+    mismatched = LayoutLens(
+        api_key="test", provider=provider, model=model, output_dir=tmp_path / "out"
+    )
+    with (
+        patch.object(batch_mod, "_openai_client") as openai_client,
+        patch.object(batch_mod, "_genai_client") as genai_client,
+        patch.object(batch_mod, "acreate_file", AsyncMock()) as create_file,
+        pytest.raises(ValidationError, match=r"requires|conflicts"),
+    ):
+        await mismatched.judge_batch([BatchRequest("r1", png, "prompt")])
+    openai_client.assert_not_called()
+    genai_client.assert_not_called()
+    create_file.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_native_openai_uses_responses_batch_with_exact_settings(openai_lens, png):
+    output = _responses_batch_line("r1", '{"answer": "yes", "confidence": 0.9}') + "\n"
+    client = _fake_openai_client(output)
+    with (
+        patch.object(batch_mod, "_openai_client", return_value=client),
+        patch.object(batch_mod, "acreate_file", AsyncMock()) as litellm_create,
+    ):
+        results = await openai_lens.judge_batch(
+            [BatchRequest("r1", png, "verbatim prompt")],
+            max_tokens=256,
+            reasoning_effort="low",
+            image_detail="original",
+        )
+
+    litellm_create.assert_not_awaited()
+    uploaded = client.files.create.await_args.kwargs["file"]
+    record = json.loads(uploaded[1].decode("utf-8"))
+    assert record["url"] == "/v1/responses"
+    assert record["body"]["model"] == "gpt-5.6-luna"
+    assert record["body"]["max_output_tokens"] == 256
+    assert record["body"]["reasoning"] == {"effort": "low"}
+    assert "temperature" not in record["body"]
+    content = record["body"]["input"][0]["content"]
+    assert content[0] == {"type": "input_text", "text": "verbatim prompt"}
+    assert content[1]["type"] == "input_image"
+    assert content[1]["detail"] == "original"
+    assert content[1]["image_url"].startswith("data:image/png;base64,")
+    assert client.batches.create.await_args.kwargs["endpoint"] == "/v1/responses"
+    assert results["r1"].answer == "yes"
+    assert results["r1"].prompt_sha256 == hashlib.sha256(b"verbatim prompt").hexdigest()
+    assert results["r1"].usage == {
+        "prompt_tokens": 80,
+        "completion_tokens": 25,
+        "total_tokens": 105,
+        "thought_tokens": 7,
+    }
+
+
+def test_openai_responses_body_normalizes_prefix_and_applies_temperature_policy(
+    tmp_path, png
+):
+    lens = LayoutLens(
+        api_key="test",
+        provider="openai",
+        model="openai/gpt-4o-mini",
+        output_dir=tmp_path / "out",
+    )
+    body = batch_mod._openai_body(
+        lens,
+        BatchRequest("r1", png, "prompt"),
+        300,
+        reasoning_effort=None,
+        image_detail="auto",
+    )
+    assert body["model"] == "gpt-4o-mini"
+    assert body["temperature"] == 0.0
+
+
+@pytest.mark.asyncio
+async def test_native_openai_marks_max_output_incomplete_as_truncated(openai_lens, png):
+    output = (
+        _responses_batch_line(
+            "r1",
+            '{"answer": "yes"}',
+            status="incomplete",
+            incomplete_reason="max_output_tokens",
+        )
+        + "\n"
+    )
+    client = _fake_openai_client(output)
+    with patch.object(batch_mod, "_openai_client", return_value=client):
+        results = await openai_lens.judge_batch(
+            [BatchRequest("r1", png, "prompt")], max_tokens=256
+        )
+    assert results["r1"].truncated is True
+
+
+@pytest.mark.asyncio
+async def test_native_openai_preserves_per_line_error_reason(openai_lens, png):
+    output = (
+        json.dumps(
+            {
+                "custom_id": "r1",
+                "response": {
+                    "status_code": 400,
+                    "body": {"error": {"message": "unsupported setting"}},
+                },
+            }
+        )
+        + "\n"
+    )
+    client = _fake_openai_client(output)
+    with patch.object(batch_mod, "_openai_client", return_value=client):
+        results = await openai_lens.judge_batch(
+            [BatchRequest("r1", png, "prompt")], max_tokens=256
+        )
+    assert results["r1"].answer == "unknown"
+    assert results["r1"].rationale == "OpenAI batch line error: unsupported setting"
+    assert results["r1"].prompt_sha256 == hashlib.sha256(b"prompt").hexdigest()
 
 
 # --- Parity: prompt byte-identical to judge() -----------------------------
@@ -319,6 +511,8 @@ async def test_resume_litellm_skips_covered_ids(lens, png, png2):
             "model": "gpt-4o-mini",
             "backend": "litellm",
             "max_tokens": 300,
+            "reasoning_effort": None,
+            "image_detail": "auto",
             "jobs": [{"batch_id": "prior", "input_file_id": "f", "ids": ["a"]}],
         },
     )
@@ -361,6 +555,50 @@ async def test_resume_litellm_skips_covered_ids(lens, png, png2):
     assert submitted_ids == {"b"}
 
 
+@pytest.mark.asyncio
+async def test_resume_never_rebills_submitted_id_missing_from_provider_output(
+    lens, png, png2
+):
+    requests = [BatchRequest("a", png, "p1"), BatchRequest("b", png2, "p2")]
+    fingerprint = batch_mod._batch_fingerprint(lens, requests, 300)
+    manifest = lens.output_dir / "partial-output.json"
+    batch_mod._write_manifest(
+        manifest,
+        {
+            "fingerprint": fingerprint,
+            "model": lens.model,
+            "backend": "litellm",
+            "max_tokens": 300,
+            "reasoning_effort": None,
+            "image_detail": "auto",
+            "jobs": [
+                {
+                    "batch_id": "prior",
+                    "input_file_id": "f",
+                    "ids": ["a", "b"],
+                }
+            ],
+        },
+    )
+    partial = _openai_batch_line("a", '{"answer": "A"}') + "\n"
+    _acf, _acb, retrieve, content = _make_litellm_mocks(partial)
+    create_file = AsyncMock()
+    create_batch = AsyncMock()
+    with (
+        patch.object(batch_mod, "acreate_file", create_file),
+        patch.object(batch_mod, "acreate_batch", create_batch),
+        patch.object(batch_mod, "aretrieve_batch", retrieve),
+        patch.object(batch_mod, "afile_content", content),
+    ):
+        results = await lens.judge_batch(requests, manifest_path=manifest)
+
+    create_file.assert_not_awaited()
+    create_batch.assert_not_awaited()
+    assert results["a"].answer == "A"
+    assert results["b"].answer == "unknown"
+    assert results["b"].rationale == "no batch response"
+
+
 def test_batch_fingerprint_binds_prompt_image_model_budget_and_order(lens, png, png2):
     requests = [BatchRequest("a", png, "p1"), BatchRequest("b", png2, "p2")]
     baseline = batch_mod._batch_fingerprint(lens, requests, 300)
@@ -390,6 +628,54 @@ def test_batch_fingerprint_binds_prompt_image_model_budget_and_order(lens, png, 
         output_dir=str(lens.output_dir),
     )
     assert batch_mod._batch_fingerprint(other_endpoint, requests, 300) != baseline
+
+
+def test_openai_fingerprint_binds_reasoning_effort_and_image_detail(openai_lens, png):
+    requests = [BatchRequest("a", png, "prompt")]
+    baseline = batch_mod._batch_fingerprint(
+        openai_lens,
+        requests,
+        256,
+        reasoning_effort="low",
+        image_detail="original",
+    )
+    assert (
+        batch_mod._batch_fingerprint(
+            openai_lens,
+            requests,
+            256,
+            reasoning_effort="medium",
+            image_detail="original",
+        )
+        != baseline
+    )
+    assert (
+        batch_mod._batch_fingerprint(
+            openai_lens,
+            requests,
+            256,
+            reasoning_effort="low",
+            image_detail="low",
+        )
+        != baseline
+    )
+
+
+@pytest.mark.asyncio
+async def test_non_openai_backend_rejects_openai_only_settings_before_submission(
+    lens, png
+):
+    acreate_file = AsyncMock()
+    with (
+        patch.object(batch_mod, "acreate_file", acreate_file),
+        pytest.raises(ValidationError, match="supported only by the native OpenAI"),
+    ):
+        await lens.judge_batch(
+            [BatchRequest("r1", png, "prompt")],
+            reasoning_effort="low",
+            image_detail="original",
+        )
+    acreate_file.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -466,6 +752,35 @@ async def test_legacy_default_manifest_blocks_possible_duplicate(lens, png):
         await lens.judge_batch(requests)
     assert fingerprint in str(exc_info.value)
     assert str(destination) in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+async def test_prior_fingerprint_with_overlapping_paid_id_blocks_upgrade_resubmit(
+    openai_lens, png
+):
+    requests = [BatchRequest("r1", png, "current prompt")]
+    prior = openai_lens.output_dir / "batch" / f"manifest_{'1' * 64}.json"
+    batch_mod._write_manifest(
+        prior,
+        {
+            "fingerprint": "1" * 64,
+            "model": openai_lens.model,
+            "backend": "litellm",
+            "max_tokens": 8000,
+            "jobs": [{"batch_id": "paid-before-upgrade", "ids": ["r1"]}],
+        },
+    )
+    with (
+        patch.object(batch_mod, "_openai_client") as client,
+        pytest.raises(ValidationError, match="overlap this run"),
+    ):
+        await openai_lens.judge_batch(
+            requests,
+            max_tokens=256,
+            reasoning_effort="low",
+            image_detail="original",
+        )
+    client.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -554,6 +869,8 @@ async def test_litellm_resume_collection_error_never_resubmits(lens, png):
             "model": lens.model,
             "backend": "litellm",
             "max_tokens": 300,
+            "reasoning_effort": None,
+            "image_detail": "auto",
             "jobs": [{"batch_id": "paid", "ids": ["r1"]}],
         },
     )
@@ -570,6 +887,83 @@ async def test_litellm_resume_collection_error_never_resubmits(lens, png):
     acf.assert_not_awaited()
     acb.assert_not_awaited()
     assert not manifest.with_suffix(f"{manifest.suffix}.lock").exists()
+
+
+@pytest.mark.asyncio
+async def test_openai_resume_collection_error_never_resubmits(openai_lens, png):
+    requests = [BatchRequest("r1", png, "p")]
+    fingerprint = batch_mod._batch_fingerprint(
+        openai_lens,
+        requests,
+        256,
+        reasoning_effort="low",
+        image_detail="original",
+    )
+    manifest = batch_mod._default_manifest_path(openai_lens, fingerprint)
+    batch_mod._write_manifest(
+        manifest,
+        {
+            "fingerprint": fingerprint,
+            "model": openai_lens.model,
+            "backend": "openai-responses",
+            "max_tokens": 256,
+            "reasoning_effort": "low",
+            "image_detail": "original",
+            "jobs": [{"batch_id": "paid", "ids": ["r1"]}],
+        },
+    )
+    client = _fake_openai_client("")
+    client.batches.retrieve.side_effect = TimeoutError("transient retrieval failure")
+    with (
+        patch.object(batch_mod, "_openai_client", return_value=client),
+        pytest.raises(TimeoutError, match="transient retrieval"),
+    ):
+        await openai_lens.judge_batch(
+            requests,
+            max_tokens=256,
+            reasoning_effort="low",
+            image_detail="original",
+        )
+    client.files.create.assert_not_awaited()
+    client.batches.create.assert_not_awaited()
+    assert not manifest.with_suffix(f"{manifest.suffix}.lock").exists()
+
+
+@pytest.mark.asyncio
+async def test_openai_happy_resume_collects_without_new_submission(openai_lens, png):
+    requests = [BatchRequest("r1", png, "p")]
+    fingerprint = batch_mod._batch_fingerprint(
+        openai_lens,
+        requests,
+        256,
+        reasoning_effort="low",
+        image_detail="original",
+    )
+    manifest = batch_mod._default_manifest_path(openai_lens, fingerprint)
+    batch_mod._write_manifest(
+        manifest,
+        {
+            "fingerprint": fingerprint,
+            "model": openai_lens.model,
+            "backend": "openai-responses",
+            "max_tokens": 256,
+            "reasoning_effort": "low",
+            "image_detail": "original",
+            "jobs": [{"batch_id": "paid", "ids": ["r1"]}],
+        },
+    )
+    output = _responses_batch_line("r1", '{"answer": "yes"}') + "\n"
+    client = _fake_openai_client(output)
+    with patch.object(batch_mod, "_openai_client", return_value=client):
+        results = await openai_lens.judge_batch(
+            requests,
+            max_tokens=256,
+            reasoning_effort="low",
+            image_detail="original",
+        )
+    client.files.create.assert_not_awaited()
+    client.batches.create.assert_not_awaited()
+    assert results["r1"].answer == "yes"
 
 
 # --- genai backend with a fake client -------------------------------------
@@ -713,6 +1107,8 @@ async def test_genai_resume_collects_prior_job_and_submits_only_uncovered(
             "model": gemini_lens.model,
             "backend": "genai",
             "max_tokens": 8000,
+            "reasoning_effort": None,
+            "image_detail": "auto",
             "jobs": [{"job_name": "batches/prior", "ids": ["a"]}],
         },
     )
@@ -747,6 +1143,8 @@ async def test_genai_resume_collection_error_never_resubmits(gemini_lens, png):
             "model": gemini_lens.model,
             "backend": "genai",
             "max_tokens": 8000,
+            "reasoning_effort": None,
+            "image_detail": "auto",
             "jobs": [{"job_name": "batches/paid", "ids": ["r1"]}],
         },
     )
@@ -887,6 +1285,7 @@ async def test_litellm_batch_forwards_constructor_key_and_api_base(tmp_path, png
     lens = LayoutLens(
         api_key="secret",
         model="gpt-4o-mini",
+        provider="litellm",
         api_base="https://example.com",
         output_dir=str(tmp_path / "out"),
     )

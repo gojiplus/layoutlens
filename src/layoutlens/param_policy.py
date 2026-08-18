@@ -159,8 +159,9 @@ def completion_params(
     """Build the policy-correct sampling kwargs for a completion call.
 
     ``max_tokens`` is always included. ``temperature`` is included only when it
-    is non-None AND the model accepts a non-default sampling parameter (see
-    :func:`model_omits_temperature`).
+    is non-None and the model is neither sampling-locked nor a reasoning model.
+    Reasoning APIs reject or constrain sampling parameters, so synchronous and
+    batch paths both retain the provider default for them.
 
     Args:
         model: The target model name.
@@ -171,6 +172,10 @@ def completion_params(
         A kwargs dict suitable for merging into an ``acompletion`` call.
     """
     params: dict[str, Any] = {"max_tokens": max_tokens}
-    if temperature is not None and not model_omits_temperature(model):
+    if (
+        temperature is not None
+        and not model_omits_temperature(model)
+        and not is_reasoning_model(model)
+    ):
         params["temperature"] = temperature
     return params

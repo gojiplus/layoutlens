@@ -31,7 +31,7 @@ classifiers = [
 ]
 requires-python = ">=3.11"
 dependencies = [
-    "openai>=1.0.0",
+    "openai>=2.54.0,<3",
     "playwright>=1.40.0",
     "beautifulsoup4>=4.12.0",
     "pyyaml>=6.0",
@@ -40,7 +40,7 @@ dependencies = [
     "rich>=13.0.0",
     "pydantic>=2.0.0",
 ]
-version = "2.1.1"
+version = "2.2.0"
 
 [project.optional-dependencies]
 # Optional extra for the google-genai inline batch backend (AI-Studio Gemini,
@@ -106,7 +106,7 @@ layoutlens = "layoutlens.pytest_plugin"
 # browser-use loosens its pins.
 override-dependencies = [
     "aiohttp>=3.14.3",
-    "openai>=2.20.0,<3",
+    "openai>=2.54.0,<3",
     "click>=8.3.3",
     "mcp>=1.28.1,<2",
     "pillow>=12.3.0",
@@ -200,6 +200,8 @@ convention = "google"
 [tool.pyright]
 include = ["src"]
 typeCheckingMode = "standard"
+venvPath = "."
+venv = ".venv"
 
 [tool.pydoclint]
 style = "google"

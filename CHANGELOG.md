@@ -4,6 +4,32 @@ All notable changes to LayoutLens are documented in this file.
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-08-18
+
+### Added
+
+- Native OpenAI Responses Batch support through the official OpenAI SDK. Vision
+  batches can now set and attest `reasoning_effort` and `image_detail`; OpenAI
+  requests use `/v1/responses`, preserve caller prompts verbatim, and retain
+  reported reasoning-token usage.
+
+### Changed
+
+- Batch resume identity now also binds the provider backend, reasoning effort,
+  image detail, and endpoint. OpenAI, Gemini, and LiteLLM jobs cannot be mixed or
+  resumed under a different inference contract.
+- A request id recorded in any submitted job is never automatically resubmitted,
+  even when the provider omits its response from the output file; it returns
+  `unknown` and requires an explicitly fresh run to incur another charge.
+
+### Upgrading
+
+- The 2.2.0 fingerprint adds backend and inference settings. When a different
+  manifest for the same model records any overlapping submitted request id,
+  resume now fails closed before provider access. Inspect and migrate the prior
+  jobs, or use `resume=False` with a new path only to authorize another billed
+  run explicitly.
+
 ## [2.1.1] - 2026-08-17
 
 ### Changed
