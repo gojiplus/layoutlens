@@ -22,6 +22,10 @@ All notable changes to LayoutLens are documented in this file.
   replacement.
 - Concurrent calls with the same Batch identity cannot submit duplicate work,
   and `resume=False` cannot overwrite the only record of a paid provider job.
+- Resume now fails closed on a timeout or transient error while collecting a
+  recorded job instead of resubmitting its ids while it may still be running.
+- Batch helpers honor constructor-supplied API keys and `api_base`; the endpoint
+  is part of resume identity, preventing cross-endpoint manifest reuse.
 
 ### Upgrading
 

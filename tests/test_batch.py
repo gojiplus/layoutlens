@@ -17,8 +17,9 @@ from __future__ import annotations
 
 import base64
 import json
-from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+import sys
+from types import ModuleType, SimpleNamespace
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
@@ -382,6 +383,14 @@ def test_batch_fingerprint_binds_prompt_image_model_budget_and_order(lens, png, 
     )
     assert batch_mod._batch_fingerprint(other_model, requests, 300) != baseline
 
+    other_endpoint = LayoutLens(
+        api_key="sk",
+        model=lens.model,
+        api_base="https://example.com",
+        output_dir=str(lens.output_dir),
+    )
+    assert batch_mod._batch_fingerprint(other_endpoint, requests, 300) != baseline
+
 
 @pytest.mark.asyncio
 async def test_explicit_resume_manifest_mismatch_fails_before_submission(lens, png):
@@ -531,6 +540,36 @@ async def test_manifest_lock_blocks_concurrent_duplicate_submission(lens, png):
         await lens.judge_batch(requests)
     acf.assert_not_awaited()
     acb.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_litellm_resume_collection_error_never_resubmits(lens, png):
+    requests = [BatchRequest("r1", png, "p")]
+    fingerprint = batch_mod._batch_fingerprint(lens, requests, 300)
+    manifest = batch_mod._default_manifest_path(lens, fingerprint)
+    batch_mod._write_manifest(
+        manifest,
+        {
+            "fingerprint": fingerprint,
+            "model": lens.model,
+            "backend": "litellm",
+            "max_tokens": 300,
+            "jobs": [{"batch_id": "paid", "ids": ["r1"]}],
+        },
+    )
+    acf, acb, _arb, afc = _make_litellm_mocks("")
+    retrieve = AsyncMock(side_effect=TimeoutError("transient retrieval failure"))
+    with (
+        patch.object(batch_mod, "acreate_file", acf),
+        patch.object(batch_mod, "acreate_batch", acb),
+        patch.object(batch_mod, "aretrieve_batch", retrieve),
+        patch.object(batch_mod, "afile_content", afc),
+        pytest.raises(TimeoutError, match="transient retrieval"),
+    ):
+        await lens.judge_batch(requests)
+    acf.assert_not_awaited()
+    acb.assert_not_awaited()
+    assert not manifest.with_suffix(f"{manifest.suffix}.lock").exists()
 
 
 # --- genai backend with a fake client -------------------------------------
@@ -697,6 +736,60 @@ async def test_genai_resume_collects_prior_job_and_submits_only_uncovered(
 
 
 @pytest.mark.asyncio
+async def test_genai_resume_collection_error_never_resubmits(gemini_lens, png):
+    requests = [BatchRequest("r1", png, "p")]
+    fingerprint = batch_mod._batch_fingerprint(gemini_lens, requests, 8000)
+    manifest = batch_mod._default_manifest_path(gemini_lens, fingerprint)
+    batch_mod._write_manifest(
+        manifest,
+        {
+            "fingerprint": fingerprint,
+            "model": gemini_lens.model,
+            "backend": "genai",
+            "max_tokens": 8000,
+            "jobs": [{"job_name": "batches/paid", "ids": ["r1"]}],
+        },
+    )
+    collect = AsyncMock(side_effect=TimeoutError("transient retrieval failure"))
+    with (
+        patch.object(batch_mod, "_genai_client", return_value=_FakeGenaiClient({})),
+        patch.object(batch_mod, "_collect_genai_job", collect),
+        patch.object(batch_mod, "_submit_genai_chunk") as submit,
+        pytest.raises(TimeoutError, match="transient retrieval"),
+    ):
+        await gemini_lens.judge_batch(requests)
+    submit.assert_not_called()
+    assert not manifest.with_suffix(f"{manifest.suffix}.lock").exists()
+
+
+def test_genai_client_forwards_api_base_without_network(tmp_path):
+    client_constructor = Mock(return_value=object())
+    fake_types = SimpleNamespace(HttpOptions=lambda **kwargs: SimpleNamespace(**kwargs))
+    fake_genai = ModuleType("google.genai")
+    fake_genai.Client = client_constructor
+    fake_genai.types = fake_types
+    fake_google = ModuleType("google")
+    fake_google.genai = fake_genai
+    lens = LayoutLens(
+        api_key="secret",
+        model="gemini/gemini-3-flash-preview",
+        provider="gemini",
+        api_base="https://example.com",
+        output_dir=str(tmp_path / "out"),
+    )
+
+    with patch.dict(
+        sys.modules,
+        {"google": fake_google, "google.genai": fake_genai},
+    ):
+        batch_mod._genai_client(lens)
+
+    kwargs = client_constructor.call_args.kwargs
+    assert kwargs["api_key"] == "secret"
+    assert kwargs["http_options"].base_url == "https://example.com"
+
+
+@pytest.mark.asyncio
 async def test_genai_missing_image_unknown(gemini_lens, png, tmp_path):
     missing = str(tmp_path / "nope.png")
     with _fake_genai(batch_mod, {"ok": '{"answer": "yes", "confidence": 0.9}'}):
@@ -787,3 +880,26 @@ async def test_litellm_ignores_unrequested_custom_ids(lens, png):
 
     assert set(results) == {"r1"}
     assert results["r1"].answer == "yes"
+
+
+@pytest.mark.asyncio
+async def test_litellm_batch_forwards_constructor_key_and_api_base(tmp_path, png):
+    lens = LayoutLens(
+        api_key="secret",
+        model="gpt-4o-mini",
+        api_base="https://example.com",
+        output_dir=str(tmp_path / "out"),
+    )
+    output = _openai_batch_line("r1", '{"answer": "yes"}') + "\n"
+    acf, acb, arb, afc = _make_litellm_mocks(output)
+    with (
+        patch.object(batch_mod, "acreate_file", acf),
+        patch.object(batch_mod, "acreate_batch", acb),
+        patch.object(batch_mod, "aretrieve_batch", arb),
+        patch.object(batch_mod, "afile_content", afc),
+    ):
+        await lens.judge_batch([BatchRequest("r1", png, "p")])
+
+    for helper in (acf, acb, arb, afc):
+        assert helper.await_args.kwargs["api_key"] == "secret"
+        assert helper.await_args.kwargs["api_base"] == "https://example.com"

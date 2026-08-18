@@ -192,6 +192,7 @@ def _batch_fingerprint(
     digest = hashlib.sha256()
     _digest_field(digest, "version", _BATCH_FINGERPRINT_VERSION)
     _digest_field(digest, "model", lens.model.encode("utf-8"))
+    _digest_field(digest, "api_base", (lens.api_base or "").encode("utf-8"))
     _digest_field(digest, "max_tokens", str(max_tokens).encode("ascii"))
     for request in sorted(requests, key=lambda item: item.id):
         image_path = Path(request.image_path)
@@ -449,14 +450,24 @@ async def _collect_litellm_job(
     deadline = time.monotonic() + poll_timeout
     # The reportArgumentType ignores on custom_llm_provider (here and below):
     # litellm's Literal understates the providers its batch API accepts.
-    batch = await aretrieve_batch(batch_id, custom_llm_provider=provider)  # pyright: ignore[reportArgumentType]
+    batch = await aretrieve_batch(
+        batch_id,
+        custom_llm_provider=provider,  # pyright: ignore[reportArgumentType]
+        api_key=lens.api_key,
+        api_base=lens.api_base,
+    )
     while str(getattr(batch, "status", "")) not in _LITELLM_TERMINAL:
         if time.monotonic() > deadline:
             raise TimeoutError(
                 f"litellm batch {batch_id} did not finish within {poll_timeout}s"
             )
         await asyncio.sleep(poll_interval)
-        batch = await aretrieve_batch(batch_id, custom_llm_provider=provider)  # pyright: ignore[reportArgumentType]
+        batch = await aretrieve_batch(
+            batch_id,
+            custom_llm_provider=provider,  # pyright: ignore[reportArgumentType]
+            api_key=lens.api_key,
+            api_base=lens.api_base,
+        )
 
     if str(getattr(batch, "status", "")) != "completed":
         logger.warning(
@@ -468,7 +479,12 @@ async def _collect_litellm_job(
     output_file_id = getattr(batch, "output_file_id", None)
     if not output_file_id:
         return {}
-    content = await afile_content(output_file_id, custom_llm_provider=provider)  # pyright: ignore[reportArgumentType]
+    content = await afile_content(
+        output_file_id,
+        custom_llm_provider=provider,  # pyright: ignore[reportArgumentType]
+        api_key=lens.api_key,
+        api_base=lens.api_base,
+    )
     # litellm's return union includes a streaming variant this call never
     # produces; the hasattr guard handles the real (buffered) shapes.
     text = content.text if hasattr(content, "text") else content.content.decode("utf-8")  # pyright: ignore[reportAttributeAccessIssue]
@@ -517,15 +533,9 @@ async def _judge_batch_litellm(
     requested = {request.id for request in valid}
     covered: set[str] = set()
     for job in jobs:
-        try:
-            collected = await _collect_litellm_job(
-                lens, job, provider, poll_interval, poll_timeout
-            )
-        except Exception as exc:
-            logger.warning(
-                "Resume: skipping prior litellm batch %s: %s", job.get("batch_id"), exc
-            )
-            continue
+        collected = await _collect_litellm_job(
+            lens, job, provider, poll_interval, poll_timeout
+        )
         collected = {
             request_id: result
             for request_id, result in collected.items()
@@ -541,12 +551,16 @@ async def _judge_batch_litellm(
             file=jsonl,
             purpose="batch",
             custom_llm_provider=provider,  # pyright: ignore[reportArgumentType]
+            api_key=lens.api_key,
+            api_base=lens.api_base,
         )
         batch = await acreate_batch(
             input_file_id=file_obj.id,
             endpoint="/v1/chat/completions",
             completion_window="24h",
             custom_llm_provider=provider,  # pyright: ignore[reportArgumentType]
+            api_key=lens.api_key,
+            api_base=lens.api_base,
         )
         job = {
             "batch_id": batch.id,
@@ -595,13 +609,15 @@ def _genai_client(lens: LayoutLens):
 
     try:
         from google import genai  # lazy: optional dependency
+        from google.genai import types
     except ImportError as exc:  # pragma: no cover - exercised only without the extra
         raise ImportError(
             "The gemini/ batch backend requires google-genai. Install it with: pip install 'layoutlens[gemini]'"
         ) from exc
 
     api_key = lens.api_key or os.environ.get("GEMINI_API_KEY")
-    return genai.Client(api_key=api_key)
+    http_options = types.HttpOptions(base_url=lens.api_base) if lens.api_base else None
+    return genai.Client(api_key=api_key, http_options=http_options)
 
 
 def _genai_inline_request(req: BatchRequest, max_tokens: int) -> dict[str, Any]:
@@ -775,15 +791,9 @@ async def _judge_batch_genai(
     covered: set[str] = set()
     collected: dict[str, dict[str, Any]] = {}
     for job in jobs:
-        try:
-            got = await _collect_genai_job(
-                client, job["job_name"], poll_interval, poll_timeout
-            )
-        except Exception as exc:
-            logger.warning(
-                "Resume: skipping prior genai job %s: %s", job.get("job_name"), exc
-            )
-            continue
+        got = await _collect_genai_job(
+            client, job["job_name"], poll_interval, poll_timeout
+        )
         requested = {request.id for request in valid}
         got = {
             request_id: result
