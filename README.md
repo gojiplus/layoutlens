@@ -14,7 +14,7 @@ Three tiers, use what you need:
 
 | Tier | What runs | Needs | Reliability |
 |---|---|---|---|
-| **Deterministic** | axe-core WCAG A/AA + geometry/contrast scorers (overlap, clipping, page overflow, truncation, tap-target size) | nothing — no API key, no network | measured facts, reproducible; this is the CI gate |
+| **Deterministic** | axe-core WCAG A/AA + geometry/contrast/occlusion scorers | no API key or model call | measured facts, reproducible; this is the CI gate |
 | **Hybrid** (default) | deterministic scan grounds the vision LLM; **measured violations force the verdict** | an LLM API key | precision-preserving: the model can add findings, never erase measured ones |
 | **LLM** | natural-language questions answered from a screenshot | an LLM API key (any LiteLLM provider, incl. Ollama/vLLM via `api_base`) | honest numbers below |
 
@@ -137,14 +137,20 @@ print(result.metadata["engine"])  # "axe-core 4.10.3"
 
 Alongside axe-core, LayoutLens ships `LayoutScorer` — a keyless, LLM-free detector for
 geometric and contrast defects, measured directly off the rendered page with the browser's
-own layout engine. These are the same detectors [UIJudgeBench](https://github.com/gojiplus/uijudge-bench)
-uses to build its layout ground truth, ported into the product. It finds:
+own layout engine. Foundational contrast and geometry measurements were ported from
+[UIJudgeBench](https://github.com/gojiplus/uijudge-bench); newer WCAG and text-occlusion
+checks are independent LayoutLens implementations evaluated by that benchmark. It finds:
 
 - **contrast** — text below the WCAG AA ratio (4.5:1 normal, 3.0:1 large), with the measured ratio
 - **overlap** — sibling elements whose bounding boxes collide
 - **clipping** — content cut off by a fixed-size box with hidden overflow
 - **viewport-protrusion** — elements extending past the viewport width (horizontal-scroll bugs)
-- **target-size** — interactive targets smaller than 24×24px (WCAG 2.5.8)
+- **target-size** — undersized targets that also fail the machine-measurable WCAG 2.5.8
+  spacing, inline, and unmodified user-agent-control exceptions
+- **focus-obscured** — keyboard-focused components entirely hidden by author DOM content
+  (the automatable geometric core of WCAG 2.4.11)
+- **text-occlusion** — rendered text, including chart labels, covered by another painted
+  DOM element; this is a visual-quality finding, not a WCAG criterion
 
 ```python
 from layoutlens.layout import LayoutScorer, contrast_ratio, read_computed_styles
@@ -164,7 +170,9 @@ contrast_ratio((0x76, 0x76, 0x76), (0xFF, 0xFF, 0xFF))  # -> 4.54
 
 Every finding is a receipt: the offending selector, its bounding box, the measured value, and
 the threshold it violated. `scan(viewport=...)` re-runs the geometry at any viewport, so
-protrusion/overlap that only appear on mobile are caught.
+protrusion/overlap that only appear on mobile are caught. Automated findings are not a
+site-wide WCAG conformance claim. In particular, target-size equivalent/essential exceptions
+and focus-obscuration interaction-history exceptions remain explicit manual-review fields.
 
 ## pytest Plugin
 
@@ -204,8 +212,9 @@ pip install "layoutlens[mcp]"
 Tools: `audit_accessibility` and `scan_layout` (keyless, deterministic —
 they return **measured numbers, not model opinions**, in compact summaries of
 a few hundred tokens), plus `check_ui` and `compare_ui` (vision LLM). The
-deterministic tools cover exactly what accessibility-tree snapshots can't
-see: contrast, overlap, clipping, page overflow, truncation, tap-target size.
+deterministic tools cover visual facts accessibility-tree snapshots cannot
+see: contrast, geometry, target spacing, complete focus obscuration, and text
+occlusion such as a chart line painted over its label.
 
 ## SARIF Output for GitHub Code Scanning
 
@@ -632,10 +641,12 @@ Calibrate your trust to the tier you use:
   subset of WCAG; Microsoft's a11y LLM evaluation makes the same disclaimer
   for its own checks. axe passing means "no automated rule failed", not
   "accessible".
-- **The deterministic scorers measure geometry, not intent.** An overlap can
-  be a deliberate design; a small target may have a large hit area via
-  spacing (the WCAG 2.5.8 spacing exception is not yet modeled). Findings
-  carry their measured numbers so you can judge.
+- **The deterministic scorers measure rendered facts, not full intent.** The
+  WCAG 2.5.8 spacing, inline, and unmodified-user-agent-control exceptions are
+  modeled. Equivalent-control and essential-presentation exceptions still
+  require review, as do interaction-history cases under WCAG 2.4.11. General
+  text occlusion is a visual-quality signal, not a WCAG conformance claim.
+  Findings carry their measured numbers so you can judge.
 - **Our own benchmark is small** (74 labeled queries) and easier than
   DiffSpot-class tasks; the 81.1% figure is honest but narrow. The harness is
   model-agnostic (`benchmarks/run_benchmark.py --model ...`) — re-run it

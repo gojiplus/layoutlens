@@ -73,22 +73,20 @@ def _finding_from_rule(rule: dict[str, Any]) -> A11yFinding:
 
 
 class AxeAuditor:
-    """Runs axe-core against a Playwright page and returns structured findings.
-
-    Args:
-        run_only: Optional list of axe tags to restrict the run to (e.g.
-            ``["wcag2a", "wcag2aa"]``). Maps to axe's
-            ``runOnly: {type: "tag", values: [...]}``. ``None`` uses axe defaults.
-        disabled_rules: Optional list of rule ids to disable. Maps to axe's
-            ``rules: {<id>: {enabled: false}}``.
-    """
+    """Run axe-core against a Playwright page and return structured findings."""
 
     def __init__(
         self,
         run_only: list[str] | None = None,
         disabled_rules: list[str] | None = None,
     ):
-        """Initialize the auditor with optional tag and rule filters."""
+        """Initialize the auditor with optional tag and rule filters.
+
+        Args:
+            run_only: Optional list of axe tags to restrict the run to (e.g.
+                ``["wcag2a", "wcag2aa"]``). ``None`` uses axe defaults.
+            disabled_rules: Optional list of axe rule ids to disable.
+        """
         self.run_only = run_only
         self.disabled_rules = disabled_rules or []
 

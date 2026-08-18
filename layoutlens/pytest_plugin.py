@@ -87,6 +87,14 @@ class LayoutLensFixture:
     ) -> AnalysisResult:
         """Assert the page has no axe-core WCAG violations (keyless).
 
+        Args:
+            source: URL or local HTML path to audit.
+            compliance_level: WCAG conformance level to check.
+            viewport: Named viewport used for rendering.
+
+        Returns:
+            Successful deterministic accessibility result.
+
         Raises:
             pytest.fail.Exception: Listing each violated rule, its impact, and
                 the first affected selectors.
@@ -116,6 +124,13 @@ class LayoutLensFixture:
 
     def assert_layout(self, source: str, viewport: str = "desktop") -> AnalysisResult:
         """Assert the deterministic layout scan measures no defects (keyless).
+
+        Args:
+            source: URL or local HTML path to scan.
+            viewport: Named viewport used for rendering.
+
+        Returns:
+            Successful deterministic layout result.
 
         Raises:
             pytest.fail.Exception: Listing each measured defect with its
@@ -148,6 +163,15 @@ class LayoutLensFixture:
 
         Skips (never fails) when ``--layoutlens-no-llm`` is set or no API key
         is configured, so keyless environments still run the rest of the suite.
+
+        Args:
+            source: URL, local HTML path, or image to analyze.
+            question: Exact UI question sent to the model.
+            min_confidence: Minimum accepted confidence score.
+            viewport: Named viewport used for rendering.
+
+        Returns:
+            Successful model-backed analysis result.
 
         Raises:
             pytest.fail.Exception: When the model answers "no" (or an

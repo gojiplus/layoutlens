@@ -198,6 +198,9 @@ def _extract_json_object(text: str) -> dict[str, Any] | None:
 def parse_judge_response(raw: str) -> tuple[str, float, str, str]:
     """Parse a raw judge response into (answer, confidence, rationale, mode).
 
+    Args:
+        raw: Raw response text returned by the model.
+
     Parsing strategy:
         1. Strict JSON object (fences and surrounding prose tolerated). Requires
            an ``answer`` field. ``rationale`` accepts ``reasoning`` as an alias.
@@ -249,6 +252,14 @@ def build_judge_messages(
     block followed by the base64 image. Extracted so the batch path
     (:mod:`layoutlens.api.batch`) reuses the exact same construction and its
     per-request prompt stays byte-identical to :func:`judge` (parity contract).
+
+    Args:
+        lens: Configured LayoutLens client used to encode the image.
+        image_path: Existing PNG or JPEG path.
+        prompt: Exact text to send as the user message's text block.
+
+    Returns:
+        The single-message LiteLLM payload.
 
     Raises:
         ValidationError: If ``image_path`` does not exist.
@@ -321,6 +332,16 @@ async def judge(
 
     See :meth:`LayoutLens.judge` for the public contract. This is the module
     implementation so ``acompletion`` is patchable at ``layoutlens.api.judge``.
+
+    Args:
+        lens: Configured LayoutLens client.
+        image_path: Existing PNG or JPEG path.
+        prompt: Exact text to send with the image.
+        max_tokens: Maximum model output tokens, or the model-aware default.
+        timeout: Request timeout in seconds.
+
+    Returns:
+        Parsed judge result with raw text and usage metadata.
 
     Raises:
         ValidationError: If ``image_path`` does not exist. No result is

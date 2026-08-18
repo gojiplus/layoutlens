@@ -3,9 +3,9 @@
 The layout analog of :mod:`layoutlens.a11y`: keyless, LLM-free detectors that
 measure geometric and contrast defects directly off a rendered page — overlap,
 clipping, viewport protrusion, undersized interactive targets, and low text
-contrast — plus a computed-style reader. The measurement math is ported from
-the UIJudgeBench render-verifier, the same detectors that built the benchmark's
-layout ground truth.
+contrast — plus focus obscuration, text occlusion, and a computed-style reader.
+Foundational measurement math was ported from the UIJudgeBench render-verifier;
+the newer standards and occlusion checks are independent LayoutLens detectors.
 """
 
 from __future__ import annotations

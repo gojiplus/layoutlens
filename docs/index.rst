@@ -13,7 +13,11 @@ LayoutLens Documentation
    :target: https://gojiplus.github.io/layoutlens/
    :alt: Documentation
 
-LayoutLens is an AI-powered UI testing framework that enables natural language visual testing. It captures screenshots using Playwright and analyzes them with a vision-capable LLM (via LiteLLM; OpenAI's ``gpt-4o-mini`` by default) to validate layouts, responsive design, and visual consistency — plus a deterministic, keyless axe-core engine for real WCAG 2.1 A/AA accessibility checks.
+LayoutLens combines deterministic browser checks with optional natural-language
+visual testing. Its keyless tier runs vendored axe-core WCAG 2.1 A/AA checks
+plus geometry, contrast, WCAG 2.2 target-spacing and focus-obscuration checks,
+and non-WCAG text occlusion detection. The optional tier captures screenshots
+with Playwright and analyzes them through LiteLLM.
 
 **Measured benchmark:** 81.1% accuracy (60/74 labeled queries, ``gpt-4o-mini``, 2026-07-21) on the bundled ground-truth suite (18 fixtures / 74 queries / 4 categories). See ``benchmarks/results/2026-07-21_gpt-4o-mini.json``. For the full-scale external benchmark of AI UI judges, see `UIJudgeBench <https://github.com/gojiplus/uijudge-bench>`_.
 
@@ -49,6 +53,7 @@ LayoutLens is an AI-powered UI testing framework that enables natural language v
 
 * **Natural Language Testing**: Ask questions like "Is the button properly aligned?"
 * **Deterministic Accessibility**: Vendored axe-core WCAG 2.1 A/AA checks, no API key required
+* **Deterministic Visual Checks**: Geometry, contrast, target spacing, focus obscuration, and text occlusion
 * **Multi-Viewport Support**: Test across mobile, tablet, and desktop
 * **Comprehensive Benchmarks**: 18 fixtures / 74 queries / 4 categories
 * **81.1% Accuracy**: Measured on the bundled ground-truth suite (gpt-4o-mini, 2026-07-21)
@@ -83,6 +88,7 @@ LayoutLens is an AI-powered UI testing framework that enables natural language v
 * ✅ **81.1% measured accuracy** on the ground-truth benchmark suite (gpt-4o-mini, 2026-07-21)
 * ✅ **18 HTML fixtures** across 4 categories (74 labeled yes/no queries)
 * ✅ **Deterministic axe-core accessibility mode** — no API key, no LLM variance
+* ✅ **Deterministic rendered-page checks** for geometry, contrast, target spacing, focus, and occlusion
 * ✅ **Multi-viewport testing** with responsive design validation
 
 Indices and tables

@@ -26,6 +26,11 @@ class PromptTemplate:
     ) -> tuple[str, str]:
         """Render the template with provided variables and context.
 
+        Args:
+            query: User question to interpolate into the prompt.
+            instructions: Optional structured prompt instructions.
+            **kwargs: Additional template variables.
+
         Returns:
             tuple: (system_prompt, user_prompt)
         """
@@ -116,6 +121,10 @@ class ExpertPrompt(ABC):
         self, query: str, instructions: Instructions | None = None
     ) -> tuple[str, str]:
         """Generate expert analysis prompts for the given query.
+
+        Args:
+            query: User question to analyze.
+            instructions: Optional structured prompt instructions.
 
         Returns:
             tuple: (system_prompt, user_prompt)

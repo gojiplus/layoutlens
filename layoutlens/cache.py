@@ -371,23 +371,15 @@ def create_cache(
 ) -> AnalysisCache:
     """Create an AnalysisCache with the specified backend.
 
-    Parameters
-    ----------
-    cache_type : str, default "memory"
-        Type of cache backend: "memory" or "file"
-    cache_dir : str or Path, default ".layoutlens_cache"
-        Directory for file cache (only used if cache_type="file")
-    max_size : int, default 1000
-        Maximum number of cache entries
-    default_ttl : int, default 3600
-        Default time-to-live in seconds
-    enabled : bool, default True
-        Whether caching is enabled
+    Args:
+        cache_type: Cache backend, either ``"memory"`` or ``"file"``.
+        cache_dir: Directory used by the file backend.
+        max_size: Maximum number of cache entries.
+        default_ttl: Default time-to-live in seconds.
+        enabled: Whether caching is enabled.
 
     Returns:
-    -------
-    AnalysisCache
-        Configured cache instance
+        Configured cache instance.
     """
     backend: InMemoryCache | FileCache
     if cache_type == "memory":

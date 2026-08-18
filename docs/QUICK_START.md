@@ -51,6 +51,27 @@ forces a "no" verdict if it finds any violation. Pass `mode="axe"` for the
 keyless deterministic-only check, or `mode="llm"` for the legacy vision-only
 check.
 
+## Deterministic Layout and WCAG 2.2 Checks (No API Key Required)
+
+The layout scanner measures geometry, contrast, WCAG 2.5.8 target spacing,
+WCAG 2.4.11 complete focus obscuration, and text occlusion such as a chart
+line painted across its label:
+
+```bash
+layoutlens page.html --layout deterministic
+```
+
+```python
+from layoutlens import LayoutScorer
+
+report = await LayoutScorer().scan("page.html", viewport="mobile")
+for finding in report.findings:
+    print(finding.defect_class, finding.selector, finding.measured)
+```
+
+These checks automate only their documented rendered-page scope. Their reports
+are evidence, not a site-wide WCAG conformance claim.
+
 ## 💡 Basic Usage
 
 LayoutLens's API is async — call it with `await` from an `async def`, or wrap

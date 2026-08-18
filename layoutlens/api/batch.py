@@ -97,6 +97,9 @@ class BatchRequest:
 def batch_usage_summary(results: dict[str, JudgeResult]) -> dict[str, Any]:
     """Aggregate token usage (and estimated cost) across judge_batch results.
 
+    Args:
+        results: Judge results keyed by the caller-owned batch request ids.
+
     Returns:
         Dict with request counts, per-field token totals, and
         ``estimated_cost_usd`` (None when the model is unknown to litellm).

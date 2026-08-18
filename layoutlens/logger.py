@@ -27,15 +27,11 @@ LOG_LEVELS = {
 def get_logger(name: str) -> logging.Logger:
     """Get a configured logger instance for the given name.
 
-    Parameters
-    ----------
-    name : str
-        Logger name, typically the module name
+    Args:
+        name: Logger name, typically the module name.
 
     Returns:
-    -------
-    logging.Logger
-        Configured logger instance
+        Configured logger instance.
     """
     logger = logging.getLogger(f"layoutlens.{name}")
 

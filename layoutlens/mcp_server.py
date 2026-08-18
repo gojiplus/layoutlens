@@ -79,7 +79,7 @@ async def audit_accessibility(url: str, compliance_level: str = "AA") -> str:
 
 @mcp.tool
 async def scan_layout(url: str, viewport: str = "desktop") -> str:
-    """Deterministic layout scan: overlap, clipping, protrusion, page overflow, truncation, contrast, tap-target size. Keyless.
+    """Deterministic geometry, contrast, target-spacing, focus, and text-occlusion scan. Keyless.
 
     Args:
         url: Page URL or local HTML file path.
