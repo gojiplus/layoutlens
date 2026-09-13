@@ -298,7 +298,7 @@ print(explained.explanation)
 
 Screenshot-only comparison is unsupported. Optional explanation cannot change
 measurements, evidence levels, or gate decisions. See the
-[migration and artifact guide](https://github.com/gojiplus/layoutlens/blob/main/docs/REGRESSION.md).
+[migration and artifact guide](https://github.com/gojiplus/layoutlens/blob/72c99eacc14c2c6f7bbf828efced6cb73cf2f4be/docs/REGRESSION.md).
 
 ### 3. Expert-Powered Analysis
 Domain expert knowledge with one line of code:

@@ -4,8 +4,13 @@ This module provides TypedDict definitions for all JSON inputs and outputs,
 plus enums for type-safe parameter validation.
 """
 
+from __future__ import annotations
+
 from enum import Enum
-from typing import Any, TypedDict
+from typing import TYPE_CHECKING, Any, TypedDict
+
+if TYPE_CHECKING:
+    from .prompts import Instructions
 
 # Enums for type-safe API parameters
 
@@ -226,7 +231,7 @@ class AnalyzeInput(TypedDict, total=False):
 
 
 class CompareInput(TypedDict, total=False):
-    """JSON-compatible inputs for structured comparison of saved or live pages."""
+    """Inputs for structured comparison of saved or live pages."""
 
     before: str
     after: str
@@ -236,7 +241,7 @@ class CompareInput(TypedDict, total=False):
     repository: str
     explain: bool
     intent: str
-    instructions: str
+    instructions: Instructions
 
 
 class LayoutLensConfigJSON(TypedDict, total=False):

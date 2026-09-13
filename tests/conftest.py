@@ -102,3 +102,13 @@ def render_state():
             )
         },
     )
+
+
+@pytest.fixture(scope="session")
+def chromium_installed():
+    """Skip browser tests when the generic CI environment has no browser binary."""
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as playwright:
+        if not Path(playwright.chromium.executable_path).is_file():
+            pytest.skip("Chromium is installed by the dedicated browser workflow")

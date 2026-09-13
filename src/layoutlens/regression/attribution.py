@@ -8,6 +8,7 @@ import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING
 from urllib.parse import unquote, urlparse
+from urllib.request import url2pathname
 
 if TYPE_CHECKING:
     from .models import RenderState, VisualDelta
@@ -73,10 +74,10 @@ def _related_patch(patch: str, line: int) -> str:
 def _file(url: str, source: str, repository: Path) -> Path | None:
     parsed = urlparse(url)
     if parsed.scheme == "file":
-        candidate = Path(unquote(parsed.path)).resolve()
+        candidate = Path(url2pathname(parsed.path)).resolve()
     elif (
         parsed.hostname in {"localhost", "127.0.0.1", "::1"}
-        and not urlparse(source).scheme
+        and urlparse(source).scheme not in {"http", "https", "file"}
         and Path(source).is_file()
     ):
         candidate = (

@@ -259,22 +259,26 @@ def test_source_maps_regular_indexed_and_unmapped():
         "sourcesContent": [".cta {width: 103px}"],
         "mappings": "AAAA",
     }
-    result = original_position(regular, 0, 5, "https://test/assets/main.css.map")
-    assert result["url"] == "https://test/src/checkout.scss"
+    result = original_position(regular, 0, 5, "https://example.com/assets/main.css.map")
+    assert result["url"] == "https://example.com/src/checkout.scss"
     assert result["line"] == 1
     indexed = {
         "version": 3,
         "sections": [{"offset": {"line": 2, "column": 10}, "map": regular}],
     }
     assert (
-        original_position(indexed, 2, 15, "https://test/assets/main.css.map") == result
+        original_position(indexed, 2, 15, "https://example.com/assets/main.css.map")
+        == result
     )
-    assert original_position(indexed, 1, 0, "https://test/assets/main.css.map") is None
+    assert (
+        original_position(indexed, 1, 0, "https://example.com/assets/main.css.map")
+        is None
+    )
     regular["mappings"] = "AAAA,C"
-    assert original_position(regular, 0, 1, "https://test/main.css.map") is None
+    assert original_position(regular, 0, 1, "https://example.com/main.css.map") is None
     regular["mappings"] = "!"
     with pytest.raises(ValueError, match="substring not found"):
-        original_position(regular, 0, 1, "https://test/main.css.map")
+        original_position(regular, 0, 1, "https://example.com/main.css.map")
 
 
 @pytest.mark.asyncio
@@ -299,6 +303,7 @@ async def test_compare_is_keyless_and_model_explanation_cannot_change_gate(
 
 
 @pytest.mark.browser
+@pytest.mark.usefixtures("chromium_installed")
 @pytest.mark.asyncio
 async def test_browser_capture_replay_clipping_and_current_focus(tmp_path):
     async with async_playwright() as playwright:
@@ -342,6 +347,7 @@ async def test_browser_capture_replay_clipping_and_current_focus(tmp_path):
 
 
 @pytest.mark.browser
+@pytest.mark.usefixtures("chromium_installed")
 @pytest.mark.asyncio
 async def test_browser_external_css_and_sourcemap(tmp_path):
     source = tmp_path / "page.html"
@@ -377,6 +383,7 @@ async def test_browser_external_css_and_sourcemap(tmp_path):
 
 
 @pytest.mark.browser
+@pytest.mark.usefixtures("chromium_installed")
 @pytest.mark.asyncio
 async def test_browser_open_shadow_and_opaque_coverage():
     async with async_playwright() as playwright:
@@ -433,13 +440,16 @@ def test_git_attribution_verifies_revision_and_selects_related_hunk(tmp_path):
     cause = result.deltas[0].likely_source[0]
     assert cause["file"] == "checkout.css"
     assert cause["line"] == 1
+    declaration["url"] = css.as_uri()
+    file_cause = diff(before, after, repository=tmp_path).deltas[0].likely_source[0]
+    assert file_cause["file"] == "checkout.css"
     assert "width:103px" in cause["git_diff"]
     assert "color:blue" not in cause["git_diff"]
     after.revision = base
     cause = diff(before, after, repository=tmp_path).deltas[0].likely_source[0]
     assert "git_diff" not in cause
     assert any("does not match" in reason for reason in cause["missing_links"])
-    declaration["url"] = "https://unrelated.example/checkout.css"
+    declaration["url"] = "https://example.org/checkout.css"
     cause = diff(before, after, repository=tmp_path).deltas[0].likely_source[0]
     assert "file" not in cause
 
@@ -476,6 +486,7 @@ async def test_cli_artifacts_and_exit_status(tmp_path, monkeypatch, capsys):
 
 
 @pytest.mark.browser
+@pytest.mark.usefixtures("chromium_installed")
 @pytest.mark.asyncio
 async def test_browser_wrap_overlap_and_loading_failure():
     async with async_playwright() as playwright:
