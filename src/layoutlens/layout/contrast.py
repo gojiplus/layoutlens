@@ -112,25 +112,42 @@ _JS_CONTRAST_SCAN = """() => {
     const r = el.getBoundingClientRect();
     return r.width > 0 && r.height > 0;
   }
+  function queryAll(root, selector) {
+    const out = [...root.querySelectorAll(root.host && selector === 'body *' ? '*' : selector)];
+    for (const el of root.querySelectorAll('*')) if (el.shadowRoot) out.push(...queryAll(el.shadowRoot, selector));
+    return out;
+  }
+  function deepHit(x, y) {
+    let el = document.elementFromPoint(x, y), next;
+    while (el && el.shadowRoot && (next = el.shadowRoot.elementFromPoint(x, y)) && next !== el) el = next;
+    return el;
+  }
+  function containsDeep(parent, child) {
+    for (let el = child; el; el = el.parentElement || el.getRootNode().host) if (el === parent) return true;
+    return false;
+  }
   function cssPath(el) {
-    if (el.id) return '#' + CSS.escape(el.id);
+    if (el === document.documentElement) return 'html';
+    const root = el.getRootNode();
+    const prefix = root.host ? cssPath(root.host) + ' >>> ' : '';
+    if (el.id && root.querySelectorAll('#' + CSS.escape(el.id)).length === 1)
+      return prefix + '#' + CSS.escape(el.id);
     const parts = [];
     let node = el;
     while (node && node.nodeType === 1 && node !== document.documentElement) {
-      if (node.id) { parts.unshift('#' + CSS.escape(node.id)); break; }
+      if (node.id && root.querySelectorAll('#' + CSS.escape(node.id)).length === 1) {
+        parts.unshift('#' + CSS.escape(node.id)); break;
+      }
       let sel = node.tagName.toLowerCase();
       const parent = node.parentElement;
-      if (parent) {
-        const sibs = [...parent.children].filter(c => c.tagName === node.tagName);
-        if (sibs.length > 1) sel += ':nth-of-type(' + (sibs.indexOf(node) + 1) + ')';
-      }
-      parts.unshift(sel);
-      node = node.parentElement;
+      const siblings = [...(parent || root).children].filter(c => c.tagName === node.tagName);
+      if (siblings.length > 1) sel += ':nth-of-type(' + (siblings.indexOf(node) + 1) + ')';
+      parts.unshift(sel); node = parent;
     }
-    return parts.join(' > ');
+    return prefix + parts.join(' > ');
   }
   const out = [];
-  for (const el of document.querySelectorAll('body *')) {
+  for (const el of queryAll(document, 'body *')) {
     let hasText = false;
     for (const n of el.childNodes) {
       if (n.nodeType === 3 && n.textContent.trim()) { hasText = true; break; }
@@ -138,7 +155,7 @@ _JS_CONTRAST_SCAN = """() => {
     if (!hasText || !visible(el)) continue;
     const cs = getComputedStyle(el);
     let node = el;
-    while (node && transparent(getComputedStyle(node).backgroundColor)) node = node.parentElement;
+    while (node && transparent(getComputedStyle(node).backgroundColor)) node = node.parentElement || node.getRootNode().host;
     const bg = node ? getComputedStyle(node).backgroundColor : 'rgb(255, 255, 255)';
     const r = el.getBoundingClientRect();
     out.push({ selector: cssPath(el), fg: cs.color, bg,
@@ -166,6 +183,13 @@ async def check_contrast(
         One :class:`LayoutFinding` per low-contrast text element.
     """
     elements = await page.evaluate(_JS_CONTRAST_SCAN)
+    return contrast_findings(elements, threshold)
+
+
+def contrast_findings(
+    elements: list[dict], threshold: float = AA_NORMAL_TEXT
+) -> list[LayoutFinding]:
+    """Diagnose saved foreground/background measurements without a browser."""
     findings: list[LayoutFinding] = []
     for el in elements:
         try:

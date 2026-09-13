@@ -55,3 +55,60 @@ def _test_env():
         os.environ["OPENAI_API_KEY"] = original_api_key
     elif "OPENAI_API_KEY" in os.environ:
         del os.environ["OPENAI_API_KEY"]
+
+
+@pytest.fixture
+def render_state():
+    """A browser-free render state with complete empty detector evidence."""
+    from io import BytesIO
+
+    from PIL import Image
+
+    from layoutlens.layout import LayoutScorer
+    from layoutlens.regression.models import (
+        CaptureEnvironment,
+        LayoutGraph,
+        RenderState,
+    )
+
+    image = BytesIO()
+    Image.new("RGB", (10, 10), "white").save(image, format="PNG")
+    return RenderState(
+        screenshot=image.getvalue(),
+        source="fixture.html",
+        environment=CaptureEnvironment(
+            browser_version="fixture",
+            viewport=(1280, 720),
+            dpr=1,
+            user_agent="fixture",
+            platform="test",
+            locale="en-US",
+            timezone="UTC",
+        ),
+        graph=LayoutGraph(),
+        detector_config=vars(LayoutScorer(probe_focus=False)),
+        detector_evidence={
+            key: []
+            for key in (
+                "contrast",
+                "overlaps",
+                "clipping",
+                "protrusion",
+                "page_overflow",
+                "truncation",
+                "small_targets",
+                "text_occlusion",
+                "focus_obscured",
+            )
+        },
+    )
+
+
+@pytest.fixture(scope="session")
+def chromium_installed():
+    """Skip browser tests when the generic CI environment has no browser binary."""
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as playwright:
+        if not Path(playwright.chromium.executable_path).is_file():
+            pytest.skip("Chromium is installed by the dedicated browser workflow")

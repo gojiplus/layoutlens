@@ -9,10 +9,13 @@ import sys
 from pathlib import Path
 
 import yaml
+from playwright.async_api import Error as PlaywrightError
 
-from .api.core import BatchResult, ComparisonResult, LayoutLens
+from .api.core import BatchResult, LayoutLens
 from .exceptions import LayoutLensError
-from .sarif import to_sarif
+from .regression.capture import capture_state
+from .regression.models import DiffReport
+from .sarif import diff_to_sarif, to_sarif
 
 
 async def _run_a11y(sources, args) -> int:
@@ -73,7 +76,7 @@ async def _run_layout(sources, args) -> int:
         results = []
         for source in sources:
             result = await lens.check_layout(
-                source, viewport=args.viewport, mode=args.layout
+                source, viewport=args.viewport, mode=args.layout, policy=args.fail_on
             )
             results.append(result)
     except LayoutLensError as e:
@@ -93,12 +96,90 @@ async def _run_layout(sources, args) -> int:
         for result in results:
             print(f"📍 {result.source}")
             print(f"📐 Layout ({args.layout}): {result.answer}")
-            print(f"📊 Confidence: {result.confidence:.0%}")
+            if result.metadata.get("confidence_kind") != "not_estimated":
+                print(f"📊 Model confidence: {result.confidence:.0%}")
             if result.reasoning:
                 print(f"💭 {result.reasoning}")
             print()
 
-    return 0
+    if any(r.metadata.get("gate_status") == "incomplete" for r in results):
+        return 2
+    return int(any(r.metadata.get("gate_status") == "fail" for r in results))
+
+
+def _print_diff(report: DiffReport, output: str) -> int:
+    if output == "sarif":
+        print(json.dumps(diff_to_sarif(report), indent=2))
+    elif output == "json":
+        print(report.to_json())
+    else:
+        print(report.summary())
+        for delta in report.deltas:
+            if delta.defect_class:
+                print(
+                    f"{delta.status}: {delta.defect_class} at {delta.element}: {delta.measured_delta}"
+                )
+        for reason in report.incomplete_reasons:
+            print(f"incomplete: {reason}")
+    return {"pass": 0, "fail": 1, "incomplete": 2}[report.gate_status]
+
+
+async def _regression_main(arguments: list[str]) -> int:
+    parser = argparse.ArgumentParser(prog="layoutlens " + arguments[0])
+    parser.add_argument("sources", nargs="+")
+    parser.add_argument("--viewport", default="desktop")
+    parser.add_argument("--output", default="json", choices=["json", "text", "sarif"])
+    parser.add_argument(
+        "--save",
+        help="New artifact directory; existing baselines are never overwritten",
+    )
+    parser.add_argument("--revision")
+    parser.add_argument("--wait-for-selector")
+    parser.add_argument("--repository")
+    parser.add_argument(
+        "--fail-on", choices=["qualified", "findings", "nothing"], default="qualified"
+    )
+    parser.add_argument("--tolerance-px", type=float, default=1)
+    parser.add_argument("--explain", action="store_true")
+    parser.add_argument("--intent")
+    args = parser.parse_args(arguments[1:])
+    try:
+        if arguments[0] == "capture":
+            if len(args.sources) != 1 or not args.save:
+                parser.error("capture requires one source and --save DIRECTORY")
+            state = await capture_state(
+                args.sources[0],
+                viewport=args.viewport,
+                revision=args.revision,
+                wait_for_selector=args.wait_for_selector,
+            )
+            manifest = state.save(args.save)
+            print(
+                json.dumps(
+                    {
+                        "artifact": str(manifest),
+                        "stable": state.stable,
+                        "coverage_gaps": state.coverage_gaps,
+                    }
+                )
+            )
+            return 2 if state.coverage_gaps or not state.stable else 0
+        if len(args.sources) != 2:
+            parser.error("diff requires baseline and candidate")
+        report = await LayoutLens().compare(
+            args.sources[0],
+            args.sources[1],
+            viewport=args.viewport,
+            policy=args.fail_on,
+            tolerance_px=args.tolerance_px,
+            repository=args.repository,
+            explain=args.explain,
+            intent=args.intent,
+        )
+        return _print_diff(report, args.output)
+    except (LayoutLensError, ValueError, OSError, PlaywrightError) as error:
+        print(f"Error: {error}", file=sys.stderr)
+        return 2
 
 
 async def _run_suite(args) -> int:
@@ -139,6 +220,8 @@ async def _run_suite(args) -> int:
 
 async def main():
     """Main CLI entry point."""
+    if len(sys.argv) > 1 and sys.argv[1] in {"capture", "diff"}:
+        return await _regression_main(sys.argv[1:])
     parser = argparse.ArgumentParser(
         prog="layoutlens",
         description="AI-powered UI testing and analysis",
@@ -156,6 +239,9 @@ Examples:
         "sources", nargs="*", help="URLs, HTML files, or screenshots to analyze"
     )
     parser.add_argument("--query", "-q", help="Question to ask about the UI")
+    parser.add_argument(
+        "--fail-on", choices=["qualified", "findings", "nothing"], default="qualified"
+    )
     parser.add_argument(
         "--compare",
         "-c",
@@ -246,7 +332,7 @@ Examples:
         return 1
 
     # SARIF output only makes sense for deterministic finding streams.
-    if args.output == "sarif" and not (args.a11y or args.layout):
+    if args.output == "sarif" and not (args.a11y or args.layout or args.compare):
         print(
             "Error: --output sarif requires --a11y or --layout (LLM verdicts "
             "carry no rule ids or locations)",
@@ -296,19 +382,17 @@ Examples:
 
     # Execute analysis
     try:
-        if args.compare and len(sources) >= 2:
-            # Compare mode
-            result = await lens.compare(
-                sources=sources[:2],  # Compare first two
-                query=query,
-                viewport=args.viewport,
+        if args.compare:
+            if len(sources) != 2:
+                print("Error: comparison requires exactly two sources", file=sys.stderr)
+                return 2
+            report = await lens.compare(
+                sources[0], sources[1], viewport=args.viewport, policy=args.fail_on
             )
-        else:
-            # Regular analysis (smart method handles single/multiple)
-            source = sources[0] if len(sources) == 1 else sources
-            result = await lens.analyze(
-                source=source, query=query, viewport=args.viewport
-            )
+            return _print_diff(report, args.output)
+        # Regular analysis (smart method handles single/multiple)
+        source = sources[0] if len(sources) == 1 else sources
+        result = await lens.analyze(source=source, query=query, viewport=args.viewport)
 
         # Output results
         if args.output == "json":
@@ -322,11 +406,8 @@ Examples:
                     print(f"❓ {r.query}")
                     print(f"✅ {r.answer}")
                     print(f"📊 Confidence: {r.confidence:.0%}\n")
-            else:  # Single result or ComparisonResult
-                if isinstance(result, ComparisonResult):
-                    print(f"📍 Comparing: {' vs '.join(result.sources)}")
-                else:
-                    print(f"📍 {result.source}")
+            else:
+                print(f"📍 {result.source}")
                 print(f"❓ {query}")
                 print(f"✅ {result.answer}")
                 print(f"📊 Confidence: {result.confidence:.0%}")

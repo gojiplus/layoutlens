@@ -77,7 +77,7 @@ class TestLayoutReport:
     def test_ok_and_grouping(self):
         empty = LayoutReport(source="p.html", viewport="desktop", findings=[])
         assert empty.ok is True
-        assert "No layout defects" in empty.summary()
+        assert "No candidate layout findings" in empty.summary()
 
         findings = [
             LayoutFinding(

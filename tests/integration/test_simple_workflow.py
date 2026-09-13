@@ -63,42 +63,15 @@ class TestSimpleWorkflow:
             # Cleanup
             Path(temp_file).unlink()
 
-    @patch("layoutlens.capture.Capture.screenshots")
-    @patch("layoutlens.api.core.acompletion")
     @pytest.mark.asyncio
-    async def test_page_comparison(self, mock_acompletion, mock_capture):
-        """Test comparing two pages with current architecture."""
-        # Setup mocks
-        mock_capture.return_value = ["/fake/screenshot1.png", "/fake/screenshot2.png"]
-
-        mock_response = Mock()
-        mock_response.choices = [Mock()]
-        mock_response.choices[
-            0
-        ].message.content = '{"answer": "The second design is better.", "confidence": 0.78, "reasoning": "Better visual hierarchy."}'
-        mock_response.usage.total_tokens = 120
-        mock_acompletion.return_value = mock_response
-
-        with (
-            patch("os.path.exists", return_value=True),
-            # compare() now routes local HTML through the capture path (real
-            # screenshots instead of raw HTML bytes), which existence-checks the
-            # file via Path.exists — mocked here alongside the mocked capture.
-            patch("pathlib.Path.exists", return_value=True),
-            patch(
-                "layoutlens.api.core.LayoutLens._encode_image",
-                return_value="fake-base64",
-            ),
-        ):
-            # Initialize LayoutLens
-            lens = LayoutLens(api_key="test-key")
-
-            # Compare pages
-            result = await lens.compare(
-                sources=["page1.html", "page2.html"], query="Which design is better?"
-            )
-
-            # Verify results
-            assert "second" in result.answer.lower()
-            assert result.confidence == 0.78
-            assert len(result.sources) == 2
+    async def test_page_comparison(self, tmp_path, render_state):
+        before = render_state.model_copy(update={"source": "before.html"})
+        after = render_state.model_copy(update={"source": "after.html"})
+        before_path = before.save(tmp_path / "before")
+        after_path = after.save(tmp_path / "after")
+        result = await LayoutLens(output_dir=tmp_path / "out").compare(
+            before_path, after_path
+        )
+        assert result.gate_status == "pass"
+        assert result.before == "before.html"
+        assert result.after == "after.html"

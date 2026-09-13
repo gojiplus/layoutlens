@@ -43,32 +43,19 @@ async def advanced_analysis_with_context():
 async def comprehensive_comparison_workflow():
     """Demonstrate advanced comparison scenarios.
 
-    compare() accepts URLs, local HTML files, or screenshot images; every
-    source is rendered and every screenshot goes to the model.
+    compare() captures browser evidence and returns structured deltas.
     """
 
     tester = LayoutLens(output_dir="comparison_analysis")
 
     # Before/after comparison with specific focus
-    before_after_context = {
-        "focus_areas": "navigation, accessibility, mobile_experience",
-        "comparison_type": "redesign_evaluation",
-    }
-
     html_files = [
         "benchmarks/test_data/layout_alignment/nav_misaligned.html",
         "benchmarks/test_data/layout_alignment/nav_centered.html",
     ]
-    screenshots = await tester.capture(html_files)
+    result = await tester.compare(html_files[0], html_files[1])
 
-    result = await tester.compare(
-        sources=[screenshots[path] for path in html_files],
-        query="How does the redesigned navigation improve the user experience?",
-        context=before_after_context,
-    )
-
-    print(f"\nDesign comparison: {result.answer}")
-    print(f"Analysis confidence: {result.confidence:.1%}")
+    print(result.summary())
 
 
 async def batch_analysis_workflow():

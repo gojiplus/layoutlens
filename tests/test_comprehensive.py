@@ -27,7 +27,7 @@ class TestImports:
             AnalysisResult,
             BatchResult,
             Capture,
-            ComparisonResult,
+            DiffReport,
             Instructions,
             LayoutLens,
             LayoutScorer,
@@ -42,7 +42,7 @@ class TestImports:
             AnalysisResult,
             BatchResult,
             Capture,
-            ComparisonResult,
+            DiffReport,
             Instructions,
             LayoutLens,
             LayoutScorer,
@@ -122,16 +122,13 @@ class TestAPIFunctionality:
 
     @pytest.mark.asyncio
     async def test_compare_handles_missing_files(self):
-        """compare() degrades to an error result instead of crashing."""
+        """Structured comparison rejects screenshot-only inputs explicitly."""
         from layoutlens.api.core import LayoutLens
 
         lens = LayoutLens(api_key=MOCK_API_KEY)
 
-        result = await lens.compare(
-            ["/nonexistent1.png", "/nonexistent2.png"], "Which design is better?"
-        )
-        assert result.confidence == 0.0
-        assert "Error" in result.answer
+        with pytest.raises(ValueError, match="structured comparison requires"):
+            await lens.compare("/nonexistent1.png", "/nonexistent2.png")
 
     @pytest.mark.asyncio
     @patch("layoutlens.api.core.acompletion")

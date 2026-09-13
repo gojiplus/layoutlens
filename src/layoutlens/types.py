@@ -4,8 +4,13 @@ This module provides TypedDict definitions for all JSON inputs and outputs,
 plus enums for type-safe parameter validation.
 """
 
+from __future__ import annotations
+
 from enum import Enum
-from typing import Any, TypedDict
+from typing import TYPE_CHECKING, Any, TypedDict
+
+if TYPE_CHECKING:
+    from .prompts import Instructions
 
 # Enums for type-safe API parameters
 
@@ -78,34 +83,6 @@ class AnalysisResultJSON(TypedDict):
     confidence: float  # 0.0 to 1.0
     reasoning: str
     screenshot_path: str | None
-    viewport: str
-    timestamp: str
-    execution_time: float
-    metadata: dict[str, Any]
-
-
-class ComparisonResultJSON(TypedDict):
-    """JSON schema for ComparisonResult objects.
-
-    Example:
-        {
-            "sources": ["page1.html", "page2.html"],
-            "query": "Which design is better?",
-            "answer": "The second design is more user-friendly.",
-            "confidence": 0.78,
-            "reasoning": "Page 2 has better visual hierarchy...",
-            "viewport": "desktop",
-            "timestamp": "2024-01-15T10:30:45",
-            "execution_time": 3.1,
-            "metadata": {"comparison_type": "design_quality"}
-        }
-    """
-
-    sources: list[str]
-    query: str
-    answer: str
-    confidence: float  # 0.0 to 1.0
-    reasoning: str
     viewport: str
     timestamp: str
     execution_time: float
@@ -254,21 +231,17 @@ class AnalyzeInput(TypedDict, total=False):
 
 
 class CompareInput(TypedDict, total=False):
-    """Input schema for lens.compare() method.
+    """Inputs for structured comparison of saved or live pages."""
 
-    Example:
-        {
-            "sources": ["page1.html", "page2.html"],  # Required
-            "query": "Which is better?",              # Required
-            "viewport": "desktop",                    # Optional
-            "context": {"focus": "usability"}        # Optional
-        }
-    """
-
-    sources: list[str]  # Required: List of sources to compare
-    query: str  # Required: Comparison question
-    viewport: str  # Optional: Viewport for analysis
-    context: dict[str, Any]  # Optional: Comparison context
+    before: str
+    after: str
+    viewport: str
+    policy: str
+    tolerance_px: float
+    repository: str
+    explain: bool
+    intent: str
+    instructions: Instructions
 
 
 class LayoutLensConfigJSON(TypedDict, total=False):
@@ -303,7 +276,6 @@ __all__ = [
     "CacheType",
     "CacheTypeType",
     "CompareInput",
-    "ComparisonResultJSON",
     # Enums
     "ComplianceLevel",
     "ComplianceLevelType",

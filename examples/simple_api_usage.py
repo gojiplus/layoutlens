@@ -83,12 +83,11 @@ async def before_after_comparison():
 
         # Compare two designs
         result = await lens.compare(
-            sources=["https://example.com", "https://httpbin.org"],
-            query="Which page has a cleaner, more professional design?",
+            "https://example.com",
+            "https://httpbin.org",
         )
 
-        print(f"Comparison: {result.answer[:100]}...")
-        print(f"Confidence: {result.confidence:.1%}")
+        print(result.summary())
 
     except Exception as e:
         print(f"Error: {e}")

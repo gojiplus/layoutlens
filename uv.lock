@@ -265,6 +265,20 @@ wheels = [
 ]
 
 [[package]]
+name = "batchlane"
+version = "0.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "httpx" },
+    { name = "litellm" },
+    { name = "tenacity" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/da/74/e1d98ac8127d0a95595bbb9a5d5459f6db09ac2e92e2e2e7f56daffcc69a/batchlane-0.2.0.tar.gz", hash = "sha256:3eae6a1ddec46bba7beaf97a8422b3ad690c6798324ba6b8aea73e9405623fea", size = 55394, upload-time = "2026-09-07T23:45:15.344Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b1/8a/f271e24246b5606a7b227167d6e31ccdb8ab7064c2b549aa62c8edf8ac68/batchlane-0.2.0-py3-none-any.whl", hash = "sha256:bb832859de44ddef536fa6f967d4b44873f10d1b28f61c18afd9966919ad6ea9", size = 69893, upload-time = "2026-09-07T23:45:14.063Z" },
+]
+
+[[package]]
 name = "beartype"
 version = "0.22.9"
 source = { registry = "https://pypi.org/simple" }
@@ -1694,9 +1708,10 @@ wheels = [
 
 [[package]]
 name = "layoutlens"
-version = "2.2.0"
+version = "3.0.0"
 source = { editable = "." }
 dependencies = [
+    { name = "batchlane" },
     { name = "beautifulsoup4" },
     { name = "litellm" },
     { name = "openai" },
@@ -1708,9 +1723,6 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
-gemini = [
-    { name = "google-genai" },
-]
 mcp = [
     { name = "fastmcp" },
 ]
@@ -1728,6 +1740,7 @@ dev = [
     { name = "pytest-cov" },
     { name = "pytest-mock" },
     { name = "pytest-xdist" },
+    { name = "respx" },
     { name = "rich" },
     { name = "ruff" },
 ]
@@ -1746,13 +1759,14 @@ test = [
     { name = "pytest-cov" },
     { name = "pytest-mock" },
     { name = "pytest-xdist" },
+    { name = "respx" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "batchlane", specifier = ">=0.2.0" },
     { name = "beautifulsoup4", specifier = ">=4.12.0" },
     { name = "fastmcp", marker = "extra == 'mcp'", specifier = ">=3" },
-    { name = "google-genai", marker = "extra == 'gemini'", specifier = ">=1.0" },
     { name = "litellm", specifier = ">=1.80.10" },
     { name = "openai", specifier = ">=2.54.0,<4" },
     { name = "pillow", specifier = ">=10.0.0" },
@@ -1761,7 +1775,7 @@ requires-dist = [
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "rich", specifier = ">=13.0.0" },
 ]
-provides-extras = ["gemini", "mcp"]
+provides-extras = ["mcp"]
 
 [package.metadata.requires-dev]
 browser-use = [{ name = "browser-use", specifier = ">=0.13,<0.14" }]
@@ -1774,6 +1788,7 @@ dev = [
     { name = "pytest-cov", specifier = ">=4.0.0" },
     { name = "pytest-mock", specifier = ">=3.10.0" },
     { name = "pytest-xdist", specifier = ">=3.0.0" },
+    { name = "respx", specifier = ">=0.21" },
     { name = "rich", specifier = ">=14.2.0" },
     { name = "ruff", specifier = ">=0.7.0" },
 ]
@@ -1792,6 +1807,7 @@ test = [
     { name = "pytest-cov", specifier = ">=4.0.0" },
     { name = "pytest-mock", specifier = ">=3.10.0" },
     { name = "pytest-xdist", specifier = ">=3.0.0" },
+    { name = "respx", specifier = ">=0.21" },
 ]
 
 [[package]]
@@ -5850,6 +5866,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/42/f2/05f29bc3913aea15eb670be136045bf5c5bbf4b99ecb839da9b422bb2c85/requests-oauthlib-2.0.0.tar.gz", hash = "sha256:b3dffaebd884d8cd778494369603a9e7b58d29111bf6b41bdc2dcd87203af4e9", size = 55650, upload-time = "2024-03-22T20:32:29.939Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/3b/5d/63d4ae3b9daea098d5d6f5da83984853c1bbacd5dc826764b249fe119d24/requests_oauthlib-2.0.0-py2.py3-none-any.whl", hash = "sha256:7dd8a5c40426b779b0868c404bdef9768deccf22749cde15852df527e6269b36", size = 24179, upload-time = "2024-03-22T20:32:28.055Z" },
+]
+
+[[package]]
+name = "respx"
+version = "0.23.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "httpx" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/43/98/4e55c9c486404ec12373708d015ebce157966965a5ebe7f28ff2c784d41b/respx-0.23.1.tar.gz", hash = "sha256:242dcc6ce6b5b9bf621f5870c82a63997e8e82bc7c947f9ffe272b8f3dd5a780", size = 29243, upload-time = "2026-04-08T14:37:16.008Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1d/4a/221da6ca167db45693d8d26c7dc79ccfc978a440251bf6721c9aaf251ac0/respx-0.23.1-py2.py3-none-any.whl", hash = "sha256:b18004b029935384bccfa6d7d9d74b4ec9af73a081cc28600fffc0447f4b8c1a", size = 25557, upload-time = "2026-04-08T14:37:14.613Z" },
 ]
 
 [[package]]

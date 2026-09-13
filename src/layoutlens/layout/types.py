@@ -29,7 +29,7 @@ TEXT_OCCLUSION = "text-occlusion"
 
 @dataclass(slots=True)
 class LayoutFinding:
-    """A single measured layout defect affecting one or two DOM elements.
+    """A candidate layout finding affecting one or two DOM elements.
 
     Attributes:
         defect_class: Stable finding class such as ``"contrast"``, ``"overlap"``,
@@ -54,6 +54,10 @@ class LayoutFinding:
     threshold: dict[str, Any]
     description: str
     wcag_refs: list[str] = field(default_factory=list)
+    level: str = "candidate"
+    gateability: dict[str, Any] = field(
+        default_factory=lambda: {"qualified": False, "blocks": False}
+    )
 
 
 @dataclass(slots=True)
@@ -63,7 +67,7 @@ class LayoutReport:
     Attributes:
         source: The URL or file path that was scanned.
         viewport: The viewport name used for the scan.
-        findings: All measured layout defects, in detector order.
+        findings: All candidate layout findings, in detector order.
         timestamp: ISO-8601 timestamp of when the report was created.
     """
 
@@ -96,7 +100,7 @@ class LayoutReport:
             f"{len(self.findings)} finding(s) across {len(grouped)} class(es)."
         )
         if not self.findings:
-            return header + " No layout defects found."
+            return header + " No candidate layout findings measured."
 
         lines = [header, "Findings:"]
         for defect_class, findings in grouped.items():

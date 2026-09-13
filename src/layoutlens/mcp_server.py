@@ -11,15 +11,15 @@ Design notes:
   see: pixel layout, contrast, clipping, overflow.
 - Responses are compact, pre-grouped summaries — never raw axe JSON dumps —
   so they cost the calling agent hundreds of tokens, not tens of thousands.
-- ``check_ui``/``compare_ui`` use the vision LLM and return a clear error
-  string when no API key is configured.
+- ``compare_ui`` returns structured regression evidence without a model.
+- ``check_ui`` uses the optional vision LLM.
 
 Requires the extra: ``pip install "layoutlens[mcp]"``.
 """
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 try:
     from fastmcp import FastMCP
@@ -29,6 +29,9 @@ except ImportError as e:  # pragma: no cover - exercised only without the extra
     ) from e
 
 from .api.core import LayoutLens
+
+if TYPE_CHECKING:
+    from .regression.policy import GatePolicy
 
 mcp: Any = FastMCP(
     "LayoutLens",
@@ -127,27 +130,53 @@ async def check_ui(url: str, question: str, viewport: str = "desktop") -> str:
 
 
 @mcp.tool
-async def compare_ui(url_a: str, url_b: str, question: str) -> str:
-    """Compare two pages/screenshots with the vision LLM.
+async def compare_ui(
+    before: str, after: str, viewport: str = "desktop", policy: str = "qualified"
+) -> dict:
+    """Compare saved render states or live pages using browser measurements.
 
     Args:
-        url_a: First page URL, HTML file, or screenshot.
-        url_b: Second page URL, HTML file, or screenshot.
-        question: What to compare (e.g. "Which is more accessible?").
+        before: Baseline artifact path, URL, or HTML file.
+        after: Candidate artifact path, URL, or HTML file.
+        viewport: Named viewport for live captures.
+        policy: qualified, findings, or nothing.
 
     Returns:
-        The model's comparative answer with confidence and reasoning.
+        Structured deltas, source evidence, and an explicit gate status.
     """
-    lens = _get_lens()
-    try:
-        result = await lens.compare([url_a, url_b], question)
-    except Exception as e:
-        return f"error: {e}"
-    return (
-        f"answer: {result.answer}\n"
-        f"confidence: {result.confidence:.2f}\n"
-        f"reasoning: {result.reasoning}"
+    import json
+    from typing import cast
+
+    if policy not in {"qualified", "findings", "nothing"}:
+        raise ValueError("unknown gate policy")
+    result = await _get_lens().compare(
+        before, after, viewport=viewport, policy=cast("GatePolicy", policy)
     )
+    return json.loads(result.to_json())
+
+
+@mcp.tool
+async def capture_render_state(
+    source: str, directory: str, viewport: str = "desktop"
+) -> dict:
+    """Save browser evidence in a new artifact directory.
+
+    Args:
+        source: Page URL or local HTML file.
+        directory: New directory; existing baselines are not overwritten.
+        viewport: Named viewport.
+
+    Returns:
+        Artifact location and capture completeness information.
+    """
+    from .regression.capture import capture_state
+
+    state = await capture_state(source, viewport=viewport)
+    return {
+        "artifact": str(state.save(directory)),
+        "stable": state.stable,
+        "coverage_gaps": state.coverage_gaps,
+    }
 
 
 def main() -> None:

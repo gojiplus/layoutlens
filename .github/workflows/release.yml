@@ -22,7 +22,10 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  contracts:
+    uses: ./.github/workflows/contracts.yml
   release:
+    needs: contracts
     uses: gojiplus/py-canon/.github/workflows/reusable-release.yml@v1
     permissions:
       contents: write

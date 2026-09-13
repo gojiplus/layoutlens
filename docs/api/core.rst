@@ -19,10 +19,8 @@ Result Classes
    :undoc-members:
    :show-inheritance:
 
-.. autoclass:: layoutlens.ComparisonResult
-   :members:
-   :undoc-members:
-   :show-inheritance:
+Structured comparison returns :class:`layoutlens.DiffReport`. See
+:doc:`regression` for capture, diff, and qualification types.
 
 .. autoclass:: layoutlens.BatchResult
    :members:

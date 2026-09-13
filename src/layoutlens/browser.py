@@ -207,8 +207,8 @@ async def open_page(
         context = await b.new_context(**context_options)
         page = await context.new_page()
         page.set_default_timeout(timeout)
-        await page.goto(target_url, wait_until="networkidle")
         try:
+            await page.goto(target_url, wait_until="networkidle")
             yield page
         finally:
             await context.close()

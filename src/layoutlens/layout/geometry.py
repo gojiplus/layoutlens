@@ -17,11 +17,11 @@ oracles when it evaluates them.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ..browser import open_page
 from ..types import Viewport, ViewportType
-from .contrast import check_contrast
+from .contrast import _JS_CONTRAST_SCAN, contrast_findings
 from .types import (
     CLIPPING,
     FOCUS_OBSCURED,
@@ -48,22 +48,39 @@ _JS_HELPERS = """
     const r = el.getBoundingClientRect();
     return r.width > 0 && r.height > 0;
   }
+  function queryAll(root, selector) {
+    const out = [...root.querySelectorAll(root.host && selector === 'body *' ? '*' : selector)];
+    for (const el of root.querySelectorAll('*')) if (el.shadowRoot) out.push(...queryAll(el.shadowRoot, selector));
+    return out;
+  }
+  function deepHit(x, y) {
+    let el = document.elementFromPoint(x, y), next;
+    while (el && el.shadowRoot && (next = el.shadowRoot.elementFromPoint(x, y)) && next !== el) el = next;
+    return el;
+  }
+  function containsDeep(parent, child) {
+    for (let el = child; el; el = el.parentElement || el.getRootNode().host) if (el === parent) return true;
+    return false;
+  }
   function cssPath(el) {
-    if (el.id) return '#' + CSS.escape(el.id);
+    if (el === document.documentElement) return 'html';
+    const root = el.getRootNode();
+    const prefix = root.host ? cssPath(root.host) + ' >>> ' : '';
+    if (el.id && root.querySelectorAll('#' + CSS.escape(el.id)).length === 1)
+      return prefix + '#' + CSS.escape(el.id);
     const parts = [];
     let node = el;
     while (node && node.nodeType === 1 && node !== document.documentElement) {
-      if (node.id) { parts.unshift('#' + CSS.escape(node.id)); break; }
+      if (node.id && root.querySelectorAll('#' + CSS.escape(node.id)).length === 1) {
+        parts.unshift('#' + CSS.escape(node.id)); break;
+      }
       let sel = node.tagName.toLowerCase();
       const parent = node.parentElement;
-      if (parent) {
-        const sibs = [...parent.children].filter(c => c.tagName === node.tagName);
-        if (sibs.length > 1) sel += ':nth-of-type(' + (sibs.indexOf(node) + 1) + ')';
-      }
-      parts.unshift(sel);
-      node = node.parentElement;
+      const siblings = [...(parent || root).children].filter(c => c.tagName === node.tagName);
+      if (siblings.length > 1) sel += ':nth-of-type(' + (siblings.indexOf(node) + 1) + ')';
+      parts.unshift(sel); node = parent;
     }
-    return parts.join(' > ');
+    return prefix + parts.join(' > ');
   }
 """
 
@@ -74,7 +91,7 @@ _JS_OVERLAP = (
     + _JS_HELPERS
     + """
   const out = [];
-  for (const parent of document.querySelectorAll('*')) {
+  for (const parent of [...queryAll(document, '*'), ...queryAll(document, '*').map(el => el.shadowRoot).filter(Boolean)]) {
     const kids = [...parent.children].filter(visible);
     for (let i = 0; i < kids.length; i++) {
       for (let j = i + 1; j < kids.length; j++) {
@@ -102,7 +119,7 @@ _JS_CLIP = (
     + _JS_HELPERS
     + """
   const out = [];
-  for (const el of document.querySelectorAll('body *')) {
+  for (const el of queryAll(document, 'body *')) {
     if (!visible(el)) continue;
     const cs = getComputedStyle(el);
     const hiddenY = cs.overflowY === 'hidden' || cs.overflowY === 'clip';
@@ -132,7 +149,7 @@ _JS_PROTRUDE = (
     + """
   const out = [];
   const vw = document.documentElement.clientWidth;
-  for (const el of document.querySelectorAll('body *')) {
+  for (const el of queryAll(document, 'body *')) {
     if (!visible(el)) continue;
     const r = el.getBoundingClientRect();
     const parent = el.parentElement;
@@ -180,7 +197,7 @@ _JS_TRUNCATION = (
     + _JS_HELPERS
     + """
   const out = [];
-  for (const el of document.querySelectorAll('body *')) {
+  for (const el of queryAll(document, 'body *')) {
     if (!visible(el)) continue;
     const cs = getComputedStyle(el);
     if (cs.textOverflow !== 'ellipsis') continue;
@@ -207,7 +224,7 @@ _JS_TARGETS = (
     + """
   const sel = 'a[href], button, input:not([type=hidden]), select, textarea, ' +
               '[role=button], [role=link], [role=checkbox], [role=radio], [onclick]';
-  const targets = [...document.querySelectorAll(sel)].filter(visible);
+  const targets = [...queryAll(document, sel)].filter(visible);
   const out = [];
   function rectDistanceToPoint(r, x, y) {
     const dx = Math.max(r.left - x, 0, x - r.right);
@@ -299,7 +316,7 @@ _JS_TEXT_OCCLUSION = (
     for (let node = el; node && node !== document.documentElement; node = node.parentElement) {
       // A common ancestor paints behind both branches; it cannot occlude text
       // merely because a transparent sibling was returned by hit testing.
-      if (node.contains(textElement)) break;
+      if (containsDeep(node, textElement)) break;
       const cs = getComputedStyle(node);
       if (parseFloat(cs.opacity) === 0) continue;
       if (/^(IMG|VIDEO|CANVAS)$/.test(node.tagName)) return node;
@@ -322,7 +339,7 @@ _JS_TEXT_OCCLUSION = (
     }
     return null;
   }
-  for (const el of document.querySelectorAll('body *')) {
+  for (const el of queryAll(document, 'body *')) {
     if (!visible(el) || ![...el.childNodes].some(n => n.nodeType === Node.TEXT_NODE && (n.textContent || '').trim())) continue;
     const before = el.getBoundingClientRect();
     if (before.bottom <= 0 || before.top >= innerHeight || before.right <= 0 || before.left >= innerWidth) {
@@ -342,8 +359,8 @@ _JS_TEXT_OCCLUSION = (
             const y = rect.top + rect.height * (yi + 0.5) / samplesPerAxis;
             if (x < 0 || y < 0 || x >= innerWidth || y >= innerHeight) continue;
             sampled++;
-            const top = document.elementFromPoint(x, y);
-            if (top && top !== el && !el.contains(top) && !top.contains(el)) {
+            const top = deepHit(x, y);
+            if (top && top !== el && !containsDeep(el, top) && !top.contains(el)) {
               const occluder = paintedElement(top, el);
               if (occluder) hits.set(occluder, (hits.get(occluder) || 0) + 1);
             }
@@ -372,12 +389,12 @@ _JS_TEXT_OCCLUSION = (
 # AA failure is complete obscuration; partial obscuration is intentionally not
 # reported. Scroll position and prior focus are restored after the scan.
 _JS_FOCUS_OBSCURED = (
-    "(samplesPerAxis) => {"
+    "(options) => { const {samplesPerAxis, probeFocus} = options;"
     + _JS_HELPERS
     + """
   const selector = 'a[href], button, input:not([type=hidden]), select, textarea, summary, ' +
     '[tabindex]:not([tabindex="-1"]), [contenteditable="true"]';
-  const targets = [...document.querySelectorAll(selector)].filter(el => visible(el) && !el.disabled);
+  const targets = [...queryAll(document, selector)].filter(el => visible(el) && !el.disabled && (probeFocus || el === document.activeElement));
   const oldX = scrollX, oldY = scrollY, oldFocus = document.activeElement;
   const out = [];
   function opaqueRectangle(el) {
@@ -399,7 +416,7 @@ _JS_FOCUS_OBSCURED = (
     for (let node = hit; node && node !== document.documentElement; node = node.parentElement) {
       // Stop before the first shared ancestor. Its paint is behind the target,
       // not part of the stacking branch hit in front of it.
-      if (node.contains(target)) break;
+      if (containsDeep(node, target)) break;
       branch.push(node);
     }
     const effectiveOpacity = branch.reduce(
@@ -410,8 +427,10 @@ _JS_FOCUS_OBSCURED = (
     return null;
   }
   for (const el of targets) {
-    el.focus({preventScroll: false});
-    el.scrollIntoView({block: 'nearest', inline: 'nearest', behavior: 'instant'});
+    if (probeFocus) {
+      el.focus({preventScroll: false});
+      el.scrollIntoView({block: 'nearest', inline: 'nearest', behavior: 'instant'});
+    }
     if (document.activeElement !== el) continue;
     const r = el.getBoundingClientRect();
     let sampled = 0, visiblePoints = 0;
@@ -423,8 +442,8 @@ _JS_FOCUS_OBSCURED = (
         if (x < Math.max(0, r.left) || x > Math.min(innerWidth, r.right) ||
             y < Math.max(0, r.top) || y > Math.min(innerHeight, r.bottom)) continue;
         sampled++;
-        const top = document.elementFromPoint(x, y);
-        if (top && (top === el || el.contains(top))) visiblePoints++;
+        const top = deepHit(x, y);
+        if (top && (top === el || containsDeep(el, top))) visiblePoints++;
         else if (top) {
           const blocker = opaqueBlocker(top, el);
           if (blocker) blockers.set(blocker, (blockers.get(blocker) || 0) + 1);
@@ -453,8 +472,8 @@ _JS_FOCUS_OBSCURED = (
                 occluderBbox: [o.x, o.y, o.width, o.height]});
     }
   }
-  if (oldFocus && oldFocus instanceof HTMLElement) oldFocus.focus({preventScroll: true});
-  else if (document.activeElement && document.activeElement instanceof HTMLElement) document.activeElement.blur();
+  if (probeFocus && oldFocus && oldFocus instanceof HTMLElement) oldFocus.focus({preventScroll: true});
+  else if (probeFocus && document.activeElement && document.activeElement instanceof HTMLElement) document.activeElement.blur();
   scrollTo(oldX, oldY);
   return out;
 }"""
@@ -478,6 +497,7 @@ class LayoutScorer:
         protrude_tolerance_px: int = 1,
         contrast_threshold: float = 4.5,
         occlusion_samples_per_axis: int = 5,
+        probe_focus: bool = True,
     ):
         """Initialise the scorer with detector thresholds.
 
@@ -488,10 +508,12 @@ class LayoutScorer:
             protrude_tolerance_px: Slack before calling viewport protrusion.
             contrast_threshold: Normal-text contrast ratio to require.
             occlusion_samples_per_axis: Grid resolution for occlusion hit testing.
+            probe_focus: Focus each control when true; otherwise measure only current focus.
 
         Raises:
             ValueError: If ``occlusion_samples_per_axis`` is less than two.
         """
+        self.probe_focus = probe_focus
         self.min_target_px = min_target_px
         self.overlap_threshold_px2 = overlap_threshold_px2
         self.clip_tolerance_px = clip_tolerance_px
@@ -504,6 +526,10 @@ class LayoutScorer:
     async def detect_overlaps(self, page: Page) -> list[LayoutFinding]:
         """Return findings for visible siblings whose bounding boxes overlap."""
         raw = await page.evaluate(_JS_OVERLAP, self.overlap_threshold_px2)
+        return self.findings_overlaps(raw)
+
+    def findings_overlaps(self, raw: list[dict[str, Any]]) -> list[LayoutFinding]:
+        """Diagnose saved overlaps measurements."""
         return [
             LayoutFinding(
                 defect_class=OVERLAP,
@@ -523,6 +549,10 @@ class LayoutScorer:
     async def detect_clipping(self, page: Page) -> list[LayoutFinding]:
         """Return findings for elements whose content is clipped by hidden overflow."""
         raw = await page.evaluate(_JS_CLIP, self.clip_tolerance_px)
+        return self.findings_clipping(raw)
+
+    def findings_clipping(self, raw: list[dict[str, Any]]) -> list[LayoutFinding]:
+        """Diagnose saved clipping measurements."""
         findings: list[LayoutFinding] = []
         for m in raw:
             axis = "vertically" if m["clippedY"] else "horizontally"
@@ -553,6 +583,10 @@ class LayoutScorer:
     async def detect_protrusion(self, page: Page) -> list[LayoutFinding]:
         """Return findings for elements protruding past either horizontal viewport edge."""
         raw = await page.evaluate(_JS_PROTRUDE, self.protrude_tolerance_px)
+        return self.findings_protrusion(raw)
+
+    def findings_protrusion(self, raw: list[dict[str, Any]]) -> list[LayoutFinding]:
+        """Diagnose saved protrusion measurements."""
         return [
             LayoutFinding(
                 defect_class=PROTRUSION,
@@ -576,6 +610,10 @@ class LayoutScorer:
     async def detect_page_overflow(self, page: Page) -> list[LayoutFinding]:
         """Return a finding if the whole document scrolls horizontally."""
         raw = await page.evaluate(_JS_PAGE_OVERFLOW, self.protrude_tolerance_px)
+        return self.findings_page_overflow(raw)
+
+    def findings_page_overflow(self, raw: list[dict[str, Any]]) -> list[LayoutFinding]:
+        """Diagnose saved page overflow measurements."""
         return [
             LayoutFinding(
                 defect_class=PAGE_OVERFLOW,
@@ -598,6 +636,10 @@ class LayoutScorer:
     async def detect_truncation(self, page: Page) -> list[LayoutFinding]:
         """Return findings for single-line text actually cut off by an ellipsis."""
         raw = await page.evaluate(_JS_TRUNCATION, self.clip_tolerance_px)
+        return self.findings_truncation(raw)
+
+    def findings_truncation(self, raw: list[dict[str, Any]]) -> list[LayoutFinding]:
+        """Diagnose saved truncation measurements."""
         findings: list[LayoutFinding] = []
         for m in raw:
             hidden_px = m["scrollWidth"] - m["clientWidth"]
@@ -626,6 +668,10 @@ class LayoutScorer:
         exceptions are semantic and remain manual-review fields on every finding.
         """
         raw = await page.evaluate(_JS_TARGETS, self.min_target_px)
+        return self.findings_small_targets(raw)
+
+    def findings_small_targets(self, raw: list[dict[str, Any]]) -> list[LayoutFinding]:
+        """Diagnose saved small targets measurements."""
         return [
             LayoutFinding(
                 defect_class=TARGET_SIZE,
@@ -660,6 +706,10 @@ class LayoutScorer:
     async def detect_text_occlusion(self, page: Page) -> list[LayoutFinding]:
         """Return rendered text fragments covered by another painted DOM element."""
         raw = await page.evaluate(_JS_TEXT_OCCLUSION, self.occlusion_samples_per_axis)
+        return self.findings_text_occlusion(raw)
+
+    def findings_text_occlusion(self, raw: list[dict[str, Any]]) -> list[LayoutFinding]:
+        """Diagnose saved text occlusion measurements."""
         return [
             LayoutFinding(
                 defect_class=TEXT_OCCLUSION,
@@ -687,7 +737,17 @@ class LayoutScorer:
         was user-opened and can be dismissed without advancing focus can require
         interaction history, so each finding discloses those manual exceptions.
         """
-        raw = await page.evaluate(_JS_FOCUS_OBSCURED, self.occlusion_samples_per_axis)
+        raw = await page.evaluate(
+            _JS_FOCUS_OBSCURED,
+            {
+                "samplesPerAxis": self.occlusion_samples_per_axis,
+                "probeFocus": self.probe_focus,
+            },
+        )
+        return self.findings_focus_obscured(raw)
+
+    def findings_focus_obscured(self, raw: list[dict[str, Any]]) -> list[LayoutFinding]:
+        """Diagnose saved focus obscured measurements."""
         return [
             LayoutFinding(
                 defect_class=FOCUS_OBSCURED,
@@ -727,21 +787,49 @@ class LayoutScorer:
         Returns:
             The structured layout report.
         """
-        findings: list[LayoutFinding] = []
-        findings.extend(await check_contrast(page, threshold=self.contrast_threshold))
-        findings.extend(await self.detect_overlaps(page))
-        findings.extend(await self.detect_clipping(page))
-        findings.extend(await self.detect_protrusion(page))
-        findings.extend(await self.detect_page_overflow(page))
-        findings.extend(await self.detect_truncation(page))
-        findings.extend(await self.detect_small_targets(page))
-        findings.extend(await self.detect_text_occlusion(page))
-        findings.extend(await self.detect_focus_obscured(page))
+        evidence = await self.collect_evidence(page)
         return LayoutReport(
             source=source if source is not None else page.url,
             viewport=viewport,
-            findings=findings,
+            findings=self.diagnose(evidence),
         )
+
+    async def collect_evidence(self, page: Page) -> dict[str, Any]:
+        """Collect replayable measurements, including hit tests and contrast."""
+        return {
+            "contrast": await page.evaluate(_JS_CONTRAST_SCAN),
+            "overlaps": await page.evaluate(_JS_OVERLAP, self.overlap_threshold_px2),
+            "clipping": await page.evaluate(_JS_CLIP, self.clip_tolerance_px),
+            "protrusion": await page.evaluate(_JS_PROTRUDE, self.protrude_tolerance_px),
+            "page_overflow": await page.evaluate(
+                _JS_PAGE_OVERFLOW, self.protrude_tolerance_px
+            ),
+            "truncation": await page.evaluate(_JS_TRUNCATION, self.clip_tolerance_px),
+            "small_targets": await page.evaluate(_JS_TARGETS, self.min_target_px),
+            "text_occlusion": await page.evaluate(
+                _JS_TEXT_OCCLUSION, self.occlusion_samples_per_axis
+            ),
+            "focus_obscured": await page.evaluate(
+                _JS_FOCUS_OBSCURED,
+                {
+                    "samplesPerAxis": self.occlusion_samples_per_axis,
+                    "probeFocus": self.probe_focus,
+                },
+            ),
+        }
+
+    def diagnose(self, evidence: dict[str, Any]) -> list[LayoutFinding]:
+        """Run the same predicates on a live capture or persisted evidence."""
+        findings = contrast_findings(evidence["contrast"], self.contrast_threshold)
+        findings.extend(self.findings_overlaps(evidence["overlaps"]))
+        findings.extend(self.findings_clipping(evidence["clipping"]))
+        findings.extend(self.findings_protrusion(evidence["protrusion"]))
+        findings.extend(self.findings_page_overflow(evidence["page_overflow"]))
+        findings.extend(self.findings_truncation(evidence["truncation"]))
+        findings.extend(self.findings_small_targets(evidence["small_targets"]))
+        findings.extend(self.findings_text_occlusion(evidence["text_occlusion"]))
+        findings.extend(self.findings_focus_obscured(evidence["focus_obscured"]))
+        return findings
 
     async def scan(
         self, source: str | Path, viewport: ViewportType = "desktop"

@@ -41,6 +41,7 @@ async def test_tools_are_registered():
         "scan_layout",
         "check_ui",
         "compare_ui",
+        "capture_render_state",
     }
 
 
@@ -86,7 +87,7 @@ async def test_scan_layout_keyless_end_to_end(tmp_path, monkeypatch):
     async with Client(srv.mcp) as client:
         result = await client.call_tool("scan_layout", {"url": str(page)})
     text = result.content[0].text
-    assert text.splitlines()[0].lower().startswith("no")
+    assert text.splitlines()[0].startswith("Review")
     assert "page-overflow" in text
     # Compact contract: a defect summary, not a raw report dump.
     assert len(text) < 2000
