@@ -204,6 +204,14 @@ def _overlapping_manifest_paths(
             for request_id in job.get("ids", [])
             if isinstance(request_id, str)
         }
+        # Requests are persisted before submission; a crash can leave receipts
+        # only in batchlane's journal, before job handles reach this manifest.
+        submitted_ids.update(
+            request["custom_id"]
+            for request in manifest.get("requests", [])
+            if isinstance(request, dict)
+            and isinstance(request.get("custom_id"), str)
+        )
         if submitted_ids & request_ids:
             overlaps.append(candidate)
     return overlaps

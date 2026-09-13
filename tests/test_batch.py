@@ -480,3 +480,31 @@ def test_openai_fingerprint_binds_reasoning_effort_and_image_detail(openai_lens,
         )
         != baseline
     )
+
+
+@pytest.mark.asyncio
+async def test_changed_retry_after_submission_receipt_cannot_submit_again(
+    api, lens, png, monkeypatch
+):
+    original_write = batch_mod._write_manifest
+
+    def crash_before_job_handle(path, manifest):
+        if manifest.get("jobs"):
+            raise RuntimeError("crash before persisting job handle")
+        original_write(path, manifest)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(batch_mod, "_write_manifest", crash_before_job_handle)
+        with pytest.raises(RuntimeError, match="crash before"):
+            await lens.judge_batch([BatchRequest("r1", png, "original")])
+    manifest = next((lens.output_dir / "batch").glob("manifest_*.json"))
+    assert json.loads(manifest.read_text())["jobs"] == []
+    assert manifest.with_suffix(".batchlane.jsonl").stat().st_size > 0
+    assert api.post(f"{BASE}/batches").call_count == 1
+
+    with pytest.raises(ValidationError, match="possibly duplicate paid submission"):
+        await lens.judge_batch([BatchRequest("r1", png, "changed")])
+    assert api.post(f"{BASE}/batches").call_count == 1
+    result = await lens.judge_batch([BatchRequest("r1", png, "original")])
+    assert result["r1"].answer == "yes"
+    assert api.post(f"{BASE}/batches").call_count == 1
