@@ -1,6 +1,6 @@
 # Structured regressions and migration to 3.0
 
-Python 3.12+ and Chromium are required. `compare(before, after)` replaces the
+Python 3.12+ and an installed Playwright browser are required. `compare(before, after)` replaces the
 old list-of-screenshots/query API and returns `DiffReport`. `ComparisonResult`
 is removed. `compare_with_expert(before, after, expert_persona, intent=...)`
 adds explanation to a measured diff. Generic screenshot questions still use
@@ -25,12 +25,19 @@ review and explicitly replace baseline directories through your normal version
 control or artifact workflow. DOM/text/screenshot artifacts contain page data;
 store them with the same access controls as your test captures.
 
-`capture_page(page)` records an existing Chromium page, including caller-set
-focus or interaction state. Capture disables animations, hides carets, and uses
-light color scheme and reduced motion. It waits for fonts and image decoding,
-then checks that measurements stayed stable across evidence and screenshot
-acquisition. Open shadow DOM is traversed; closed roots, frame interiors,
-canvas, and video are reported as coverage gaps.
+`capture_page(page)` records an existing Chromium, Firefox, or WebKit page,
+including caller-set focus and media preferences. Capture preserves animations,
+carets, and DOM attributes. It waits for fonts and image decoding, then checks
+that measurements stayed stable across evidence and screenshot acquisition.
+Open shadow DOM is traversed; frame interiors, canvas, and video remain
+unsupported. Chromium additionally detects closed shadow roots and provides
+native accessibility-tree and CSS/source-map evidence. Firefox and WebKit use
+portable ARIA snapshots and disclose unavailable native attribution through
+`capabilities` and per-element attribution gaps.
+
+LayoutLens 4 uses schema 2. Recapture schema 1 artifacts
+before comparing them with the new engine. See [stateful scenarios](SCENARIOS.md)
+for browser configuration, interaction receipts, and checkpoint comparisons.
 
 Coordinates are floating-point document CSS pixels. Screenshots also record
 DPR; pixel-only differences are observations. Temporary local-server origins are
@@ -110,7 +117,8 @@ Optional model explanation cannot mutate evidence or gate decisions.
 Build and test the LayoutLens wheel on Python 3.12 and the highest supported
 Python, then exercise UIJudgeBench adapters and Action report handling against
 that wheel. Publish LayoutLens 3 before its consumers: UIJudgeBench declares
-`layoutlens>=3.0.0,<4` with Python 3.12+, and Action v2 pins LayoutLens 3.
+`layoutlens>=3.0.0,<5` with Python 3.12+. Action v3 pins LayoutLens 4;
+Action v2 continues to pin LayoutLens 3.
 The `judge` extra in UIJudgeBench no longer requests LayoutLens's removed
 `gemini` extra. This change does not collect benchmark labels, qualify rules,
 or publish any package automatically.

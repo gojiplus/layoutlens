@@ -42,6 +42,7 @@ async def test_tools_are_registered():
         "check_ui",
         "compare_ui",
         "capture_render_state",
+        "run_ui_scenario",
     }
 
 

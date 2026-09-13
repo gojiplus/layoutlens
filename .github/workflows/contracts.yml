@@ -24,13 +24,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: gojiplus/layoutlens-action
-          ref: 23c0fa2ca3e2b238927e6f9d6e6c59ac61fc9031
+          ref: a265f91866a5f00d83a7db7d6e7f4fae074d0e32
           path: consumers/action
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: gojiplus/uijudge-bench
-          ref: 1d450b28b80e58fbb10a80efd64dfcaa14bd1c6b
+          ref: be734a5d5293323d2dbe7c88cba2daadaeee1e4e
           path: consumers/bench
           persist-credentials: false
       - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
@@ -42,7 +42,7 @@ jobs:
         run: |
           uv pip install --reinstall dist/*.whl
           uv pip install --no-deps ./consumers/bench
-          uv run --no-sync playwright install --with-deps chromium
+          uv run --no-sync playwright install --with-deps chromium firefox webkit
       - name: Verify wheel contracts and browser behavior
         env:
           LAYOUTLENS_ACTION_ROOT: ${{ github.workspace }}/consumers/action
@@ -52,7 +52,7 @@ jobs:
           LAYOUTLENS_WHEEL=$(find "$PWD/dist" -name '*.whl' -print -quit)
           export LAYOUTLENS_WHEEL
           echo "LAYOUTLENS_WHEEL=$LAYOUTLENS_WHEEL" >> "$GITHUB_ENV"
-          uv run --no-sync pytest tests/test_release_contract.py tests/test_regression.py
+          uv run --no-sync pytest tests/test_release_contract.py tests/test_regression.py tests/test_scenarios.py
           uv run --no-sync python consumers/action/scripts/test_report.py
       - name: Exercise candidate wheel through the composite action
         uses: ./consumers/action

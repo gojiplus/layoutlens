@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from ..browser import open_page
+from ..browser import BrowserConfig, open_page
 from ..types import Viewport, ViewportType
 from .contrast import _JS_CONTRAST_SCAN, contrast_findings
 from .types import (
@@ -832,7 +832,11 @@ class LayoutScorer:
         return findings
 
     async def scan(
-        self, source: str | Path, viewport: ViewportType = "desktop"
+        self,
+        source: str | Path,
+        viewport: ViewportType = "desktop",
+        *,
+        browser_config: BrowserConfig | None = None,
     ) -> LayoutReport:
         """Scan a URL or local HTML file, owning the browser lifecycle.
 
@@ -840,13 +844,15 @@ class LayoutScorer:
             source: A URL or path to a local HTML file.
             viewport: Viewport name or :class:`~layoutlens.types.Viewport` member.
 
+            browser_config: Local engine and emulation settings.
+
         Returns:
             The structured layout report.
         """
         viewport_name = (
             viewport.value if isinstance(viewport, Viewport) else str(viewport)
         )
-        async with open_page(source, viewport) as page:
+        async with open_page(source, viewport, config=browser_config) as page:
             return await self.scan_page(
                 page, source=str(source), viewport=viewport_name
             )

@@ -4,6 +4,22 @@ All notable changes to LayoutLens are documented in this file.
 
 ## [Unreleased]
 
+## [4.0.0] - 2026-09-12
+
+- Add stateful scenarios with keyboard, form, pointer, hover, resize, and route
+  actions; explicit expectations; ordered event/focus receipts; and named
+  RenderState checkpoints with saved evidence and offline comparison.
+- Support local Chromium, Firefox, and WebKit with media, locale, timezone, and
+  DPR settings in capture identity. Declare native attribution capabilities.
+- Add scenario CLI, pytest, MCP, and SARIF integration. Failed actions and
+  incomplete captures cannot produce passing gates.
+- Preserve checkpoint focus, media preferences, animations, and DOM attributes.
+  Use a threaded local HTTP server to support browser speculative connections.
+- Keep the MCP extra on the tested FastMCP 3 major; a fresh FastMCP 4
+  installation fails to import with its resolved MCP dependency.
+- Advance RenderState artifacts to schema 2 and record current form-control
+  state. Schema 1 artifacts require recapture. Require Playwright 1.49+.
+
 ## [3.0.0] - 2026-09-12
 
 - Replace model-first comparison with versioned RenderState capture, offline

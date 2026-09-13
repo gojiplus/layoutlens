@@ -15,7 +15,36 @@ from .api.core import BatchResult, LayoutLens
 from .exceptions import LayoutLensError
 from .regression.capture import capture_state
 from .regression.models import DiffReport
-from .sarif import diff_to_sarif, to_sarif
+from .sarif import diff_to_sarif, scenario_to_sarif, to_sarif
+from .scenarios import Scenario
+
+_BROWSER_KEYS = (
+    "browser",
+    "color_scheme",
+    "reduced_motion",
+    "locale",
+    "timezone_id",
+    "device_scale_factor",
+)
+
+
+def _browser_options(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--browser", choices=["chromium", "firefox", "webkit"], default="chromium"
+    )
+    parser.add_argument(
+        "--color-scheme", choices=["light", "dark", "no-preference"], default="light"
+    )
+    parser.add_argument(
+        "--reduced-motion", choices=["reduce", "no-preference"], default="reduce"
+    )
+    parser.add_argument("--locale", default="en-US")
+    parser.add_argument("--timezone-id", default="UTC")
+    parser.add_argument("--device-scale-factor", type=float)
+
+
+def _browser_kwargs(args: argparse.Namespace) -> dict:
+    return {name: getattr(args, name) for name in _BROWSER_KEYS}
 
 
 async def _run_a11y(sources, args) -> int:
@@ -26,7 +55,9 @@ async def _run_a11y(sources, args) -> int:
     """
     try:
         lens = LayoutLens(
-            api_key=args.api_key or os.getenv("OPENAI_API_KEY"), model=args.model
+            **_browser_kwargs(args),
+            api_key=args.api_key or os.getenv("OPENAI_API_KEY"),
+            model=args.model,
         )
     except Exception as e:
         print(f"Error initializing LayoutLens: {e}", file=sys.stderr)
@@ -71,7 +102,9 @@ async def _run_layout(sources, args) -> int:
     """
     try:
         lens = LayoutLens(
-            api_key=args.api_key or os.getenv("OPENAI_API_KEY"), model=args.model
+            **_browser_kwargs(args),
+            api_key=args.api_key or os.getenv("OPENAI_API_KEY"),
+            model=args.model,
         )
         results = []
         for source in sources:
@@ -126,7 +159,12 @@ def _print_diff(report: DiffReport, output: str) -> int:
 
 async def _regression_main(arguments: list[str]) -> int:
     parser = argparse.ArgumentParser(prog="layoutlens " + arguments[0])
+    _browser_options(parser)
     parser.add_argument("sources", nargs="+")
+    parser.add_argument("--base-url")
+    parser.add_argument("--timeout", type=int, default=30000)
+    parser.add_argument("--width", type=int)
+    parser.add_argument("--height", type=int)
     parser.add_argument("--viewport", default="desktop")
     parser.add_argument("--output", default="json", choices=["json", "text", "sarif"])
     parser.add_argument(
@@ -143,13 +181,43 @@ async def _regression_main(arguments: list[str]) -> int:
     parser.add_argument("--explain", action="store_true")
     parser.add_argument("--intent")
     args = parser.parse_args(arguments[1:])
+    if (args.width is None) != (args.height is None):
+        parser.error("--width and --height must be supplied together")
+    viewport = (args.width, args.height) if args.width is not None else args.viewport
     try:
+        if arguments[0] == "scenario":
+            if len(args.sources) != 1:
+                parser.error("scenario requires one JSON definition")
+            report = await Scenario.load(args.sources[0], base_url=args.base_url).run(
+                viewport=viewport,
+                timeout=args.timeout,
+                policy=args.fail_on,
+                **_browser_kwargs(args),
+            )
+            if args.save:
+                report.save(args.save)
+            if args.output == "sarif":
+                print(json.dumps(scenario_to_sarif(report), indent=2))
+            elif args.output == "text":
+                print(f"Scenario: {report.gate_status}")
+                for step in report.steps:
+                    print(
+                        f"{step.index}: {step.action}: {step.status}"
+                        + (f" - {step.error}" if step.error else "")
+                    )
+                for reason in report.incomplete_reasons:
+                    print(f"incomplete: {reason}")
+            else:
+                print(report.to_json())
+            return {"pass": 0, "fail": 1, "incomplete": 2}[report.gate_status]
         if arguments[0] == "capture":
             if len(args.sources) != 1 or not args.save:
                 parser.error("capture requires one source and --save DIRECTORY")
             state = await capture_state(
                 args.sources[0],
-                viewport=args.viewport,
+                viewport=viewport,
+                timeout=args.timeout,
+                **_browser_kwargs(args),
                 revision=args.revision,
                 wait_for_selector=args.wait_for_selector,
             )
@@ -166,10 +234,10 @@ async def _regression_main(arguments: list[str]) -> int:
             return 2 if state.coverage_gaps or not state.stable else 0
         if len(args.sources) != 2:
             parser.error("diff requires baseline and candidate")
-        report = await LayoutLens().compare(
+        report = await LayoutLens(**_browser_kwargs(args)).compare(
             args.sources[0],
             args.sources[1],
-            viewport=args.viewport,
+            viewport=viewport,
             policy=args.fail_on,
             tolerance_px=args.tolerance_px,
             repository=args.repository,
@@ -196,7 +264,9 @@ async def _run_suite(args) -> int:
 
     try:
         lens = LayoutLens(
-            api_key=args.api_key or os.getenv("OPENAI_API_KEY"), model=args.model
+            **_browser_kwargs(args),
+            api_key=args.api_key or os.getenv("OPENAI_API_KEY"),
+            model=args.model,
         )
         results = await lens.run_test_suite(suite)
     except LayoutLensError as e:
@@ -220,7 +290,7 @@ async def _run_suite(args) -> int:
 
 async def main():
     """Main CLI entry point."""
-    if len(sys.argv) > 1 and sys.argv[1] in {"capture", "diff"}:
+    if len(sys.argv) > 1 and sys.argv[1] in {"capture", "diff", "scenario"}:
         return await _regression_main(sys.argv[1:])
     parser = argparse.ArgumentParser(
         prog="layoutlens",
@@ -233,6 +303,8 @@ Examples:
   layoutlens *.html "Is the design consistent?" --viewport mobile
         """,
     )
+
+    _browser_options(parser)
 
     # Main arguments
     parser.add_argument(
@@ -374,7 +446,9 @@ Examples:
     # Initialize LayoutLens
     try:
         lens = LayoutLens(
-            api_key=args.api_key or os.getenv("OPENAI_API_KEY"), model=args.model
+            **_browser_kwargs(args),
+            api_key=args.api_key or os.getenv("OPENAI_API_KEY"),
+            model=args.model,
         )
     except Exception as e:
         print(f"Error initializing LayoutLens: {e}", file=sys.stderr)

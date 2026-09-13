@@ -12,6 +12,7 @@ from .api.batch import BatchRequest, batch_usage_summary
 from .api.core import AnalysisResult, BatchResult, LayoutLens
 from .api.judge import JudgeResult
 from .api.test_suite import UITestCase, UITestResult, UITestSuite
+from .browser import BrowserConfig
 from .cache import AnalysisCache, create_cache
 from .capture import Capture
 from .exceptions import (
@@ -54,6 +55,7 @@ from .regression import (
 )
 from .regression.capture import capture_page, capture_state
 from .regression.diff import diff
+from .scenarios import Scenario, ScenarioDiff, ScenarioReport
 from .types import (
     CacheType,
     CacheTypeType,
@@ -78,6 +80,7 @@ __all__ = [
     "AxeAuditor",
     "BatchRequest",
     "BatchResult",
+    "BrowserConfig",
     "CacheType",
     "CacheTypeType",
     "Capture",
@@ -102,6 +105,9 @@ __all__ = [
     "LayoutScorer",
     "Qualification",
     "RenderState",
+    "Scenario",
+    "ScenarioDiff",
+    "ScenarioReport",
     "UITestCase",
     "UITestResult",
     "UITestSuite",

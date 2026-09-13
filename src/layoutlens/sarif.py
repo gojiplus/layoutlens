@@ -226,3 +226,71 @@ def diff_to_sarif(report) -> dict[str, Any]:
             }
         ],
     }
+
+
+def scenario_to_sarif(report) -> dict[str, Any]:
+    """Export scenario expectations, candidate observations, and execution gaps."""
+    from . import __version__
+
+    results = []
+    for step in report.steps:
+        if step.status == "pass":
+            continue
+        results.append(
+            {
+                "ruleId": f"scenario/{step.action}",
+                "level": "error" if report.policy != "nothing" else "warning",
+                "message": {"text": step.error or f"{step.action} failed"},
+                "properties": {
+                    "step": step.index,
+                    "status": step.status,
+                    "evidence": step.evidence,
+                    "before": step.before,
+                    "after": step.after,
+                },
+            }
+        )
+    results.extend(
+        {
+            "ruleId": f"interaction/{finding.defect_class}",
+            "level": "error" if report.policy == "findings" else "warning",
+            "message": {"text": f"Candidate {finding.defect_class}: {finding.element}"},
+            "properties": finding.model_dump(mode="json"),
+        }
+        for finding in report.findings
+    )
+    for result in results:
+        result["locations"] = [
+            {
+                "physicalLocation": {
+                    "artifactLocation": {"uri": _artifact_uri(report.source)}
+                }
+            }
+        ]
+    return {
+        "version": SARIF_VERSION,
+        "$schema": SARIF_SCHEMA,
+        "runs": [
+            {
+                "tool": {
+                    "driver": {
+                        "name": "layoutlens",
+                        "version": __version__,
+                        "rules": [
+                            {"id": rule}
+                            for rule in sorted({r["ruleId"] for r in results})
+                        ],
+                    }
+                },
+                "results": results,
+                "invocations": [
+                    {"executionSuccessful": report.gate_status != "incomplete"}
+                ],
+                "properties": {
+                    "gate_status": report.gate_status,
+                    "incomplete": report.gate_status == "incomplete",
+                    "incomplete_reasons": report.incomplete_reasons,
+                },
+            }
+        ],
+    }

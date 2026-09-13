@@ -32,7 +32,7 @@ requires-python = ">=3.12"
 dependencies = [
     "batchlane>=0.2.0",
     "openai>=2.54.0,<4",
-    "playwright>=1.40.0",
+    "playwright>=1.49.0",
     "beautifulsoup4>=4.12.0",
     "pyyaml>=6.0",
     "Pillow>=10.0.0",
@@ -40,11 +40,11 @@ dependencies = [
     "rich>=13.0.0",
     "pydantic>=2.0.0",
 ]
-version = "3.0.0"
+version = "4.0.0"
 
 [project.optional-dependencies]
 # MCP server (layoutlens-mcp): deterministic UI checks as agent tools.
-mcp = ["fastmcp>=3"]
+mcp = ["fastmcp>=3,<4"]
 
 [dependency-groups]
 dev = [
@@ -130,7 +130,7 @@ markers = [
     "slow: Slow running tests",
     "requires_api: Tests that require API access",
     "performance: Performance benchmark tests",
-    "browser: Tests that launch a real chromium browser",
+    "browser: Tests that launch local Playwright browsers",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning",

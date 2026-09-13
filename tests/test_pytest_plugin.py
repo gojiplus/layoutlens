@@ -154,3 +154,27 @@ def test_assert_ui_runs_with_provider_specific_key(
     outcomes = result.parseoutcomes()
     assert outcomes.get("skipped", 0) == 0
     assert outcomes.get("failed", 0) == 1 or outcomes.get("errors", 0) == 1
+
+
+@pytest.mark.browser
+@requires_chromium
+def test_scenario_fixture_uses_browser_and_enforces_expectations(pytester, monkeypatch):
+    monkeypatch.setenv("PLAYWRIGHT_BROWSERS_PATH", _BROWSERS_PATH)
+    pytester.makefile(
+        ".html",
+        form='<html><head><title>Form</title></head><body><input id="email"></body></html>',
+    )
+    pytester.makepyfile("""
+        from layoutlens import Scenario
+
+        def test_pass(layoutlens):
+            result = layoutlens.assert_scenario(
+                Scenario("form.html").tab().expect_focus("email").checkpoint("ready")
+            )
+            assert result.checkpoints["ready"].environment.browser == "firefox"
+
+        def test_fail(layoutlens):
+            layoutlens.assert_scenario(Scenario("form.html").expect_visible("#missing"), timeout=250)
+    """)
+    result = pytester.runpytest_subprocess("--layoutlens-browser", "firefox")
+    result.assert_outcomes(passed=1, failed=1)

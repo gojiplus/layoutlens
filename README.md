@@ -82,7 +82,7 @@ layoutlens capture after.html --save artifacts/candidate
 layoutlens diff artifacts/baseline artifacts/candidate --output json
 ```
 
-These commands need Chromium but no model API key. Diff exits with 0 for a
+These commands use Chromium by default and need no model API key. Diff exits with 0 for a
 passing gate, 1 for a blocking finding, and 2 for incomplete evidence or an
 execution error. Candidates warn by default; add `--fail-on findings` to block
 introduced or worsened candidates without upgrading their evidence level.
@@ -247,10 +247,10 @@ GitHub permissions appropriate to the workflow and fork context.
 [`gojiplus/layoutlens-action`](https://github.com/gojiplus/layoutlens-action)
 handles installation, scanning, job summaries, PR annotations, an optional
 results comment, and SARIF upload. This example pins the Action revision tested
-against LayoutLens 3:
+against LayoutLens 4:
 
 ```yaml
-- uses: gojiplus/layoutlens-action@23c0fa2ca3e2b238927e6f9d6e6c59ac61fc9031
+- uses: gojiplus/layoutlens-action@a265f91866a5f00d83a7db7d6e7f4fae074d0e32
   with:
     sources: "dist/*.html"
 ```
@@ -579,6 +579,46 @@ def test_checkout_regression(layoutlens):
 Keep baseline and candidate capture conditions the same. An incomplete
 comparison fails the assertion rather than reporting a pass.
 
+## Stateful scenarios and browser matrices
+
+A scenario runs interactions in one browser context and saves a `RenderState`
+at each named checkpoint. Explicit expectations test the behavior you intend:
+
+```python
+from layoutlens import Scenario
+
+scenario = (
+    Scenario("/checkout", base_url="http://localhost:3000")
+    .tab()
+    .expect_focus("email")
+    .type("me@example.com")
+    .click("Continue")
+    .expect_visible("payment")
+    .checkpoint("payment")
+)
+report = await scenario.run(browser="firefox", viewport=(1280, 800))
+report.save("artifacts/checkout-firefox")
+assert report.gate_status == "pass", report.to_json()
+```
+
+Start the application before running this example. Scenarios also support hover,
+keyboard chords, dialog dismissal expectations, drag and pointer actions, viewport
+resizing, and navigation. Reports retain ordered events, focus transitions,
+computed focus styles, and obscured-target hit tests. A failed action interrupts
+the run and returns `incomplete`; a failed expectation returns `fail`.
+Automatic interaction candidates remain warnings under the default policy.
+
+Local capture and scenarios support `chromium`, `firefox`, and `webkit`, with
+color scheme, reduced motion, locale, timezone, and DPR in the state identity.
+Install engines with `playwright install chromium firefox webkit` and compare
+each browser with its own baseline. Native accessibility-tree and matched
+CSS/source-map attribution remain Chromium-specific; each artifact declares its
+available evidence. Checkpoints preserve the page's interaction and media state.
+
+The [scenario guide](https://github.com/gojiplus/layoutlens/blob/7a621cedcb13ddd848b49e648f5834e82b75a34d/docs/SCENARIOS.md) covers the CLI, pytest, MCP, artifact
+comparison, and limits of the checks. These additions use RenderState schema 2;
+artifacts captured with schema 1 must be recaptured.
+
 ## Benchmark & Evaluation Workflow
 
 The bundled benchmark contains 18 fixtures and 74 labeled questions for testing
@@ -704,7 +744,7 @@ lens = LayoutLens(
   and unmodified browser controls have machine-checkable exceptions. Equivalent
   controls, essential presentation, and focus-obscuration interaction history
   still require review. Text occlusion is a visual-quality signal.
-- **Capture coverage is limited.** The regression engine uses Chromium. It
+- **Capture coverage is limited.** The regression engine records browser-specific capabilities. It
   traverses open shadow DOM but reports closed roots, frame interiors, canvas,
   and video as coverage gaps. Unstable captures and ambiguous element matches
   make comparisons incomplete. CSS and git attribution identify candidate
