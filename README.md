@@ -579,7 +579,7 @@ def test_checkout_regression(layoutlens):
 Keep baseline and candidate capture conditions the same. An incomplete
 comparison fails the assertion rather than reporting a pass.
 
-## Stateful scenarios and browser matrices (unreleased)
+## Stateful scenarios and browser matrices
 
 A scenario runs interactions in one browser context and saves a `RenderState`
 at each named checkpoint. Explicit expectations test the behavior you intend:
@@ -615,7 +615,7 @@ each browser with its own baseline. Native accessibility-tree and matched
 CSS/source-map attribution remain Chromium-specific; each artifact declares its
 available evidence. Checkpoints preserve the page's interaction and media state.
 
-The [scenario guide](docs/SCENARIOS.md) covers the CLI, pytest, MCP, artifact
+The [scenario guide](https://github.com/gojiplus/layoutlens/blob/46057c32dd0a7d98508fd362ccc9712f6d2aa6be/docs/SCENARIOS.md) covers the CLI, pytest, MCP, artifact
 comparison, and limits of the checks. These additions use RenderState schema 2;
 artifacts captured with schema 1 must be recaptured.
 

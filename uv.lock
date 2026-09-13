@@ -1708,7 +1708,7 @@ wheels = [
 
 [[package]]
 name = "layoutlens"
-version = "3.0.0"
+version = "4.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "batchlane" },

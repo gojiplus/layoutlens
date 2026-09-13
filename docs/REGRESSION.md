@@ -35,7 +35,7 @@ native accessibility-tree and CSS/source-map evidence. Firefox and WebKit use
 portable ARIA snapshots and disclose unavailable native attribution through
 `capabilities` and per-element attribution gaps.
 
-The unreleased stateful additions use schema 2. Recapture schema 1 artifacts
+LayoutLens 4 uses schema 2. Recapture schema 1 artifacts
 before comparing them with the new engine. See [stateful scenarios](SCENARIOS.md)
 for browser configuration, interaction receipts, and checkpoint comparisons.
 
@@ -117,7 +117,8 @@ Optional model explanation cannot mutate evidence or gate decisions.
 Build and test the LayoutLens wheel on Python 3.12 and the highest supported
 Python, then exercise UIJudgeBench adapters and Action report handling against
 that wheel. Publish LayoutLens 3 before its consumers: UIJudgeBench declares
-`layoutlens>=3.0.0,<4` with Python 3.12+, and Action v2 pins LayoutLens 3.
+`layoutlens>=3.0.0,<5` with Python 3.12+. Action v3 pins LayoutLens 4;
+Action v2 continues to pin LayoutLens 3.
 The `judge` extra in UIJudgeBench no longer requests LayoutLens's removed
 `gemini` extra. This change does not collect benchmark labels, qualify rules,
 or publish any package automatically.

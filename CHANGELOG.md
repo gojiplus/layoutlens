@@ -4,9 +4,11 @@ All notable changes to LayoutLens are documented in this file.
 
 ## [Unreleased]
 
+## [4.0.0] - 2026-09-12
+
 - Add stateful scenarios with keyboard, form, pointer, hover, resize, and route
   actions; explicit expectations; ordered event/focus receipts; and named
-  RenderState checkpoints with offline replay and comparison.
+  RenderState checkpoints with saved evidence and offline comparison.
 - Support local Chromium, Firefox, and WebKit with media, locale, timezone, and
   DPR settings in capture identity. Declare native attribution capabilities.
 - Add scenario CLI, pytest, MCP, and SARIF integration. Failed actions and

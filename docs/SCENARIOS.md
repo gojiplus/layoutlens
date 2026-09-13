@@ -1,6 +1,6 @@
 # Stateful scenarios and local browser matrices
 
-These APIs are in development after LayoutLens 3.0.0. A scenario runs in one
+LayoutLens 4 adds stateful scenarios and local browser selection. A scenario runs in one
 browser context, records actions and focus transitions, and captures a
 `RenderState` at each named checkpoint. It needs no model or API key.
 
