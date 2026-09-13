@@ -4,7 +4,7 @@ All notable changes to LayoutLens are documented in this file.
 
 ## [Unreleased]
 
-### 3.0.0
+## [3.0.0] - 2026-09-12
 
 - Replace model-first comparison with versioned RenderState capture, offline
   graph correspondence, structured visual deltas, and replayable diagnosis.
