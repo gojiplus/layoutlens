@@ -365,6 +365,7 @@ async def capture_state(
         timezone_id=timezone_id,
         device_scale_factor=device_scale_factor,
     )
+    # preen: allow-dropped-arg -- engine is in config; browser accepts a shared instance.
     async with open_page(
         source, viewport=viewport, timeout=timeout, config=config
     ) as page:

@@ -359,7 +359,7 @@ async def run_scenario(
                         result.after = await page.evaluate(_OBSERVE)
                         _diagnose(report, result)
                         report.checkpoints[f"__failure_{current}"] = await capture_page(
-                            page, timeout=timeout, config=config
+                            page, source=page.url, timeout=timeout, config=config
                         )
                     except (PlaywrightError, ValueError, OSError):
                         report.incomplete_reasons.append(
