@@ -24,13 +24,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: gojiplus/layoutlens-action
-          ref: 24bf89afc2db23008791deeafd83b82dd0dc210a
+          ref: a265f91866a5f00d83a7db7d6e7f4fae074d0e32
           path: consumers/action
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: gojiplus/uijudge-bench
-          ref: 5a8090a75ec7d54501c862062c482ae3785e61ac
+          ref: be734a5d5293323d2dbe7c88cba2daadaeee1e4e
           path: consumers/bench
           persist-credentials: false
       - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0

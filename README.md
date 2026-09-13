@@ -250,7 +250,7 @@ results comment, and SARIF upload. This example pins the Action revision tested
 against LayoutLens 4:
 
 ```yaml
-- uses: gojiplus/layoutlens-action@24bf89afc2db23008791deeafd83b82dd0dc210a
+- uses: gojiplus/layoutlens-action@a265f91866a5f00d83a7db7d6e7f4fae074d0e32
   with:
     sources: "dist/*.html"
 ```
