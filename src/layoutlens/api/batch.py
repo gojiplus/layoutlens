@@ -209,8 +209,7 @@ def _overlapping_manifest_paths(
         submitted_ids.update(
             request["custom_id"]
             for request in manifest.get("requests", [])
-            if isinstance(request, dict)
-            and isinstance(request.get("custom_id"), str)
+            if isinstance(request, dict) and isinstance(request.get("custom_id"), str)
         )
         if submitted_ids & request_ids:
             overlaps.append(candidate)
