@@ -50,6 +50,11 @@
       tag: el.tagName.toLowerCase(), attributes: Object.fromEntries([...el.attributes].map(a => [a.name, a.value])),
       bbox: rect(r), styles, text: textNodes.map(n => n.textContent).join('').trim(), visible,
       focusable: visible && focusable, interactive: focusable || el.hasAttribute('onclick'),
+      control_state: el.matches('input,textarea,select') ? {
+        value: el.type === 'password' ? '[redacted]' : el.value,
+        checked: el.checked, selected_index: el.selectedIndex, disabled: el.disabled,
+        read_only: el.readOnly
+      } : {},
       focused: el === (el.getRootNode().activeElement || document.activeElement), text_rects: textRects};
   });
   return {nodes, dom: document.documentElement.outerHTML,
@@ -61,6 +66,10 @@
       ready_state: document.readyState},
     environment: {viewport: [innerWidth, innerHeight], dpr: devicePixelRatio, user_agent: navigator.userAgent,
       platform: navigator.platform, locale: navigator.language, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      color_scheme: matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' :
+        matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'no-preference',
+      reduced_motion: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'reduce' : 'no-preference',
+      has_touch: navigator.maxTouchPoints > 0,
       scroll: [scrollX, scrollY]},
     gaps: all.filter(el => el.matches('iframe,canvas,video')).map(el => 'opaque content: ' + path(el))};
 }

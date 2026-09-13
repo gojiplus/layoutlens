@@ -9,7 +9,7 @@ import time
 from pathlib import Path
 from urllib.parse import urlparse
 
-from .browser import VIEWPORTS, open_browser, open_page
+from .browser import VIEWPORTS, BrowserConfig, open_browser, open_page
 from .logger import get_logger, log_performance_metric
 
 
@@ -22,11 +22,18 @@ class Capture:
     # Reuse the canonical viewport definitions owned by the browser module.
     VIEWPORTS = VIEWPORTS
 
-    def __init__(self, output_dir: str | Path = "screenshots", timeout: int = 30000):
+    def __init__(
+        self,
+        output_dir: str | Path = "screenshots",
+        timeout: int = 30000,
+        *,
+        browser_config: BrowserConfig | None = None,
+    ):
         """Initialize capture system."""
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.timeout = timeout
+        self.browser_config = browser_config or BrowserConfig()
         self.logger = get_logger("vision.capture")
 
         self.logger.info(
@@ -87,7 +94,7 @@ class Capture:
         if len(urls) > 1:
             # One chromium launch shared by the whole batch; each capture
             # still gets its own isolated context.
-            async with open_browser() as browser:
+            async with open_browser(self.browser_config.browser) as browser:
                 results = await asyncio.gather(
                     *(capture_single(url, browser) for url in urls)
                 )
@@ -120,7 +127,11 @@ class Capture:
         start_time = time.time()
 
         async with open_page(
-            url, viewport, timeout=self.timeout, browser=browser
+            url,
+            viewport,
+            timeout=self.timeout,
+            browser=browser,
+            config=self.browser_config,
         ) as page:
             # Wait for specific selector if provided
             if wait_for_selector:

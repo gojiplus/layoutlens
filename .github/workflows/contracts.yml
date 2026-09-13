@@ -42,7 +42,7 @@ jobs:
         run: |
           uv pip install --reinstall dist/*.whl
           uv pip install --no-deps ./consumers/bench
-          uv run --no-sync playwright install --with-deps chromium
+          uv run --no-sync playwright install --with-deps chromium firefox webkit
       - name: Verify wheel contracts and browser behavior
         env:
           LAYOUTLENS_ACTION_ROOT: ${{ github.workspace }}/consumers/action
@@ -52,7 +52,7 @@ jobs:
           LAYOUTLENS_WHEEL=$(find "$PWD/dist" -name '*.whl' -print -quit)
           export LAYOUTLENS_WHEEL
           echo "LAYOUTLENS_WHEEL=$LAYOUTLENS_WHEEL" >> "$GITHUB_ENV"
-          uv run --no-sync pytest tests/test_release_contract.py tests/test_regression.py
+          uv run --no-sync pytest tests/test_release_contract.py tests/test_regression.py tests/test_scenarios.py
           uv run --no-sync python consumers/action/scripts/test_report.py
       - name: Exercise candidate wheel through the composite action
         uses: ./consumers/action

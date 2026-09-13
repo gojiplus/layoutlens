@@ -19,7 +19,7 @@ Requires the extra: ``pip install "layoutlens[mcp]"``.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 try:
     from fastmcp import FastMCP
@@ -131,7 +131,16 @@ async def check_ui(url: str, question: str, viewport: str = "desktop") -> str:
 
 @mcp.tool
 async def compare_ui(
-    before: str, after: str, viewport: str = "desktop", policy: str = "qualified"
+    before: str,
+    after: str,
+    viewport: str = "desktop",
+    policy: str = "qualified",
+    browser: str = "chromium",
+    color_scheme: str = "light",
+    reduced_motion: str = "reduce",
+    locale: str = "en-US",
+    timezone_id: str = "UTC",
+    device_scale_factor: float | None = None,
 ) -> dict:
     """Compare saved render states or live pages using browser measurements.
 
@@ -140,6 +149,12 @@ async def compare_ui(
         after: Candidate artifact path, URL, or HTML file.
         viewport: Named viewport for live captures.
         policy: qualified, findings, or nothing.
+        browser: Local Chromium, Firefox, or WebKit engine.
+        color_scheme: Light, dark, or no-preference media emulation.
+        reduced_motion: Reduce or no-preference media emulation.
+        locale: Browser locale.
+        timezone_id: IANA timezone name.
+        device_scale_factor: Optional DPR override.
 
     Returns:
         Structured deltas, source evidence, and an explicit gate status.
@@ -149,15 +164,28 @@ async def compare_ui(
 
     if policy not in {"qualified", "findings", "nothing"}:
         raise ValueError("unknown gate policy")
-    result = await _get_lens().compare(
-        before, after, viewport=viewport, policy=cast("GatePolicy", policy)
-    )
+    result = await LayoutLens(
+        browser=browser,
+        color_scheme=color_scheme,
+        reduced_motion=reduced_motion,
+        locale=locale,
+        timezone_id=timezone_id,
+        device_scale_factor=device_scale_factor,
+    ).compare(before, after, viewport=viewport, policy=cast("GatePolicy", policy))
     return json.loads(result.to_json())
 
 
 @mcp.tool
 async def capture_render_state(
-    source: str, directory: str, viewport: str = "desktop"
+    source: str,
+    directory: str,
+    viewport: str = "desktop",
+    browser: str = "chromium",
+    color_scheme: str = "light",
+    reduced_motion: str = "reduce",
+    locale: str = "en-US",
+    timezone_id: str = "UTC",
+    device_scale_factor: float | None = None,
 ) -> dict:
     """Save browser evidence in a new artifact directory.
 
@@ -165,18 +193,67 @@ async def capture_render_state(
         source: Page URL or local HTML file.
         directory: New directory; existing baselines are not overwritten.
         viewport: Named viewport.
+        browser: Local Chromium, Firefox, or WebKit engine.
+        color_scheme: Light, dark, or no-preference media emulation.
+        reduced_motion: Reduce or no-preference media emulation.
+        locale: Browser locale.
+        timezone_id: IANA timezone name.
+        device_scale_factor: Optional DPR override.
 
     Returns:
         Artifact location and capture completeness information.
     """
     from .regression.capture import capture_state
 
-    state = await capture_state(source, viewport=viewport)
+    state = await capture_state(
+        source,
+        viewport=viewport,
+        browser=browser,
+        color_scheme=color_scheme,
+        reduced_motion=reduced_motion,
+        locale=locale,
+        timezone_id=timezone_id,
+        device_scale_factor=device_scale_factor,
+    )
     return {
         "artifact": str(state.save(directory)),
         "stable": state.stable,
         "coverage_gaps": state.coverage_gaps,
     }
+
+
+@mcp.tool
+async def run_ui_scenario(
+    definition: dict,
+    directory: str,
+    browser: str = "chromium",
+    viewport: str = "desktop",
+    color_scheme: str = "light",
+    reduced_motion: str = "reduce",
+    locale: str = "en-US",
+    timezone_id: str = "UTC",
+    device_scale_factor: float | None = None,
+    timeout: int = 30000,
+    policy: str = "qualified",
+) -> dict:
+    """Run declared interactions and save checkpoint artifacts and ordered evidence."""
+    import json
+
+    from .scenarios import Scenario
+
+    report = await Scenario.from_dict(definition).run(
+        browser=browser,
+        viewport=viewport,
+        color_scheme=color_scheme,
+        reduced_motion=reduced_motion,
+        locale=locale,
+        timezone_id=timezone_id,
+        device_scale_factor=device_scale_factor,
+        timeout=timeout,
+        policy=cast("GatePolicy", policy),
+    )
+    artifact = report.save(directory)
+    return {"artifact": str(artifact), **json.loads(report.to_json())}
 
 
 def main() -> None:

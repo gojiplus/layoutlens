@@ -27,6 +27,7 @@ def _changes(a: Element, b: Element) -> dict[str, Any]:
         "focusable",
         "interactive",
         "focused",
+        "control_state",
         "attributes",
     ):
         before, after = getattr(a, field), getattr(b, field)
@@ -151,6 +152,8 @@ def diff(
         or before.rule_version != after.rule_version
     ):
         gaps.append("detector configuration or version differs")
+    if before.capabilities != after.capabilities:
+        gaps.append("capture capabilities differ")
     old = {n.key: n for n in before.graph.nodes}
     new = {n.key: n for n in after.graph.nodes}
     matches, unmatched_before, unmatched_after = match_elements(

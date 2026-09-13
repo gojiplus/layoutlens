@@ -21,6 +21,7 @@ from urllib.parse import urlparse
 
 if TYPE_CHECKING:
     from ..regression.policy import GatePolicy, Qualification, Verification
+    from ..scenarios import Scenario, ScenarioReport
     from .batch import BatchRequest
     from .judge import JudgeResult
     from .test_suite import UITestResult, UITestSuite
@@ -35,7 +36,7 @@ except ImportError as e:
 from ..a11y import AXE_VERSION, A11yReport, AxeAuditor
 
 # Import shared browser lifecycle (single-session hybrid audits)
-from ..browser import open_page
+from ..browser import BrowserConfig, open_page
 
 # Import caching
 from ..cache import create_cache
@@ -213,6 +214,12 @@ class LayoutLens:
         cache_ttl: int = 3600,
         api_base: str | None = None,
         temperature: float | None = None,
+        browser: str = "chromium",
+        color_scheme: str = "light",
+        reduced_motion: str = "reduce",
+        locale: str = "en-US",
+        timezone_id: str = "UTC",
+        device_scale_factor: float | None = None,
     ):
         """Initialize LayoutLens with AI provider credentials.
 
@@ -240,6 +247,13 @@ class LayoutLens:
                 reject non-default sampling params (e.g. Claude Sonnet 5) omit it
                 regardless.
 
+            browser: Local Chromium, Firefox, or WebKit engine.
+            color_scheme: Light, dark, or no-preference media emulation.
+            reduced_motion: Reduce or no-preference media emulation.
+            locale: Browser locale.
+            timezone_id: Browser timezone.
+            device_scale_factor: Optional DPR override.
+
         Raises:
             ConfigurationError: If invalid provider or configuration is specified.
 
@@ -249,6 +263,14 @@ class LayoutLens:
             keyless operations such as ``check_accessibility(..., mode="axe")`` work
             without any credentials configured.
         """
+        self.browser_config = BrowserConfig(
+            browser,
+            color_scheme,
+            reduced_motion,
+            locale,
+            timezone_id,
+            device_scale_factor,
+        )
         # Initialize logger
         self.logger = get_logger("api.core")
 
@@ -668,7 +690,10 @@ Focus on:
                     source=str(source),
                     query=query,
                     viewport=viewport_value,
-                    context=context,
+                    context={
+                        "browser": asdict(self.browser_config),
+                        "user_context": context,
+                    },
                     model=self._model_fingerprint(),
                     instructions_fingerprint=self._instructions_fingerprint(
                         instructions
@@ -693,7 +718,8 @@ Focus on:
                     if self._is_url(source):
                         self.logger.debug("Capturing screenshot from URL: %s", source)
                         capture_engine = Capture(
-                            output_dir=self.output_dir / "screenshots"
+                            output_dir=self.output_dir / "screenshots",
+                            browser_config=self.browser_config,
                         )
                         screenshot_paths = await capture_engine.screenshots(
                             [str(source)], viewport_value
@@ -861,12 +887,28 @@ Focus on:
             ),
         )
 
+    async def run_scenario(
+        self,
+        scenario: Scenario,
+        *,
+        viewport: ViewportType | tuple[int, int] = "desktop",
+        timeout: int = 30000,
+        policy: GatePolicy = "qualified",
+    ) -> ScenarioReport:
+        """Execute a Scenario with this client's browser and emulation settings."""
+        return await scenario.run(
+            viewport=viewport,
+            timeout=timeout,
+            policy=policy,
+            **asdict(self.browser_config),
+        )
+
     async def compare(
         self,
         before: RenderState | str | Path,
         after: RenderState | str | Path,
         *,
-        viewport: ViewportType = "desktop",
+        viewport: ViewportType | tuple[int, int] = "desktop",
         policy: GatePolicy = "qualified",
         tolerance_px: float = 1,
         qualifications: list[Qualification] | None = None,
@@ -901,7 +943,9 @@ Focus on:
             path = Path(value)
             if path.is_dir() or path.suffix == ".json":
                 return RenderState.load(path)
-            return await capture_state(value, viewport=viewport)
+            return await capture_state(
+                value, viewport=viewport, **asdict(self.browser_config)
+            )
 
         baseline, candidate = await state(before), await state(after)
         report = diff(
@@ -989,7 +1033,10 @@ Focus on:
         viewport_value = (
             viewport.value if isinstance(viewport, Viewport) else str(viewport)
         )
-        capture_engine = Capture(output_dir=self.output_dir / "screenshots")
+        capture_engine = Capture(
+            output_dir=self.output_dir / "screenshots",
+            browser_config=self.browser_config,
+        )
         screenshot_paths = await capture_engine.screenshots(
             [str(html_file_path)],
             viewport_value,
@@ -1105,7 +1152,10 @@ Focus on:
         if urls_to_capture:
             try:
                 # Create Capture instance for URL processing
-                capture_engine = Capture(output_dir=self.output_dir / "screenshots")
+                capture_engine = Capture(
+                    output_dir=self.output_dir / "screenshots",
+                    browser_config=self.browser_config,
+                )
                 screenshot_paths = await capture_engine.screenshots(
                     [str(u) for u in urls_to_capture],
                     viewport_value,
@@ -1338,7 +1388,9 @@ Focus on:
             return result
 
         if mode == "axe":
-            report = await AxeAuditor(run_only=run_only).audit(source, viewport_value)
+            report = await AxeAuditor(run_only=run_only).audit(
+                source, viewport_value, browser_config=self.browser_config
+            )
             return self._build_axe_result(
                 source, query, viewport_value, report, mode, run_only
             )
@@ -1369,7 +1421,7 @@ Focus on:
             source=str(source),
             query=query,
             viewport=viewport_value,
-            context={"a11y_mode": mode},
+            context={"a11y_mode": mode, "browser": asdict(self.browser_config)},
             model=self._model_fingerprint(),
             instructions_fingerprint=self._instructions_fingerprint(instructions),
         )
@@ -1380,14 +1432,19 @@ Focus on:
             return cached
 
         start_time = time.time()
-        capture_engine = Capture(output_dir=self.output_dir / "screenshots")
+        capture_engine = Capture(
+            output_dir=self.output_dir / "screenshots",
+            browser_config=self.browser_config,
+        )
         screenshot_path = capture_engine.output_dir / capture_engine._generate_filename(  # noqa: SLF001
             str(source), viewport_value
         )
 
         report: A11yReport | None = None
         axe_error: str | None = None
-        async with open_page(source, viewport_value) as page:
+        async with open_page(
+            source, viewport_value, config=self.browser_config
+        ) as page:
             await page.screenshot(path=str(screenshot_path), full_page=True)
             try:
                 report = await AxeAuditor(run_only=run_only).audit_page(
@@ -1735,7 +1792,9 @@ Focus on:
             return result
 
         if mode == "deterministic":
-            report = await scorer.scan(source, viewport=viewport_value)
+            report = await scorer.scan(
+                source, viewport=viewport_value, browser_config=self.browser_config
+            )
             result = AnalysisResult(
                 source=str(source),
                 query=query,
@@ -1782,6 +1841,7 @@ Focus on:
             # custom scorer must never be served the lenient scorer's verdict.
             context={
                 "layout_mode": mode,
+                "browser": asdict(self.browser_config),
                 "scorer": {
                     "probe_focus": scorer.probe_focus,
                     "min_target_px": scorer.min_target_px,
@@ -1800,14 +1860,19 @@ Focus on:
             return cached
 
         start_time = time.time()
-        capture_engine = Capture(output_dir=self.output_dir / "screenshots")
+        capture_engine = Capture(
+            output_dir=self.output_dir / "screenshots",
+            browser_config=self.browser_config,
+        )
         screenshot_path = capture_engine.output_dir / capture_engine._generate_filename(  # noqa: SLF001
             str(source), viewport_value
         )
 
         report: LayoutReport | None = None
         layout_error: str | None = None
-        async with open_page(source, viewport_value) as page:
+        async with open_page(
+            source, viewport_value, config=self.browser_config
+        ) as page:
             await page.screenshot(path=str(screenshot_path), full_page=True)
             try:
                 report = await scorer.scan_page(

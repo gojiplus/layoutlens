@@ -35,6 +35,12 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     """Register layoutlens command-line options."""
     group = parser.getgroup("layoutlens")
     group.addoption(
+        "--layoutlens-browser",
+        choices=["chromium", "firefox", "webkit"],
+        default="chromium",
+        help="Local Playwright browser",
+    )
+    group.addoption(
         "--layoutlens-model",
         default="gpt-4o-mini",
         help="Model for LLM-backed assert_ui checks (default: gpt-4o-mini)",
@@ -76,7 +82,11 @@ class LayoutLensFixture:
         self._no_llm = bool(config.getoption("--layoutlens-no-llm"))
         model = config.getoption("--layoutlens-model") or "gpt-4o-mini"
         provider = str(config.getoption("--layoutlens-provider") or "openai")
-        self.lens = LayoutLens(model=str(model), provider=provider)
+        self.lens = LayoutLens(
+            model=str(model),
+            provider=provider,
+            browser=str(config.getoption("--layoutlens-browser")),
+        )
 
     # -- keyless deterministic assertions ---------------------------------
 
@@ -184,6 +194,20 @@ class LayoutLensFixture:
         if report.gate_status != "pass":
             pytest.fail(
                 report.summary() + "\n" + "\n".join(report.incomplete_reasons),
+                pytrace=False,
+            )
+        return report
+
+    def assert_scenario(self, scenario, **options):
+        """Require a complete scenario to satisfy its explicit expectations and policy."""
+        report = _run(self.lens.run_scenario(scenario, **options))
+        if report.gate_status != "pass":
+            errors = [step.error for step in report.steps if step.error]
+            pytest.fail(
+                "Scenario "
+                + report.gate_status
+                + "\n"
+                + "\n".join(errors + report.incomplete_reasons),
                 pytrace=False,
             )
         return report

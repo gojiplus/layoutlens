@@ -13,7 +13,7 @@ from functools import lru_cache
 from importlib import resources
 from typing import TYPE_CHECKING, Any
 
-from ..browser import open_page
+from ..browser import BrowserConfig, open_page
 from ..exceptions import AnalysisError
 from ..logger import get_logger
 from ..types import Viewport, ViewportType
@@ -159,13 +159,19 @@ class AxeAuditor:
         return self._build_report(results, source_label, viewport)
 
     async def audit(
-        self, source: str | Path, viewport: ViewportType = "desktop"
+        self,
+        source: str | Path,
+        viewport: ViewportType = "desktop",
+        *,
+        browser_config: BrowserConfig | None = None,
     ) -> A11yReport:
         """Audit a URL or local HTML file, owning the browser lifecycle.
 
         Args:
             source: A URL or path to a local HTML file.
             viewport: Viewport name or :class:`~layoutlens.types.Viewport` enum member.
+
+            browser_config: Local engine and emulation settings.
 
         Returns:
             The structured accessibility report.
@@ -176,7 +182,7 @@ class AxeAuditor:
         viewport_name = (
             viewport.value if isinstance(viewport, Viewport) else str(viewport)
         )
-        async with open_page(source, viewport) as page:
+        async with open_page(source, viewport, config=browser_config) as page:
             return await self.audit_page(
                 page, source=str(source), viewport=viewport_name
             )

@@ -7,6 +7,7 @@
 
    QUICK_START
    REGRESSION
+   SCENARIOS
 
 .. toctree::
    :maxdepth: 2
@@ -14,6 +15,7 @@
 
    api/core
    api/regression
+   api/scenarios
    api/a11y
    api/layout
    api/judge

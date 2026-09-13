@@ -34,6 +34,7 @@ class Element(Record):
     visible: bool = True
     focusable: bool = False
     interactive: bool = False
+    control_state: dict[str, Any] = Field(default_factory=dict)
     focused: bool = False
     text_rects: list[tuple[float, float, float, float]] = Field(default_factory=list)
     declarations: list[dict[str, Any]] = Field(default_factory=list)
@@ -69,16 +70,19 @@ class CaptureEnvironment(Record):
     timezone: str
     color_scheme: str = "light"
     reduced_motion: str = "reduce"
+    has_touch: bool = False
+    emulation: dict[str, Any] = Field(default_factory=dict)
     scroll: tuple[float, float] = (0, 0)
 
 
 class RenderState(Record):
     """A replayable capture with screenshot bytes kept outside its manifest."""
 
-    schema_version: Literal[1] = 1
+    schema_version: Literal[2] = 2
     source: str
     environment: CaptureEnvironment
     graph: LayoutGraph
+    capabilities: dict[str, bool] = Field(default_factory=dict)
     geometry: dict[str, float] = Field(default_factory=dict)
     loading: dict[str, Any] = Field(default_factory=dict)
     accessibility: list[dict[str, Any]] = Field(default_factory=list)
@@ -163,7 +167,7 @@ class RenderState(Record):
         if manifest.is_dir():
             manifest /= "state.json"
         payload = json.loads(manifest.read_text(encoding="utf-8"))
-        if payload.get("schema_version") != 1:
+        if payload.get("schema_version") != 2:
             raise ValueError("unsupported RenderState schema version")
         assets = payload.pop("assets", {})
         if set(assets) != {"screenshot.png", "dom.html"}:
