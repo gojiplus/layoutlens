@@ -47,9 +47,10 @@ attribution, and gate policy. Saved artifacts can be compared offline.
 | Gateable | An applicable independent precision evaluation qualifies the rule |
 
 Default CI blocking requires a sealed independent evaluation whose **95%
-Wilson precision interval has a lower bound of at least 99%**. Rule version,
-configuration, capture conditions, dataset hash, and evaluation counts must
-match. No layout rules ship with qualifying evidence yet. Candidates remain
+Wilson precision interval has a lower bound of at least 99%**. The evaluation
+must match the rule version, detector configuration, and capture conditions.
+Its record includes the dataset hash, provenance, and evaluation counts.
+No layout rules ship with qualifying evidence yet. Candidates remain
 warnings; `policy="findings"` explicitly opts into strict blocking. An
 incomplete comparison never reports a passing gate.
 
