@@ -226,21 +226,17 @@ class AnalyzeInput(TypedDict, total=False):
 
 
 class CompareInput(TypedDict, total=False):
-    """Input schema for lens.compare() method.
+    """JSON-compatible inputs for structured comparison of saved or live pages."""
 
-    Example:
-        {
-            "sources": ["page1.html", "page2.html"],  # Required
-            "query": "Which is better?",              # Required
-            "viewport": "desktop",                    # Optional
-            "context": {"focus": "usability"}        # Optional
-        }
-    """
-
-    sources: list[str]  # Required: List of sources to compare
-    query: str  # Required: Comparison question
-    viewport: str  # Optional: Viewport for analysis
-    context: dict[str, Any]  # Optional: Comparison context
+    before: str
+    after: str
+    viewport: str
+    policy: str
+    tolerance_px: float
+    repository: str
+    explain: bool
+    intent: str
+    instructions: str
 
 
 class LayoutLensConfigJSON(TypedDict, total=False):

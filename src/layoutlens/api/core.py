@@ -188,22 +188,18 @@ class BatchResult:
 
 
 class LayoutLens:
-    """Simple API for AI-powered UI testing with natural language.
+    """Measured UI comparisons and optional model analysis.
 
-    This class provides an intuitive interface for analyzing websites and
-    screenshots using natural language queries, designed for developer
-    workflows and CI/CD integration.
+    Compare browser states with replayable evidence or ask natural-language
+    questions about pages and screenshots. All analysis methods are async.
 
     Examples:
     >>> lens = LayoutLens(api_key="sk-...")
-    >>> result = lens.analyze("https://example.com", "Is the navigation clearly visible?")
+    >>> result = await lens.analyze("https://example.com", "Is navigation visible?")
     >>> print(result.answer)
 
-    >>> # Compare two designs
-    >>> result = lens.compare(
-    ...     ["before.png", "after.png"],
-    ...     "Are these layouts consistent?"
-    ... )
+    >>> report = await lens.compare("before.html", "after.html")
+    >>> print(report.gate_status)
     """
 
     def __init__(

@@ -224,7 +224,8 @@ pip install "layoutlens[mcp]"
 
 Tools: `audit_accessibility` and `scan_layout` (keyless, deterministic —
 they return **measured numbers, not model opinions**, in compact summaries of
-a few hundred tokens), plus `compare_ui` (structured regression) and `check_ui` (vision LLM). The
+a few hundred tokens), plus `capture_render_state` (saved browser evidence), `compare_ui` (structured
+regression), and `check_ui` (vision LLM). The
 deterministic tools cover visual facts accessibility-tree snapshots cannot
 see: contrast, geometry, target spacing, complete focus obscuration, and text
 occlusion such as a chart line painted over its label.
@@ -723,8 +724,8 @@ Calibrate your trust to the tier you use:
 - **Zero Selectors** - No more fragile XPath or CSS selectors
 - **Visual Understanding** - AI sees what users see, not just code
 - **Async-by-Default** - Concurrent processing for optimal performance
-- **Simple API** - One analyze method handles single pages, batches, and comparisons
-- **Structured JSON Output** - TypedDict schemas for full type safety in automation
+- **Async API** - Analyze pages, run batches, and compare rendered states
+- **Structured JSON Output** - Validated render states and deltas for automation
 - **Honest Benchmarking** - Compact built-in suite (81.1% measured accuracy, gpt-4o-mini, 74 queries); see [UIJudgeBench](https://github.com/gojiplus/uijudge-bench) for the full-scale external benchmark
 - **Deterministic Accessibility** - Vendored axe-core WCAG 2.1 A/AA checks, no API key or LLM variance
 
