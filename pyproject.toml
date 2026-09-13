@@ -44,7 +44,7 @@ version = "4.0.0"
 
 [project.optional-dependencies]
 # MCP server (layoutlens-mcp): deterministic UI checks as agent tools.
-mcp = ["fastmcp>=3"]
+mcp = ["fastmcp>=3,<4"]
 
 [dependency-groups]
 dev = [

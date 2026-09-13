@@ -32,7 +32,8 @@ creates its own pages and runs all three engines.
 
 A plain target such as `email` resolves by exact ID, then accessible label, then
 test ID, then exact text. Use `css=#checkout button`, `#email`, or a Playwright
-selector when you need explicit targeting. A selector that matches several
+selector with an explicit engine prefix such as `role=button[name="Continue"]`
+when you need explicit targeting. Prefix bare CSS tag selectors with `css=`. A selector that matches several
 elements is an execution error for single-element actions; the runner never
 picks an arbitrary match. `expect_count()` deliberately accepts multiple matches.
 

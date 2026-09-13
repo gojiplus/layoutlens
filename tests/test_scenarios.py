@@ -497,3 +497,19 @@ async def test_shadow_focus_receipts_match_checkpoint_selectors(tmp_path, engine
     assert node.control_state["value"] == "hello"
     assert node.role == "textbox"
     assert node.name == "Email"
+
+
+@pytest.mark.browser
+@pytest.mark.asyncio
+@pytest.mark.parametrize("engine", ["chromium", "firefox", "webkit"])
+async def test_explicit_role_selector_uses_playwright_engine(checkout, engine):
+    report = await (
+        Scenario(checkout)
+        .click('role=button[name="Open"]')
+        .expect_visible("role=dialog")
+        .click('role=button[name="Close"]')
+        .expect_hidden("role=dialog")
+        .checkpoint("closed")
+        .run(browser=engine, timeout=1000)
+    )
+    assert report.gate_status == "pass", report.to_json()

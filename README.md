@@ -247,7 +247,7 @@ GitHub permissions appropriate to the workflow and fork context.
 [`gojiplus/layoutlens-action`](https://github.com/gojiplus/layoutlens-action)
 handles installation, scanning, job summaries, PR annotations, an optional
 results comment, and SARIF upload. This example pins the Action revision tested
-against LayoutLens 3:
+against LayoutLens 4:
 
 ```yaml
 - uses: gojiplus/layoutlens-action@24bf89afc2db23008791deeafd83b82dd0dc210a

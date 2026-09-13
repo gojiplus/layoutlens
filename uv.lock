@@ -1766,7 +1766,7 @@ test = [
 requires-dist = [
     { name = "batchlane", specifier = ">=0.2.0" },
     { name = "beautifulsoup4", specifier = ">=4.12.0" },
-    { name = "fastmcp", marker = "extra == 'mcp'", specifier = ">=3" },
+    { name = "fastmcp", marker = "extra == 'mcp'", specifier = ">=3,<4" },
     { name = "litellm", specifier = ">=1.80.10" },
     { name = "openai", specifier = ">=2.54.0,<4" },
     { name = "pillow", specifier = ">=10.0.0" },

@@ -15,6 +15,8 @@ All notable changes to LayoutLens are documented in this file.
   incomplete captures cannot produce passing gates.
 - Preserve checkpoint focus, media preferences, animations, and DOM attributes.
   Use a threaded local HTTP server to support browser speculative connections.
+- Keep the MCP extra on the tested FastMCP 3 major; a fresh FastMCP 4
+  installation fails to import with its resolved MCP dependency.
 - Advance RenderState artifacts to schema 2 and record current form-control
   state. Schema 1 artifacts require recapture. Require Playwright 1.49+.
 

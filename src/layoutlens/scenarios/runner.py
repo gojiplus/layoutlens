@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -32,7 +33,9 @@ _RECORDER = Path(__file__).with_name("record.js").read_text(encoding="utf-8")
 async def _locate(page: Page, target: str | None) -> Locator:
     if not target:
         raise ValueError("an element target is required")
-    if target.startswith(("css=", "text=", "xpath=", "#", ".", "[")):
+    if re.match(r"^[a-zA-Z_][\w-]*=", target) or target.startswith(
+        ("#", ".", "[", "//")
+    ):
         return page.locator(target.replace(" >>> ", " >> "))
     by_id = page.locator(f"[id={json.dumps(target)}]")
     if await by_id.count():
