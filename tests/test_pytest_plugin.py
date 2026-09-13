@@ -101,7 +101,7 @@ class TestKeylessAssertionsEndToEnd:
         pytester.makepyfile(
             """
             def test_layout(layoutlens):
-                layoutlens.assert_layout("defect.html")
+                layoutlens.assert_layout("defect.html", policy="findings")
             """
         )
         result = pytester.runpytest_subprocess()

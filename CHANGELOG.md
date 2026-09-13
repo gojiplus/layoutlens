@@ -2,7 +2,21 @@
 
 All notable changes to LayoutLens are documented in this file.
 
+## 3.0.0 (unreleased)
+
+- Replace model-first comparison with versioned RenderState capture, offline
+  graph correspondence, structured visual deltas, and replayable diagnosis.
+- Record candidate CSS declarations, source-map locations, and verified git context.
+- Separate measurements, candidate findings, verification, and CI qualification;
+  unqualified layout findings warn by default. Add explicit strict policy.
+- Add artifact capture/diff CLI commands, structured MCP tools, pytest regression
+  assertions, and SARIF baseline status.
+- Require Python 3.12+ and add built-wheel consumer contracts for the Action
+  and UIJudgeBench. See docs/REGRESSION.md for migration.
+
 ## [Unreleased]
+
+- Use batchlane for asynchronous judging, including native OpenAI Responses and newly available Anthropic batches. Preserve manifest locking, inputs, usage, refusals, and truncation; cache completed judgments locally. Remove the Gemini extra and reject custom batch API bases.
 
 ## [2.2.0] - 2026-08-18
 

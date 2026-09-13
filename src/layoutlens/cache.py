@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any
 # Use TYPE_CHECKING to avoid circular imports
 
 if TYPE_CHECKING:
-    from .api.core import AnalysisResult, ComparisonResult
+    from .api.core import AnalysisResult
 
 from .exceptions import ConfigurationError
 
@@ -23,7 +23,7 @@ class CacheEntry:
     """Represents a cached analysis result."""
 
     key: str
-    result: "AnalysisResult | ComparisonResult"
+    result: "AnalysisResult"
     timestamp: float
     ttl_seconds: int = 3600  # 1 hour default
     metadata: dict[str, Any] = field(default_factory=dict)
@@ -275,7 +275,7 @@ class AnalysisCache:
         content_str = json.dumps(content, sort_keys=True)
         return hashlib.sha256(content_str.encode()).hexdigest()[:16]
 
-    def get(self, key: str) -> "AnalysisResult | ComparisonResult | None":
+    def get(self, key: str) -> "AnalysisResult | None":
         """Get a cached result.
 
         Returns a deep copy so callers can freely mutate the result (e.g. the
@@ -296,7 +296,7 @@ class AnalysisCache:
     def set(
         self,
         key: str,
-        result: "AnalysisResult | ComparisonResult",
+        result: "AnalysisResult",
         ttl: int | None = None,
     ) -> None:
         """Cache a result.

@@ -7,7 +7,8 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from layoutlens.api.core import AnalysisResult, BatchResult, ComparisonResult
+from layoutlens import DiffReport
+from layoutlens.api.core import AnalysisResult, BatchResult
 from layoutlens.cli import main
 
 
@@ -48,13 +49,7 @@ class TestSimpleCLI:
         mock_lens = Mock()
         mock_lens_class.return_value = mock_lens
 
-        mock_result = ComparisonResult(
-            sources=["page1.html", "page2.html"],
-            query="Which is better?",
-            answer="Page 2 has better design",
-            confidence=0.85,
-            reasoning="Improved layout and accessibility",
-        )
+        mock_result = DiffReport(before="page1.html", after="page2.html")
         mock_lens.compare = AsyncMock(return_value=mock_result)
 
         # Test with args

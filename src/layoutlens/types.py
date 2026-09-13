@@ -84,34 +84,6 @@ class AnalysisResultJSON(TypedDict):
     metadata: dict[str, Any]
 
 
-class ComparisonResultJSON(TypedDict):
-    """JSON schema for ComparisonResult objects.
-
-    Example:
-        {
-            "sources": ["page1.html", "page2.html"],
-            "query": "Which design is better?",
-            "answer": "The second design is more user-friendly.",
-            "confidence": 0.78,
-            "reasoning": "Page 2 has better visual hierarchy...",
-            "viewport": "desktop",
-            "timestamp": "2024-01-15T10:30:45",
-            "execution_time": 3.1,
-            "metadata": {"comparison_type": "design_quality"}
-        }
-    """
-
-    sources: list[str]
-    query: str
-    answer: str
-    confidence: float  # 0.0 to 1.0
-    reasoning: str
-    viewport: str
-    timestamp: str
-    execution_time: float
-    metadata: dict[str, Any]
-
-
 class BatchResultJSON(TypedDict):
     """JSON schema for BatchResult objects.
 
@@ -303,7 +275,6 @@ __all__ = [
     "CacheType",
     "CacheTypeType",
     "CompareInput",
-    "ComparisonResultJSON",
     # Enums
     "ComplianceLevel",
     "ComplianceLevelType",

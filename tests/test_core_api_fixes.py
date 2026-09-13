@@ -65,58 +65,16 @@ async def test_litellm_provider_omits_api_key_and_does_not_require_openai_key(
 
 
 @pytest.mark.asyncio
-async def test_compare_routes_local_html_through_capture(tmp_path):
-    """compare() must screenshot local HTML, not base64-encode the raw HTML bytes."""
-    a = tmp_path / "a.html"
-    b = tmp_path / "b.html"
-    a.write_text("<html><body>A</body></html>")
-    b.write_text("<html><body>B</body></html>")
-
-    shots = {str(a): str(tmp_path / "a.png"), str(b): str(tmp_path / "b.png")}
-
-    lens = LayoutLens(api_key="sk-test", output_dir=str(tmp_path / "out"))
-
-    async def fake_serve(source, viewport, *args, **kwargs):
-        return shots[str(source)]
-
-    lens._serve_html_and_capture = AsyncMock(side_effect=fake_serve)
-    # Individual per-source analyses are irrelevant to this assertion.
-    lens.analyze = AsyncMock(
-        return_value=AnalysisResult(
-            source="x", query="q", answer="ok", confidence=0.7, reasoning="r"
-        )
-    )
-    lens._call_vision_api = AsyncMock(
-        return_value={
-            "answer": "B is better",
-            "confidence": 0.8,
-            "reasoning": "r",
-            "metadata": {},
-        }
-    )
-
-    from layoutlens.prompts import Instructions
-
-    sentinel_instructions = Instructions(expert_persona="accessibility_expert")
-    await lens.compare(
-        [str(a), str(b)], "Which is better?", instructions=sentinel_instructions
-    )
-
-    # Both HTML sources were rendered to screenshots.
-    assert lens._serve_html_and_capture.await_count == 2
-    # The comparative vision call received EVERY screenshot, in order — not
-    # just the first with the rest pasted in as filenames.
-    comparative_images = lens._call_vision_api.await_args.kwargs["image_path"]
-    assert comparative_images == [shots[str(a)], shots[str(b)]]
-    # Each per-source analysis ran on the captured screenshot, not the raw HTML
-    # (which would re-capture it a second time).
-    analyzed = [c.args[0] for c in lens.analyze.await_args_list]
-    assert analyzed == [shots[str(a)], shots[str(b)]]
-    # The legend maps Image N to the original sources.
-    query_sent = lens._call_vision_api.await_args.kwargs["query"]
-    assert f"Image 1: {a}" in query_sent
-    assert f"Image 2: {b}" in query_sent
-    # Expert instructions flow into the individual analyses too, not just the
-    # comparative call.
-    for call in lens.analyze.await_args_list:
-        assert call.kwargs.get("instructions") is sentinel_instructions
+async def test_compare_routes_local_html_through_capture(tmp_path, render_state):
+    a, b = tmp_path / "a.html", tmp_path / "b.html"
+    a.write_text("<html>A</html>")
+    b.write_text("<html>B</html>")
+    lens = LayoutLens(output_dir=tmp_path / "out")
+    lens._call_vision_api = AsyncMock()
+    with patch(
+        "layoutlens.api.core.capture_state", new=AsyncMock(return_value=render_state)
+    ) as capture:
+        report = await lens.compare(a, b)
+    assert [call.args[0] for call in capture.call_args_list] == [a, b]
+    assert report.gate_status == "pass"
+    lens._call_vision_api.assert_not_called()

@@ -20,7 +20,6 @@ classifiers = [
     "Framework :: Pytest",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
@@ -29,8 +28,9 @@ classifiers = [
     "Topic :: Multimedia :: Graphics :: Capture :: Screen Capture",
     "Operating System :: OS Independent",
 ]
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
+    "batchlane>=0.2.0",
     "openai>=2.54.0,<3",
     "playwright>=1.40.0",
     "beautifulsoup4>=4.12.0",
@@ -40,13 +40,9 @@ dependencies = [
     "rich>=13.0.0",
     "pydantic>=2.0.0",
 ]
-version = "2.2.0"
+version = "3.0.0"
 
 [project.optional-dependencies]
-# Optional extra for the google-genai inline batch backend (AI-Studio Gemini,
-# ``gemini/*`` models) used by ``LayoutLens.judge_batch``. Imported lazily, so
-# the base install and all other backends never require it.
-gemini = ["google-genai>=1.0"]
 # MCP server (layoutlens-mcp): deterministic UI checks as agent tools.
 mcp = ["fastmcp>=3"]
 
@@ -54,6 +50,7 @@ mcp = ["fastmcp>=3"]
 dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
+    "respx>=0.21",
     "pytest-mock>=3.10.0",
     "pytest-xdist>=3.0.0",
     "ruff>=0.7.0",
@@ -64,6 +61,7 @@ dev = [
     "pydoclint>=0.5",
 ]
 test = [
+    "respx>=0.21",
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
     "pytest-mock>=3.10.0",
@@ -170,7 +168,7 @@ exclude_lines = [
 
 [tool.ruff]
 line-length = 88
-target-version = "py311"
+target-version = "py312"
 
 [tool.ruff.lint]
 external = ["DOC"]

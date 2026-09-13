@@ -5,14 +5,13 @@ designed for developer workflows and CI/CD integration.
 """
 
 from .batch import BatchRequest
-from .core import AnalysisResult, BatchResult, ComparisonResult, LayoutLens
+from .core import AnalysisResult, BatchResult, LayoutLens
 from .judge import JudgeResult
 
 __all__ = [
     "AnalysisResult",
     "BatchRequest",
     "BatchResult",
-    "ComparisonResult",
     "JudgeResult",
     "LayoutLens",
 ]

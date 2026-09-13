@@ -32,7 +32,7 @@ async def check_with_verdict():
     print(result.reasoning)
 
     # Hybrid mode (needs a key): the scan grounds the vision model, and any
-    # MEASURED defect forces the verdict to "no" regardless of the model.
+    # Candidate measurements remain attached to the model assessment.
     # result = await lens.check_layout("page.html", mode="hybrid")
 
 

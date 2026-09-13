@@ -65,10 +65,10 @@ class TestCheckLayoutModes:
 
         mock_llm.assert_not_called()
         mock_scan.assert_awaited_once()
-        assert result.answer.lower().startswith("no")
+        assert result.answer.startswith("Review")
         assert "overlap" in result.answer
         assert "contrast" in result.answer
-        assert result.confidence == 1.0
+        assert result.confidence == 0.0
         assert result.reasoning == report.summary()
         assert result.metadata["mode"] == "deterministic"
         assert result.metadata["engine"] == "layoutlens-layout"
@@ -83,8 +83,8 @@ class TestCheckLayoutModes:
         ):
             result = await lens.check_layout("page.html", mode="deterministic")
 
-        assert result.answer.lower().startswith("yes")
-        assert result.confidence == 1.0
+        assert result.answer == "No candidate layout findings measured"
+        assert result.confidence == 0.0
 
     async def test_hybrid_single_session_and_override(self):
         lens = LayoutLens(cache_enabled=False)
@@ -117,9 +117,9 @@ class TestCheckLayoutModes:
             "Deterministic layout/geometry scan results"
             in lens._call_vision_api.call_args.kwargs["query"]
         )
-        # Measured defects override the LLM's opinion.
-        assert result.answer.lower().startswith("no")
-        assert result.confidence == 1.0
+        assert result.answer == "Yes, the layout looks clean"
+        assert result.confidence == 0.6
+        assert result.metadata["layout"]["findings"][0]["level"] == "candidate"
         assert "LLM assessment" in result.reasoning
         assert result.metadata["mode"] == "hybrid"
         assert result.metadata["layout"]["findings"][0]["defect_class"] == "clipping"

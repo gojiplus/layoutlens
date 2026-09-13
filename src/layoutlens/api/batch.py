@@ -1,56 +1,25 @@
-"""Multi-provider batch judging for LayoutLens.
+"""Resumable vision judging through batchlane's provider batch transports.
 
-Bulk offline evaluation (thousands of independent judgments with no latency
-requirement) is exactly what provider *batch* APIs are for: a flat ~50% discount
-and no rate-limit juggling. This module adds :func:`judge_batch`, which sends the
-same caller-owned prompt VERBATIM and the same image bytes as
-:func:`layoutlens.api.judge.judge`, with a reasoning-aware output budget, over a
-provider-native batch transport, and parses every response with the
-SHARED :func:`layoutlens.api.judge.parse_judge_response`. A parity test asserts
-each request's prompt is byte-identical to the synchronous path.
-
-Two backends, dispatched by ``lens.model``:
-
-* ``gemini/*`` (AI Studio) -> **google-genai inline batch**. ``google-genai`` is
-  an optional dependency (``layoutlens[gemini]``), imported lazily through a
-  patchable factory so importing this module never requires it. Requests are
-  chunked under the ~20 MB inline cap, keyed back to ids via per-request
-  ``metadata``. Usage output = ``total - prompt`` (Gemini bills thinking as
-  output).
-* native OpenAI (``provider="openai"``) -> **Responses Batch API** with an
-  explicit image-detail and reasoning-effort contract.
-* everything else (``anthropic/*``/``vertex_ai/*``/``bedrock/*`` ...) ->
-  **litellm file-based batch**: a JSONL upload
-  (``acreate_file``) -> ``acreate_batch`` -> poll ``aretrieve_batch`` ->
-  ``afile_content``, parsed by ``custom_id``.
-
-Both backends are **resumable**: a manifest persists submitted job/batch/file
-ids immediately after submission and before polling, so a run interrupted during
-polling can collect prior work on the next call and submit only uncovered ids.
-Resume identity binds the backend, endpoint, model, token budget, reasoning
-effort, image detail, exact prompt bytes, image MIME types, and image content; a
-changed request can never silently reuse stale results.
-
-``acompletion`` is not used here; the litellm batch helpers are imported at
-module level so tests patch them at ``layoutlens.api.batch``.
+LayoutLens owns verbatim prompts, image preparation, manifest locking, and
+judgment parsing. Batchlane owns request sizing, submission, recovery, polling
+requests, and result transport. Provider calls run outside the event loop.
 """
 
 from __future__ import annotations
 
 import asyncio
-import base64
 import hashlib
 import json
+import math
 import os
 import tempfile
 import time
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from litellm import acreate_batch, acreate_file, afile_content, aretrieve_batch
-from openai import AsyncOpenAI
+import batchlane as bl
 
 from ..exceptions import ValidationError
 from ..logger import get_logger
@@ -61,12 +30,7 @@ from ..param_policy import (
     completion_params,
     resolved_max_tokens,
 )
-from .judge import (
-    _JPEG_SUFFIXES,
-    JudgeResult,
-    build_judge_messages,
-    build_judge_result,
-)
+from .judge import _JPEG_SUFFIXES, JudgeResult, build_judge_messages, build_judge_result
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -75,25 +39,10 @@ if TYPE_CHECKING:
 
 logger = get_logger("api.batch")
 
-# Inline batch payloads are capped at ~20 MB; leave headroom for JSON overhead.
-_INLINE_CHUNK_BYTES = 18 * 1024 * 1024
-
-# Batch statuses that mean "no further polling" (OpenAI/litellm vocabulary).
-_LITELLM_TERMINAL = frozenset({"completed", "failed", "cancelled", "expired"})
-# Substrings that mark a terminal google-genai batch job state.
-_GENAI_TERMINAL = ("SUCCEEDED", "FAILED", "EXPIRED", "CANCELLED")
-_OPENAI_TERMINAL = frozenset({"completed", "failed", "cancelled", "expired"})
-
 _OPENAI_REASONING_EFFORTS = frozenset({"none", "low", "medium", "high", "xhigh", "max"})
 _OPENAI_IMAGE_DETAILS = frozenset({"auto", "low", "high", "original"})
-
-_ZERO_USAGE: dict[str, int] = {
-    "prompt_tokens": 0,
-    "completion_tokens": 0,
-    "total_tokens": 0,
-}
-
-_BATCH_FINGERPRINT_VERSION = b"layoutlens-batch-request-v3"
+_ZERO_USAGE = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+_BATCH_FINGERPRINT_VERSION = b"layoutlens-batch-request-v4"
 
 
 @dataclass(slots=True)
@@ -138,9 +87,6 @@ def batch_usage_summary(results: dict[str, JudgeResult]) -> dict[str, Any]:
         if model
         else None,
     }
-
-
-# --- shared helpers -------------------------------------------------------
 
 
 def _mime_for(image_path: str | Path) -> str:
@@ -397,42 +343,6 @@ def _split_missing_images(
     return valid
 
 
-# --- litellm file-based backend -------------------------------------------
-
-# LiteLLM's batch helpers accept these custom_llm_provider values. NOTE: as of
-# litellm 1.80.10, BOTH ``acreate_file`` AND ``acreate_batch`` restrict
-# custom_llm_provider to openai/azure/vertex_ai/bedrock/hosted_vllm — NEITHER
-# lists "anthropic" (only aretrieve_batch/afile_content do). So a native
-# Anthropic/Claude model cannot even create a batch through litellm: it is FULLY
-# unsupported, not partially. ``judge_batch`` therefore fails loud and helpful at
-# submit time for such models (see ``_judge_batch_litellm``) rather than letting
-# a cryptic litellm error surface mid-run. Run Claude synchronously via
-# ``judge()``, or route it through Vertex.
-_LITELLM_PROVIDER_PREFIXES = frozenset(
-    {"openai", "azure", "vertex_ai", "bedrock", "anthropic", "hosted_vllm", "vertex"}
-)
-
-
-def _litellm_provider_for(model: str) -> str:
-    """Derive the ``custom_llm_provider`` for a litellm batch from ``model``.
-
-    Uses the explicit ``provider/`` prefix when present, else infers from the
-    bare model family (``gpt``/``o1``/``o3``/``o4`` -> openai, ``claude`` ->
-    anthropic), defaulting to ``openai``.
-    """
-    lowered = (model or "").lower()
-    if "/" in lowered:
-        prefix = lowered.split("/", 1)[0]
-        if prefix in _LITELLM_PROVIDER_PREFIXES:
-            return "vertex_ai" if prefix == "vertex" else prefix
-    bare = _normalize_model(model)
-    if bare.startswith(("gpt", "o1", "o3", "o4")):
-        return "openai"
-    if bare.startswith("claude"):
-        return "anthropic"
-    return "openai"
-
-
 def _litellm_body(
     lens: LayoutLens, req: BatchRequest, max_tokens: int
 ) -> dict[str, Any]:
@@ -442,239 +352,6 @@ def _litellm_body(
         "messages": build_judge_messages(lens, req.image_path, req.prompt),
         **completion_params(lens.model, temperature=0.0, max_tokens=max_tokens),
     }
-
-
-def _litellm_jsonl(
-    lens: LayoutLens, requests: list[BatchRequest], max_tokens: int
-) -> bytes:
-    """Encode the batch input JSONL (one line per request, keyed by custom_id)."""
-    lines = [
-        json.dumps(
-            {
-                "custom_id": req.id,
-                "method": "POST",
-                "url": "/v1/chat/completions",
-                "body": _litellm_body(lens, req, max_tokens),
-            }
-        )
-        for req in requests
-    ]
-    return ("\n".join(lines) + "\n").encode("utf-8")
-
-
-def _parse_litellm_output(
-    lens: LayoutLens, text: str, prompts: dict[str, str] | None = None
-) -> dict[str, JudgeResult]:
-    """Parse a batch output JSONL body into ``{custom_id: JudgeResult}``."""
-    out: dict[str, JudgeResult] = {}
-    for line in text.splitlines():
-        if not line.strip():
-            continue
-        try:
-            rec = json.loads(line)
-        except (json.JSONDecodeError, ValueError):
-            continue
-        cid = rec.get("custom_id")
-        if cid is None:
-            continue
-        body = ((rec.get("response") or {}).get("body")) or {}
-        choices = body.get("choices") or [{}]
-        first = choices[0] or {}
-        raw = (first.get("message") or {}).get("content") or ""
-        finish = first.get("finish_reason")
-        usage_raw = body.get("usage") or {}
-        usage = {
-            "prompt_tokens": int(usage_raw.get("prompt_tokens", 0) or 0),
-            "completion_tokens": int(usage_raw.get("completion_tokens", 0) or 0),
-            "total_tokens": int(usage_raw.get("total_tokens", 0) or 0),
-        }
-        out[cid] = build_judge_result(
-            lens, raw, usage, finish, prompt=(prompts or {}).get(str(cid), "")
-        )
-    return out
-
-
-async def _collect_litellm_job(
-    lens: LayoutLens,
-    job: dict[str, Any],
-    provider: str,
-    poll_interval: float,
-    poll_timeout: float,
-    prompts: dict[str, str],
-) -> dict[str, JudgeResult]:
-    """Poll one prior/just-submitted litellm batch to completion and parse it.
-
-    Returns ``{}`` (its ids stay uncovered) if the batch failed or produced no
-    output file, so those ids fall back to unknown rather than crashing.
-    """
-    batch_id = job["batch_id"]
-    deadline = time.monotonic() + poll_timeout
-    # The reportArgumentType ignores on custom_llm_provider (here and below):
-    # litellm's Literal understates the providers its batch API accepts.
-    batch = await aretrieve_batch(
-        batch_id,
-        custom_llm_provider=provider,  # pyright: ignore[reportArgumentType]
-        api_key=lens.api_key,
-        api_base=lens.api_base,
-    )
-    while str(getattr(batch, "status", "")) not in _LITELLM_TERMINAL:
-        if time.monotonic() > deadline:
-            raise TimeoutError(
-                f"litellm batch {batch_id} did not finish within {poll_timeout}s"
-            )
-        await asyncio.sleep(poll_interval)
-        batch = await aretrieve_batch(
-            batch_id,
-            custom_llm_provider=provider,  # pyright: ignore[reportArgumentType]
-            api_key=lens.api_key,
-            api_base=lens.api_base,
-        )
-
-    if str(getattr(batch, "status", "")) != "completed":
-        logger.warning(
-            "litellm batch %s ended in status %s",
-            batch_id,
-            getattr(batch, "status", "?"),
-        )
-        return {}
-    output_file_id = getattr(batch, "output_file_id", None)
-    if not output_file_id:
-        return {}
-    content = await afile_content(
-        output_file_id,
-        custom_llm_provider=provider,  # pyright: ignore[reportArgumentType]
-        api_key=lens.api_key,
-        api_base=lens.api_base,
-    )
-    # litellm's return union includes a streaming variant this call never
-    # produces; the hasattr guard handles the real (buffered) shapes.
-    text = content.text if hasattr(content, "text") else content.content.decode("utf-8")  # pyright: ignore[reportAttributeAccessIssue]
-    return _parse_litellm_output(lens, text, prompts)
-
-
-async def _judge_batch_litellm(
-    lens: LayoutLens,
-    requests: list[BatchRequest],
-    max_tokens_value: int,
-    resume: bool,
-    manifest_path: Path,
-    poll_interval: float,
-    poll_timeout: float,
-    fingerprint: str,
-) -> dict[str, JudgeResult]:
-    """Litellm file-based batch backend (see module docstring).
-
-    Raises:
-        ValidationError: For a native Anthropic/Claude model — litellm 1.80.10
-            supports neither ``acreate_file`` nor ``acreate_batch`` for the
-            ``anthropic`` provider, so a batch cannot be created at all.
-    """
-    provider = _litellm_provider_for(lens.model)
-    if provider == "anthropic":
-        raise ValidationError(
-            "Anthropic batch is not supported by litellm 1.80.10 "
-            "(neither acreate_file nor acreate_batch accept the 'anthropic' provider). "
-            f"Use judge() (synchronous) for Claude model '{lens.model}', or run Claude via Vertex "
-            "(vertex_ai/…) for batch.",
-            field="model",
-            value=lens.model,
-        )
-    results: dict[str, JudgeResult] = {}
-    valid = _split_missing_images(lens, requests, results)
-
-    manifest = _resume_manifest(
-        manifest_path,
-        resume=resume,
-        fingerprint=fingerprint,
-        model=lens.model,
-        backend="litellm",
-        max_tokens=max_tokens_value,
-        reasoning_effort=None,
-        image_detail="auto",
-    )
-    jobs: list[dict[str, Any]] = list(manifest.get("jobs", [])) if resume else []
-    requested = {request.id for request in valid}
-    prompts = {request.id: request.prompt for request in valid}
-    covered: set[str] = set()
-    for job in jobs:
-        covered |= {
-            request_id for request_id in job.get("ids", []) if request_id in requested
-        }
-        collected = await _collect_litellm_job(
-            lens, job, provider, poll_interval, poll_timeout, prompts
-        )
-        collected = {
-            request_id: result
-            for request_id, result in collected.items()
-            if request_id in requested
-        }
-        results.update(collected)
-
-    remaining = [r for r in valid if r.id not in covered]
-    if remaining:
-        jsonl = _litellm_jsonl(lens, remaining, max_tokens_value)
-        file_obj = await acreate_file(
-            file=jsonl,
-            purpose="batch",
-            custom_llm_provider=provider,  # pyright: ignore[reportArgumentType]
-            api_key=lens.api_key,
-            api_base=lens.api_base,
-        )
-        batch = await acreate_batch(
-            input_file_id=file_obj.id,
-            endpoint="/v1/chat/completions",
-            completion_window="24h",
-            custom_llm_provider=provider,  # pyright: ignore[reportArgumentType]
-            api_key=lens.api_key,
-            api_base=lens.api_base,
-        )
-        job = {
-            "batch_id": batch.id,
-            "input_file_id": file_obj.id,
-            "ids": [r.id for r in remaining],
-        }
-        jobs.append(job)
-        # Persist before polling so interruption during the wait leaves the
-        # submitted job recoverable on the next resume.
-        _write_manifest(
-            manifest_path,
-            {
-                "fingerprint": fingerprint,
-                "model": lens.model,
-                "backend": "litellm",
-                "max_tokens": max_tokens_value,
-                "reasoning_effort": None,
-                "image_detail": "auto",
-                "jobs": jobs,
-            },
-        )
-        collected = await _collect_litellm_job(
-            lens, job, provider, poll_interval, poll_timeout, prompts
-        )
-        results.update(
-            {
-                request_id: result
-                for request_id, result in collected.items()
-                if request_id in requested
-            }
-        )
-
-    for req in valid:
-        results.setdefault(
-            req.id, _unknown_result(lens, "no batch response", req.prompt)
-        )
-    return results
-
-
-# --- native OpenAI Responses Batch backend -------------------------------
-
-
-def _openai_client(lens: LayoutLens) -> AsyncOpenAI:
-    """Build the official async OpenAI client (patchable in offline tests)."""
-    kwargs: dict[str, Any] = {"api_key": lens.api_key}
-    if lens.api_base:
-        kwargs["base_url"] = lens.api_base
-    return AsyncOpenAI(**kwargs)
 
 
 def _openai_body(
@@ -715,35 +392,6 @@ def _openai_body(
     return body
 
 
-def _openai_jsonl(
-    lens: LayoutLens,
-    requests: list[BatchRequest],
-    max_tokens: int,
-    *,
-    reasoning_effort: str | None,
-    image_detail: str,
-) -> bytes:
-    """Encode native Responses Batch JSONL keyed by caller-owned ids."""
-    lines = [
-        json.dumps(
-            {
-                "custom_id": request.id,
-                "method": "POST",
-                "url": "/v1/responses",
-                "body": _openai_body(
-                    lens,
-                    request,
-                    max_tokens,
-                    reasoning_effort=reasoning_effort,
-                    image_detail=image_detail,
-                ),
-            }
-        )
-        for request in requests
-    ]
-    return ("\n".join(lines) + "\n").encode("utf-8")
-
-
 def _responses_output_text(body: dict[str, Any]) -> str:
     """Join every Responses API ``output_text`` block in provider order."""
     texts: list[str] = []
@@ -756,461 +404,6 @@ def _responses_output_text(body: dict[str, Any]) -> str:
             if isinstance(content, dict) and content.get("type") == "output_text"
         )
     return "\n".join(text for text in texts if text)
-
-
-def _parse_openai_output(
-    lens: LayoutLens, text: str, prompts: dict[str, str] | None = None
-) -> dict[str, JudgeResult]:
-    """Parse a native Responses Batch output JSONL file."""
-    results: dict[str, JudgeResult] = {}
-    for line in text.splitlines():
-        if not line.strip():
-            continue
-        try:
-            record = json.loads(line)
-        except (json.JSONDecodeError, ValueError):
-            continue
-        request_id = record.get("custom_id")
-        response = record.get("response") or {}
-        body = response.get("body") or {}
-        if request_id is None or not isinstance(body, dict):
-            continue
-        error = record.get("error") or body.get("error")
-        status_code = response.get("status_code")
-        if error or (isinstance(status_code, int) and status_code >= 400):
-            message = (
-                error.get("message")
-                if isinstance(error, dict)
-                else str(error or f"HTTP {status_code}")
-            )
-            logger.warning("OpenAI batch request %s failed: %s", request_id, message)
-            results[str(request_id)] = _unknown_result(
-                lens,
-                f"OpenAI batch line error: {message}",
-                (prompts or {}).get(str(request_id), ""),
-            )
-            continue
-        usage_raw = body.get("usage") or {}
-        details = usage_raw.get("output_tokens_details") or {}
-        usage = {
-            "prompt_tokens": int(usage_raw.get("input_tokens", 0) or 0),
-            "completion_tokens": int(usage_raw.get("output_tokens", 0) or 0),
-            "total_tokens": int(usage_raw.get("total_tokens", 0) or 0),
-            "thought_tokens": int(details.get("reasoning_tokens", 0) or 0),
-        }
-        incomplete = body.get("incomplete_details") or {}
-        finish_reason = (
-            "length" if incomplete.get("reason") == "max_output_tokens" else None
-        )
-        results[str(request_id)] = build_judge_result(
-            lens,
-            _responses_output_text(body),
-            usage,
-            finish_reason,
-            prompt=(prompts or {}).get(str(request_id), ""),
-        )
-    return results
-
-
-def _file_content_text(content: Any) -> str:
-    """Read text from OpenAI SDK buffered file-content response shapes."""
-    text_value = getattr(content, "text", None)
-    if isinstance(text_value, str):
-        return text_value
-    raw = getattr(content, "content", b"")
-    if isinstance(raw, bytes):
-        return raw.decode("utf-8")
-    return str(raw or "")
-
-
-async def _collect_openai_job(
-    lens: LayoutLens,
-    client: AsyncOpenAI,
-    job: dict[str, Any],
-    poll_interval: float,
-    poll_timeout: float,
-    prompts: dict[str, str],
-) -> dict[str, JudgeResult]:
-    """Collect one submitted OpenAI batch without ever resubmitting it."""
-    batch_id = job["batch_id"]
-    deadline = time.monotonic() + poll_timeout
-    batch = await client.batches.retrieve(batch_id)
-    while str(getattr(batch, "status", "")) not in _OPENAI_TERMINAL:
-        if time.monotonic() > deadline:
-            raise TimeoutError(
-                f"OpenAI batch {batch_id} did not finish within {poll_timeout}s"
-            )
-        await asyncio.sleep(poll_interval)
-        batch = await client.batches.retrieve(batch_id)
-    if str(getattr(batch, "status", "")) != "completed":
-        logger.warning(
-            "OpenAI batch %s ended in status %s",
-            batch_id,
-            getattr(batch, "status", "?"),
-        )
-        return {}
-    output_file_id = getattr(batch, "output_file_id", None)
-    if not output_file_id:
-        return {}
-    content = await client.files.content(output_file_id)
-    return _parse_openai_output(lens, _file_content_text(content), prompts)
-
-
-async def _judge_batch_openai(
-    lens: LayoutLens,
-    requests: list[BatchRequest],
-    max_tokens_value: int,
-    resume: bool,
-    manifest_path: Path,
-    poll_interval: float,
-    poll_timeout: float,
-    fingerprint: str,
-    reasoning_effort: str | None,
-    image_detail: str,
-) -> dict[str, JudgeResult]:
-    """Official OpenAI Responses Batch backend."""
-    results: dict[str, JudgeResult] = {}
-    valid = _split_missing_images(lens, requests, results)
-    if not valid:
-        return results
-    manifest = _resume_manifest(
-        manifest_path,
-        resume=resume,
-        fingerprint=fingerprint,
-        model=lens.model,
-        backend="openai-responses",
-        max_tokens=max_tokens_value,
-        reasoning_effort=reasoning_effort,
-        image_detail=image_detail,
-    )
-    jobs: list[dict[str, Any]] = list(manifest.get("jobs", [])) if resume else []
-    requested = {request.id for request in valid}
-    prompts = {request.id: request.prompt for request in valid}
-    client = _openai_client(lens)
-    covered: set[str] = set()
-    for job in jobs:
-        covered |= {
-            request_id for request_id in job.get("ids", []) if request_id in requested
-        }
-        collected = await _collect_openai_job(
-            lens, client, job, poll_interval, poll_timeout, prompts
-        )
-        collected = {
-            request_id: result
-            for request_id, result in collected.items()
-            if request_id in requested
-        }
-        results.update(collected)
-
-    remaining = [request for request in valid if request.id not in covered]
-    if remaining:
-        jsonl = _openai_jsonl(
-            lens,
-            remaining,
-            max_tokens_value,
-            reasoning_effort=reasoning_effort,
-            image_detail=image_detail,
-        )
-        input_file = await client.files.create(
-            file=("layoutlens-batch.jsonl", jsonl, "application/jsonl"),
-            purpose="batch",
-        )
-        batch = await client.batches.create(
-            input_file_id=input_file.id,
-            endpoint="/v1/responses",
-            completion_window="24h",
-        )
-        job = {
-            "batch_id": batch.id,
-            "input_file_id": input_file.id,
-            "ids": [request.id for request in remaining],
-        }
-        jobs.append(job)
-        _write_manifest(
-            manifest_path,
-            {
-                "fingerprint": fingerprint,
-                "model": lens.model,
-                "backend": "openai-responses",
-                "max_tokens": max_tokens_value,
-                "reasoning_effort": reasoning_effort,
-                "image_detail": image_detail,
-                "jobs": jobs,
-            },
-        )
-        collected = await _collect_openai_job(
-            lens, client, job, poll_interval, poll_timeout, prompts
-        )
-        results.update(
-            {
-                request_id: result
-                for request_id, result in collected.items()
-                if request_id in requested
-            }
-        )
-
-    for request in valid:
-        results.setdefault(
-            request.id, _unknown_result(lens, "no batch response", request.prompt)
-        )
-    return results
-
-
-# --- google-genai inline backend ------------------------------------------
-
-
-def _genai_client(lens: LayoutLens):
-    """Build a google-genai client (lazy import; patchable in tests).
-
-    Raises:
-        ImportError: If the optional ``google-genai`` dependency is absent.
-    """
-    import os
-
-    try:
-        from google import genai  # pyright: ignore[reportAttributeAccessIssue]
-        from google.genai import types  # pyright: ignore[reportMissingImports]
-    except ImportError as exc:  # pragma: no cover - exercised only without the extra
-        raise ImportError(
-            "The gemini/ batch backend requires google-genai. Install it with: pip install 'layoutlens[gemini]'"
-        ) from exc
-
-    api_key = lens.api_key or os.environ.get("GEMINI_API_KEY")
-    http_options = types.HttpOptions(base_url=lens.api_base) if lens.api_base else None
-    return genai.Client(api_key=api_key, http_options=http_options)
-
-
-def _genai_inline_request(req: BatchRequest, max_tokens: int) -> dict[str, Any]:
-    """Build the InlinedRequest kwargs for ``req`` as a plain dict.
-
-    Plain dict (not a google-genai type) so payload construction is pure and
-    offline-testable; :func:`_submit_genai_chunk` wraps it in the SDK types. The
-    text part is the caller's prompt VERBATIM (parity with :func:`judge`).
-    """
-    b64 = base64.b64encode(Path(req.image_path).read_bytes()).decode("ascii")
-    return {
-        "contents": [
-            {
-                "parts": [
-                    {"text": req.prompt},
-                    {
-                        "inline_data": {
-                            "mime_type": _mime_for(req.image_path),
-                            "data": b64,
-                        }
-                    },
-                ]
-            }
-        ],
-        "config": {"max_output_tokens": max_tokens},
-        "metadata": {"req_id": req.id},
-    }
-
-
-def _chunk_genai(
-    payloads: list[tuple[BatchRequest, dict[str, Any]]],
-) -> list[list[tuple[BatchRequest, dict[str, Any]]]]:
-    """Split (request, inline-dict) pairs into chunks under the inline size cap."""
-    chunks: list[list[tuple[BatchRequest, dict[str, Any]]]] = []
-    cur: list[tuple[BatchRequest, dict[str, Any]]] = []
-    cur_bytes = 0
-    for req, payload in payloads:
-        parts = payload["contents"][0]["parts"]
-        size = len(parts[1]["inline_data"]["data"]) + len(parts[0]["text"])
-        if cur and cur_bytes + size > _INLINE_CHUNK_BYTES:
-            chunks.append(cur)
-            cur, cur_bytes = [], 0
-        cur.append((req, payload))
-        cur_bytes += size
-    if cur:
-        chunks.append(cur)
-    return chunks
-
-
-def _submit_genai_chunk(
-    client,
-    model: str,
-    chunk: list[tuple[BatchRequest, dict[str, Any]]],
-    max_tokens: int,
-    display_name: str,
-) -> str:
-    """Wrap a chunk in google-genai types, submit it, return the job name.
-
-    Isolated so tests can patch it (bypassing the SDK type wrapping) while the
-    rest of the orchestration is exercised.
-    """
-    from google.genai import types  # pyright: ignore[reportMissingImports]
-
-    reqs = [
-        types.InlinedRequest(
-            contents=payload["contents"],
-            config=types.GenerateContentConfig(max_output_tokens=max_tokens),
-            metadata=payload["metadata"],
-        )
-        for _req, payload in chunk
-    ]
-    job = client.batches.create(
-        model=model, src=reqs, config={"display_name": display_name}
-    )
-    return job.name
-
-
-def _genai_usage(um: Any) -> dict[str, int]:
-    """Input/output/total split from a Gemini usage_metadata (output includes thinking)."""
-    if um is None:
-        return dict(_ZERO_USAGE)
-    prompt = int(getattr(um, "prompt_token_count", 0) or 0)
-    total = int(getattr(um, "total_token_count", 0) or 0)
-    return {
-        "prompt_tokens": prompt,
-        "completion_tokens": max(total - prompt, 0),
-        "total_tokens": total,
-    }
-
-
-def _genai_finish_reason(resp: Any) -> str | None:
-    """Normalize a Gemini candidate finish reason to the judge vocabulary.
-
-    Returns ``"length"`` when the candidate stopped on ``MAX_TOKENS`` (so
-    :func:`build_judge_result` flags truncation), else None.
-    """
-    try:
-        reason = str(resp.candidates[0].finish_reason)
-    except (AttributeError, IndexError, TypeError):
-        return None
-    return "length" if "MAX_TOKENS" in reason else None
-
-
-async def _collect_genai_job(
-    client, job_name: str, poll_interval: float, poll_timeout: float
-) -> dict[str, dict[str, Any]]:
-    """Poll one genai batch job to completion; return {req_id: {text, usage, finish}}."""
-    deadline = time.monotonic() + poll_timeout
-    job = client.batches.get(name=job_name)
-    while not any(state in str(job.state) for state in _GENAI_TERMINAL):
-        if time.monotonic() > deadline:
-            raise TimeoutError(
-                f"genai batch {job_name} did not finish within {poll_timeout}s (state {job.state})"
-            )
-        await asyncio.sleep(poll_interval)
-        job = client.batches.get(name=job_name)
-    if "SUCCEEDED" not in str(job.state):
-        logger.warning("genai batch %s ended in state %s", job_name, job.state)
-        return {}
-
-    out: dict[str, dict[str, Any]] = {}
-    dest = getattr(job, "dest", None)
-    for r in getattr(dest, "inlined_responses", None) or []:
-        md = getattr(r, "metadata", None) or {}
-        req_id = md.get("req_id")
-        if req_id is None:
-            continue
-        resp = getattr(r, "response", None)
-        text = getattr(resp, "text", None) if resp is not None else None
-        usage = _genai_usage(
-            getattr(resp, "usage_metadata", None) if resp is not None else None
-        )
-        finish = _genai_finish_reason(resp) if resp is not None else None
-        out[req_id] = {"text": text, "usage": usage, "finish": finish}
-    return out
-
-
-async def _judge_batch_genai(
-    lens: LayoutLens,
-    requests: list[BatchRequest],
-    max_tokens_value: int,
-    resume: bool,
-    manifest_path: Path,
-    poll_interval: float,
-    poll_timeout: float,
-    fingerprint: str,
-) -> dict[str, JudgeResult]:
-    """google-genai inline batch backend (see module docstring)."""
-    display_name = f"layoutlens-batch:{lens.model}"
-    # google-genai wants the bare model id (``gemini-3-flash-preview``); ``lens.model`` carries
-    # the LiteLLM ``gemini/`` prefix that routes here — strip it for the batch call.
-    genai_model = (
-        lens.model.split("/", 1)[1]
-        if lens.model.lower().startswith("gemini/")
-        else lens.model
-    )
-    results: dict[str, JudgeResult] = {}
-    valid = _split_missing_images(lens, requests, results)
-
-    manifest = _resume_manifest(
-        manifest_path,
-        resume=resume,
-        fingerprint=fingerprint,
-        model=lens.model,
-        backend="genai",
-        max_tokens=max_tokens_value,
-        reasoning_effort=None,
-        image_detail="auto",
-    )
-    payloads = [(req, _genai_inline_request(req, max_tokens_value)) for req in valid]
-    client = _genai_client(lens)
-    jobs: list[dict[str, Any]] = list(manifest.get("jobs", [])) if resume else []
-    covered: set[str] = set()
-    collected: dict[str, dict[str, Any]] = {}
-    requested = {request.id for request in valid}
-    for job in jobs:
-        covered |= {
-            request_id for request_id in job.get("ids", []) if request_id in requested
-        }
-        got = await _collect_genai_job(
-            client, job["job_name"], poll_interval, poll_timeout
-        )
-        got = {
-            request_id: result
-            for request_id, result in got.items()
-            if request_id in requested
-        }
-        collected.update(got)
-
-    remaining = [(req, payload) for req, payload in payloads if req.id not in covered]
-    # Submit ALL remaining chunks first (each ~1 API call, flushed to the
-    # manifest), then poll+collect — so a kill during polling leaves every job
-    # submitted (the next resume just collects).
-    new_jobs: list[str] = []
-    for chunk in _chunk_genai(remaining):
-        job_name = _submit_genai_chunk(
-            client, genai_model, chunk, max_tokens_value, display_name
-        )
-        new_jobs.append(job_name)
-        jobs.append({"job_name": job_name, "ids": [req.id for req, _ in chunk]})
-        _write_manifest(
-            manifest_path,
-            {
-                "fingerprint": fingerprint,
-                "model": lens.model,
-                "backend": "genai",
-                "max_tokens": max_tokens_value,
-                "reasoning_effort": None,
-                "image_detail": "auto",
-                "jobs": jobs,
-            },
-        )
-    for job_name in new_jobs:
-        collected.update(
-            await _collect_genai_job(client, job_name, poll_interval, poll_timeout)
-        )
-
-    for req in valid:
-        got = collected.get(req.id)
-        if got is None:
-            results[req.id] = _unknown_result(lens, "no batch response", req.prompt)
-        else:
-            results[req.id] = build_judge_result(
-                lens,
-                got["text"] or "",
-                got["usage"],
-                got["finish"],
-                prompt=req.prompt,
-            )
-    return results
-
-
-# --- dispatch -------------------------------------------------------------
 
 
 def _is_gemini_studio(model: str) -> bool:
@@ -1226,10 +419,10 @@ def _is_native_openai(lens: LayoutLens) -> bool:
 def _batch_backend_name(lens: LayoutLens) -> str:
     """Return the one backend selected by the model/provider contract."""
     if _is_gemini_studio(lens.model):
-        return "genai"
+        return "batchlane-chat"
     if _is_native_openai(lens):
-        return "openai-responses"
-    return "litellm"
+        return "batchlane-responses"
+    return "batchlane-chat"
 
 
 def _validate_backend_configuration(lens: LayoutLens) -> None:
@@ -1259,6 +452,244 @@ def _validate_backend_configuration(lens: LayoutLens) -> None:
         )
 
 
+def _litellm_provider_for(model: str) -> str:
+    """Resolve a provider prefix or the known bare model families."""
+    if "/" in model:
+        prefix = model.split("/", 1)[0]
+        return "vertex_ai" if prefix == "vertex" else prefix
+    return "anthropic" if model.startswith("claude") else "openai"
+
+
+def _batch_line(
+    lens: LayoutLens,
+    request: BatchRequest,
+    max_tokens: int,
+    reasoning_effort: str | None,
+    image_detail: str,
+) -> bl.BatchLine:
+    """Build a provider request without altering the caller's prompt or image."""
+    provider = _litellm_provider_for(lens.model)
+    model = (
+        lens.model
+        if lens.model.startswith(f"{provider}/")
+        else f"{provider}/{lens.model}"
+    )
+    if _is_native_openai(lens):
+        body = _openai_body(
+            lens,
+            request,
+            max_tokens,
+            reasoning_effort=reasoning_effort,
+            image_detail=image_detail,
+        )
+        return bl.BatchLine(
+            request.id,
+            model,
+            input=body.pop("input"),
+            params={k: v for k, v in body.items() if k != "model"},
+        )
+    body = _litellm_body(lens, request, max_tokens)
+    return bl.BatchLine(
+        request.id,
+        model,
+        body["messages"],
+        {k: v for k, v in body.items() if k not in {"model", "messages"}},
+    )
+
+
+def _judgment(lens: LayoutLens, result: bl.RequestResult, prompt: str) -> JudgeResult:
+    """Preserve usage, refusal, and truncation while applying the shared parser."""
+    body = result.response or {}
+    if not result.ok or body.get("error"):
+        return _unknown_result(
+            lens, f"batch request failed: {result.error or body.get('error')}", prompt
+        )
+    usage_raw = body.get("usage") or {}
+    refusal = ""
+    if "output" in body:
+        raw = _responses_output_text(body)
+        refusal = "\n".join(
+            block.get("refusal", "")
+            for item in body.get("output") or []
+            if item.get("type") == "message"
+            for block in item.get("content") or []
+            if block.get("type") == "refusal"
+        )
+        usage = {
+            "prompt_tokens": int(usage_raw.get("input_tokens") or 0),
+            "completion_tokens": int(usage_raw.get("output_tokens") or 0),
+            "total_tokens": int(usage_raw.get("total_tokens") or 0),
+            "thought_tokens": int(
+                (usage_raw.get("output_tokens_details") or {}).get("reasoning_tokens")
+                or 0
+            ),
+        }
+        finish = (
+            "length"
+            if (body.get("incomplete_details") or {}).get("reason")
+            == "max_output_tokens"
+            else None
+        )
+    else:
+        choice = (body.get("choices") or [{}])[0]
+        raw = bl.answer_text(result) or ""
+        refusal = (choice.get("message") or {}).get("refusal") or ""
+        usage = {key: int(usage_raw.get(key) or 0) for key in _ZERO_USAGE}
+        details = usage_raw.get("completion_tokens_details") or {}
+        if details.get("reasoning_tokens") is not None:
+            usage["thought_tokens"] = int(details["reasoning_tokens"])
+        finish = choice.get("finish_reason")
+    judgment = build_judge_result(lens, raw or refusal, usage, finish, prompt=prompt)
+    if refusal:
+        judgment.refused = True
+        judgment.answer = "unknown"
+    return judgment
+
+
+async def _submit_all(
+    lines: list[bl.BatchLine], endpoint: str, journal: Path, api_key: str | None
+) -> list[bl.BatchHandle]:
+    """Keep the manifest lock until a cancelled submission thread has finished."""
+    task = asyncio.create_task(
+        asyncio.to_thread(
+            bl.submit_all, lines, endpoint=endpoint, checkpoint=journal, api_key=api_key
+        )
+    )
+    cancelled = False
+    while not task.done():
+        try:
+            await asyncio.shield(task)
+        except asyncio.CancelledError:
+            cancelled = True
+    if cancelled:
+        # The journal retains completed receipts even if the caller is cancelled.
+        if not task.cancelled():
+            task.exception()
+        raise asyncio.CancelledError
+    return task.result()
+
+
+async def _judge_batchlane(
+    lens: LayoutLens,
+    requests: list[BatchRequest],
+    max_tokens: int,
+    resume: bool,
+    path: Path,
+    poll_interval: float,
+    poll_timeout: float,
+    fingerprint: str,
+    reasoning_effort: str | None,
+    image_detail: str,
+) -> dict[str, JudgeResult]:
+    """Submit once, poll without blocking the event loop, and persist judgments."""
+    results: dict[str, JudgeResult] = {}
+    valid = sorted(_split_missing_images(lens, requests, results), key=lambda r: r.id)
+    if not valid:
+        return results
+    endpoint = "responses" if _is_native_openai(lens) else "chat.completions"
+    manifest = _resume_manifest(
+        path,
+        resume=resume,
+        fingerprint=fingerprint,
+        model=lens.model,
+        backend=_batch_backend_name(lens),
+        max_tokens=max_tokens,
+        reasoning_effort=reasoning_effort,
+        image_detail=image_detail,
+    )
+    lines = [
+        _batch_line(lens, request, max_tokens, reasoning_effort, image_detail)
+        for request in valid
+    ]
+    plan = await asyncio.to_thread(bl.plan, lines, endpoint=endpoint)
+    if not manifest:
+        manifest = {
+            "fingerprint": fingerprint,
+            "model": lens.model,
+            "backend": _batch_backend_name(lens),
+            "max_tokens": max_tokens,
+            "reasoning_effort": reasoning_effort,
+            "image_detail": image_detail,
+            "requests": [asdict(line) for line in lines],
+            "jobs": [],
+            "results": {},
+        }
+        _write_manifest(path, manifest)
+    elif manifest.get("requests") != [asdict(line) for line in lines]:
+        raise ValidationError(
+            "Saved batch payload does not match these requests.",
+            field="manifest_path",
+            value=str(path),
+        )
+    jobs = manifest["jobs"]
+    if not jobs:
+        handles = await _submit_all(
+            lines, endpoint, path.with_suffix(".batchlane.jsonl"), lens.api_key
+        )
+        jobs = [
+            {"handle": handle.to_json(), "ids": [line.custom_id for line in chunk]}
+            for handle, chunk in zip(handles, plan.chunks, strict=True)
+        ]
+        manifest["jobs"] = jobs
+        _write_manifest(path, manifest)
+    prompts = {request.id: request.prompt for request in valid}
+    results.update(
+        {
+            key: JudgeResult(**value)
+            for key, value in manifest.get("results", {}).items()
+        }
+    )
+    for job in jobs:
+        ids = set(job["ids"])
+        if ids <= results.keys():
+            continue
+        handle = bl.BatchHandle.from_json(job["handle"])
+        if handle.provider != plan.provider or handle.endpoint != endpoint:
+            raise ValidationError(
+                "Saved provider handle does not match this batch.",
+                field="manifest_path",
+                value=str(path),
+            )
+        deadline = time.monotonic() + poll_timeout
+        while True:
+            state = await asyncio.to_thread(bl.status, handle, api_key=lens.api_key)
+            if state.is_terminal:
+                break
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            await asyncio.sleep(min(poll_interval, remaining))
+        if not state.is_terminal:
+            continue
+        collected = await asyncio.to_thread(
+            lambda receipt=handle: list(bl.results(receipt, api_key=lens.api_key))
+        )
+        seen: set[str] = set()
+        for result in collected:
+            if result.custom_id not in ids or result.custom_id in seen:
+                raise ValidationError(
+                    "Unexpected or duplicate batch result ID.",
+                    field="custom_id",
+                    value=result.custom_id,
+                )
+            seen.add(result.custom_id)
+            results[result.custom_id] = _judgment(
+                lens, result, prompts[result.custom_id]
+            )
+        for request_id in ids:
+            results.setdefault(
+                request_id,
+                _unknown_result(lens, "no batch response", prompts[request_id]),
+            )
+        manifest["results"].update({key: asdict(results[key]) for key in ids})
+        _write_manifest(path, manifest)
+    for request in valid:
+        results.setdefault(
+            request.id, _unknown_result(lens, "batch still running", request.prompt)
+        )
+    return results
+
+
 async def judge_batch(
     lens: LayoutLens,
     requests: list[BatchRequest],
@@ -1273,12 +704,27 @@ async def judge_batch(
 ) -> dict[str, JudgeResult]:
     """Judge every request via a batch transport (see :meth:`LayoutLens.judge_batch`).
 
-    Module implementation so the litellm batch helpers and the genai client are
-    patchable at ``layoutlens.api.batch``.
+    Uses batchlane for transport and retains the shared judgment contract.
     """
     if not requests:
         return {}
 
+    if (
+        not math.isfinite(poll_interval)
+        or poll_interval <= 0
+        or not math.isfinite(poll_timeout)
+        or poll_timeout < 0
+    ):
+        raise ValidationError(
+            "Poll interval must be positive and timeout nonnegative.",
+            field="poll_interval",
+        )
+    if lens.api_base:
+        raise ValidationError(
+            "Batch providers do not support a custom api_base.",
+            field="api_base",
+            value=lens.api_base,
+        )
     _validate_request_ids(requests)
     _validate_backend_configuration(lens)
     if (
@@ -1305,6 +751,7 @@ async def judge_batch(
             value=lens.provider,
         )
     max_tokens_value = resolved_max_tokens(lens.model, max_tokens)
+    bl.get_adapter(_litellm_provider_for(lens.model))
     lens._ensure_api_key()  # noqa: SLF001
     backend_name = _batch_backend_name(lens)
     fingerprint = _batch_fingerprint(
@@ -1358,31 +805,7 @@ async def judge_batch(
             )
 
     with _manifest_lock(path):
-        if _is_gemini_studio(lens.model):
-            return await _judge_batch_genai(
-                lens,
-                requests,
-                max_tokens_value,
-                resume,
-                path,
-                poll_interval,
-                poll_timeout,
-                fingerprint,
-            )
-        if native_openai:
-            return await _judge_batch_openai(
-                lens,
-                requests,
-                max_tokens_value,
-                resume,
-                path,
-                poll_interval,
-                poll_timeout,
-                fingerprint,
-                reasoning_effort,
-                image_detail,
-            )
-        return await _judge_batch_litellm(
+        return await _judge_batchlane(
             lens,
             requests,
             max_tokens_value,
@@ -1391,4 +814,6 @@ async def judge_batch(
             poll_interval,
             poll_timeout,
             fingerprint,
+            reasoning_effort,
+            image_detail,
         )

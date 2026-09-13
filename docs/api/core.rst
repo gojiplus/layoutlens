@@ -19,7 +19,7 @@ Result Classes
    :undoc-members:
    :show-inheritance:
 
-.. autoclass:: layoutlens.ComparisonResult
+.. autoclass:: layoutlens.DiffReport
    :members:
    :undoc-members:
    :show-inheritance:

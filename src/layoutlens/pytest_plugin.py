@@ -28,6 +28,7 @@ import pytest
 
 if TYPE_CHECKING:
     from .api.core import AnalysisResult
+    from .regression.policy import GatePolicy
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -122,12 +123,15 @@ class LayoutLensFixture:
             pytest.fail("\n".join(lines), pytrace=False)
         return result
 
-    def assert_layout(self, source: str, viewport: str = "desktop") -> AnalysisResult:
-        """Assert the deterministic layout scan measures no defects (keyless).
+    def assert_layout(
+        self, source: str, viewport: str = "desktop", *, policy: str = "qualified"
+    ) -> AnalysisResult:
+        """Apply an explicit gate policy to measured layout candidates (keyless).
 
         Args:
             source: URL or local HTML path to scan.
             viewport: Named viewport used for rendering.
+            policy: qualified (warnings), findings (strict), or nothing.
 
         Returns:
             Successful deterministic layout result.
@@ -136,11 +140,13 @@ class LayoutLensFixture:
             pytest.fail.Exception: Listing each measured defect with its
                 selector, measured values, and violated threshold.
         """
+        if policy not in {"qualified", "findings", "nothing"}:
+            raise ValueError("unknown gate policy")
         result = _run(
             self.lens.check_layout(source, viewport=viewport, mode="deterministic")
         )
         findings = result.metadata["layout"]["findings"]
-        if findings:
+        if findings and policy == "findings":
             lines = [f"Layout defects on {source} [{viewport}]:"]
             lines.extend(
                 f"  - {finding['defect_class']} at {finding['selector']}: "
@@ -148,7 +154,39 @@ class LayoutLensFixture:
                 for finding in findings
             )
             pytest.fail("\n".join(lines), pytrace=False)
+        if findings and policy == "qualified":
+            import warnings
+
+            warnings.warn(
+                f"{len(findings)} candidate layout findings require review",
+                stacklevel=2,
+            )
         return result
+
+    def assert_regression(self, before: str, after: str, *, policy: str = "qualified"):
+        """Assert a complete comparison passes the requested regression policy.
+
+        Args:
+            before: Baseline artifact, URL, or HTML source.
+            after: Candidate artifact, URL, or HTML source.
+            policy: qualified, findings, or nothing.
+
+        Returns:
+            The complete structured diff report.
+        """
+        from typing import cast
+
+        if policy not in {"qualified", "findings", "nothing"}:
+            raise ValueError("unknown gate policy")
+        report = _run(
+            self.lens.compare(before, after, policy=cast("GatePolicy", policy))
+        )
+        if report.gate_status != "pass":
+            pytest.fail(
+                report.summary() + "\n" + "\n".join(report.incomplete_reasons),
+                pytrace=False,
+            )
+        return report
 
     # -- LLM-backed assertion (skips without a key) ------------------------
 

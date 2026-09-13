@@ -45,8 +45,7 @@ async def website_analysis():
 async def compare_designs():
     """Compare two versions of a page.
 
-    compare() accepts URLs, local HTML files, or screenshot images; every
-    source is rendered and every screenshot goes to the model.
+    compare() captures browser evidence and returns structured deltas.
     """
 
     tester = LayoutLens()
@@ -55,16 +54,9 @@ async def compare_designs():
         "benchmarks/test_data/layout_alignment/nav_centered.html",
         "benchmarks/test_data/layout_alignment/nav_misaligned.html",
     ]
-    screenshots = await tester.capture(html_files)
+    result = await tester.compare(html_files[0], html_files[1])
 
-    # Compare the rendered screenshots
-    result = await tester.compare(
-        sources=[screenshots[path] for path in html_files],
-        query="Which layout has better navigation alignment?",
-    )
-
-    print(f"Comparison result: {result.answer}")
-    print(f"Confidence: {result.confidence:.1%}")
+    print(result.summary())
 
 
 # Example 4: Batch analysis

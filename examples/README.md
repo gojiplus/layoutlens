@@ -87,8 +87,8 @@ All examples use the actual LayoutLens API methods (all async):
 - `await analyze(source, query, viewport="desktop", context=None, max_concurrent=5)` - Analyze one
   or more pages/screenshots; pass a list to `source` and/or `query` to fan out concurrently (returns
   a `BatchResult` when there's more than one combination)
-- `await compare(sources, query, context=None)` - Compare multiple pages (URLs, local HTML
-  files, or screenshot images)
+- `await compare(before, after)` - Compare two render states, artifacts, URLs, or local HTML
+  files
 - `await capture(source, viewport="desktop")` - Render a URL/HTML file to a screenshot PNG
 
 ### Built-in Checks

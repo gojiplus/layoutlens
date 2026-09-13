@@ -89,7 +89,7 @@ def _layout_results(result_meta: dict[str, Any], source: str) -> tuple[list, dic
             {
                 "id": rule_id,
                 "shortDescription": {
-                    "text": f"Deterministic layout defect: {f['defect_class']}"
+                    "text": f"Candidate layout finding: {f['defect_class']}"
                 },
                 "properties": {"tags": f.get("wcag_refs", [])},
             },
@@ -97,7 +97,15 @@ def _layout_results(result_meta: dict[str, Any], source: str) -> tuple[list, dic
         out.append(
             {
                 "ruleId": rule_id,
-                "level": "warning",
+                "level": "error"
+                if f.get("gateability", {}).get("blocks")
+                else "warning",
+                "properties": {
+                    "level": f.get("level", "candidate"),
+                    "gateability": f.get("gateability", {}),
+                    "measured": f.get("measured", {}),
+                    "threshold": f.get("threshold", {}),
+                },
                 "message": {
                     "text": f"{f.get('description', f['defect_class'])} "
                     f"(measured: {f.get('measured')}, threshold: {f.get('threshold')})"
@@ -155,6 +163,66 @@ def to_sarif(results: list[AnalysisResult]) -> dict[str, Any]:
                     }
                 },
                 "results": all_results,
+            }
+        ],
+    }
+
+
+def diff_to_sarif(report) -> dict[str, Any]:
+    """Emit candidate regressions with measured evidence and baseline status."""
+    from . import __version__
+
+    results = []
+    for delta in report.deltas:
+        if not delta.defect_class:
+            continue
+        location = {"artifactLocation": {"uri": _artifact_uri(report.after)}}
+        source = next(
+            (s for s in delta.likely_source if s.get("file") and s.get("line")), None
+        )
+        if source:
+            location = {
+                "artifactLocation": {"uri": source["file"]},
+                "region": {"startLine": source["line"]},
+            }
+        results.append(
+            {
+                "ruleId": f"layout/{delta.defect_class}",
+                "level": "error" if delta.gateability.get("blocks") else "warning",
+                "baselineState": {
+                    "introduced": "new",
+                    "resolved": "absent",
+                    "unchanged": "unchanged",
+                }.get(delta.status, "updated"),
+                "message": {
+                    "text": f"{delta.level}: {delta.defect_class} at {delta.element} ({delta.status})"
+                },
+                "locations": [
+                    {
+                        "physicalLocation": location,
+                        "logicalLocations": [
+                            {"name": delta.element, "kind": "element"}
+                        ],
+                    }
+                ],
+                "properties": delta.model_dump(),
+            }
+        )
+    return {
+        "version": SARIF_VERSION,
+        "$schema": SARIF_SCHEMA,
+        "runs": [
+            {
+                "tool": {"driver": {"name": "LayoutLens", "version": __version__}},
+                "results": results,
+                "properties": {
+                    "gate_status": report.gate_status,
+                    "policy": report.policy,
+                    "incomplete_reasons": report.incomplete_reasons,
+                },
+                "invocations": [
+                    {"executionSuccessful": report.gate_status != "incomplete"}
+                ],
             }
         ],
     }

@@ -9,7 +9,7 @@ from .a11y import AXE_VERSION, A11yFinding, A11yReport, AxeAuditor
 
 # Import the main API
 from .api.batch import BatchRequest, batch_usage_summary
-from .api.core import AnalysisResult, BatchResult, ComparisonResult, LayoutLens
+from .api.core import AnalysisResult, BatchResult, LayoutLens
 from .api.judge import JudgeResult
 from .api.test_suite import UITestCase, UITestResult, UITestSuite
 from .cache import AnalysisCache, create_cache
@@ -44,6 +44,16 @@ from .logger import (
 
 # Expert persona system
 from .prompts import Instructions, UserContext, get_expert, list_available_experts
+from .regression import (
+    DiffReport,
+    LayoutGraph,
+    Qualification,
+    RenderState,
+    Verification,
+    VisualDelta,
+)
+from .regression.capture import capture_page, capture_state
+from .regression.diff import diff
 from .types import (
     CacheType,
     CacheTypeType,
@@ -71,11 +81,11 @@ __all__ = [
     "CacheType",
     "CacheTypeType",
     "Capture",
-    "ComparisonResult",
     # Types and Enums
     "ComplianceLevel",
     "ComplianceLevelType",
     "ConfigurationError",
+    "DiffReport",
     "Expert",
     "ExpertType",
     # Expert persona system
@@ -83,20 +93,27 @@ __all__ = [
     "JudgeResult",
     "LayoutFileNotFoundError",
     "LayoutFinding",
+    "LayoutGraph",
     "LayoutLens",
     # Exceptions
     "LayoutLensError",
     "LayoutReport",
     # Deterministic layout/geometry scorers
     "LayoutScorer",
+    "Qualification",
+    "RenderState",
     "UITestCase",
     "UITestResult",
     "UITestSuite",
     "UserContext",
     "ValidationError",
+    "Verification",
     "Viewport",
     "ViewportType",
+    "VisualDelta",
     "batch_usage_summary",
+    "capture_page",
+    "capture_state",
     "check_contrast",
     "configure_for_development",
     "configure_for_production",
@@ -104,6 +121,7 @@ __all__ = [
     "configure_from_env",
     "contrast_ratio",
     "create_cache",
+    "diff",
     "element_geometry",
     "get_expert",
     "get_logger",

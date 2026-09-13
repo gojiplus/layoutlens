@@ -109,10 +109,10 @@ result = await lens.analyze(
 ### Compare Designs
 
 ```python
-# Compare two pages (URLs, local HTML files, or screenshot images)
+# Compare browser measurements from two page versions
 result = await lens.compare(
-    ["https://old-design.com", "https://new-design.com"],
-    "Which design is more user-friendly?",
+    "https://old-design.com",
+    "https://new-design.com",
 )
 ```
 
@@ -152,7 +152,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
 
       - name: Install LayoutLens
         run: |
@@ -211,14 +211,12 @@ result = await lens.analyze(source=urls, query=queries)  # returns a BatchResult
 print(f"Average confidence: {result.average_confidence:.1%}")
 ```
 
-### Cross-Browser Testing
-```python
-# Compare pre-captured screenshots from different browsers
-result = await lens.compare(
-    sources=["chrome.png", "firefox.png", "safari.png"],
-    query="Are these layouts consistent across browsers?",
-)
-```
+### Capture Conditions
+
+Structured regression currently supports Chromium. Baseline and candidate
+must share browser version, viewport, DPR, and environment settings. A
+mismatch produces an incomplete comparison. Other browsers and screenshot-only
+comparisons are outside this release's structured capture contract.
 
 ### Custom Context
 ```python
