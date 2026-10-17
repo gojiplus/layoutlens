@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING, Any
 
 from ..browser import BrowserConfig, open_page
 from ..types import Viewport, ViewportType
+from ._js import JS_HELPERS
 from .contrast import _JS_CONTRAST_SCAN, contrast_findings
 from .types import (
     CLIPPING,
@@ -40,55 +41,12 @@ if TYPE_CHECKING:
 
     from playwright.async_api import Page
 
-# Shared JS helpers injected into every detector snippet.
-_JS_HELPERS = """
-  function visible(el) {
-    const cs = getComputedStyle(el);
-    if (cs.display === 'none' || cs.visibility === 'hidden' || parseFloat(cs.opacity) === 0) return false;
-    const r = el.getBoundingClientRect();
-    return r.width > 0 && r.height > 0;
-  }
-  function queryAll(root, selector) {
-    const out = [...root.querySelectorAll(root.host && selector === 'body *' ? '*' : selector)];
-    for (const el of root.querySelectorAll('*')) if (el.shadowRoot) out.push(...queryAll(el.shadowRoot, selector));
-    return out;
-  }
-  function deepHit(x, y) {
-    let el = document.elementFromPoint(x, y), next;
-    while (el && el.shadowRoot && (next = el.shadowRoot.elementFromPoint(x, y)) && next !== el) el = next;
-    return el;
-  }
-  function containsDeep(parent, child) {
-    for (let el = child; el; el = el.parentElement || el.getRootNode().host) if (el === parent) return true;
-    return false;
-  }
-  function cssPath(el) {
-    if (el === document.documentElement) return 'html';
-    const root = el.getRootNode();
-    const prefix = root.host ? cssPath(root.host) + ' >>> ' : '';
-    if (el.id && root.querySelectorAll('#' + CSS.escape(el.id)).length === 1)
-      return prefix + '#' + CSS.escape(el.id);
-    const parts = [];
-    let node = el;
-    while (node && node.nodeType === 1 && node !== document.documentElement) {
-      if (node.id && root.querySelectorAll('#' + CSS.escape(node.id)).length === 1) {
-        parts.unshift('#' + CSS.escape(node.id)); break;
-      }
-      let sel = node.tagName.toLowerCase();
-      const parent = node.parentElement;
-      const siblings = [...(parent || root).children].filter(c => c.tagName === node.tagName);
-      if (siblings.length > 1) sel += ':nth-of-type(' + (siblings.indexOf(node) + 1) + ')';
-      parts.unshift(sel); node = parent;
-    }
-    return prefix + parts.join(' > ');
-  }
-"""
 
 # Overlap: pairwise bbox intersection among visible siblings (bench _JS_INTERSECT,
 # scanned per parent so it is O(children^2) per container, not O(n^2) over the page).
 _JS_OVERLAP = (
     "(minArea) => {"
-    + _JS_HELPERS
+    + JS_HELPERS
     + """
   const out = [];
   for (const parent of [...queryAll(document, '*'), ...queryAll(document, '*').map(el => el.shadowRoot).filter(Boolean)]) {
@@ -116,7 +74,7 @@ _JS_OVERLAP = (
 # knew the mutation set overflow:hidden and so did not need to re-test it).
 _JS_CLIP = (
     "(tol) => {"
-    + _JS_HELPERS
+    + JS_HELPERS
     + """
   const out = [];
   for (const el of queryAll(document, 'body *')) {
@@ -145,7 +103,7 @@ _JS_CLIP = (
 # flood the report with all its descendants.
 _JS_PROTRUDE = (
     "(tol) => {"
-    + _JS_HELPERS
+    + JS_HELPERS
     + """
   const out = [];
   const vw = document.documentElement.clientWidth;
@@ -194,7 +152,7 @@ _JS_PAGE_OVERFLOW = (
 # with hidden overflow; this isolates the "…" case designers care about.
 _JS_TRUNCATION = (
     "(tol) => {"
-    + _JS_HELPERS
+    + JS_HELPERS
     + """
   const out = [];
   for (const el of queryAll(document, 'body *')) {
@@ -220,7 +178,7 @@ _JS_TRUNCATION = (
 # human judgment and are disclosed in each finding rather than guessed.
 _JS_TARGETS = (
     "(minPx) => {"
-    + _JS_HELPERS
+    + JS_HELPERS
     + """
   const sel = 'a[href], button, input:not([type=hidden]), select, textarea, ' +
               '[role=button], [role=link], [role=checkbox], [role=radio], [onclick]';
@@ -307,7 +265,7 @@ _JS_TARGETS = (
 # occluder. It is a visual-quality rule, not a WCAG success criterion.
 _JS_TEXT_OCCLUSION = (
     "(samplesPerAxis) => {"
-    + _JS_HELPERS
+    + JS_HELPERS
     + """
   const out = [];
   const seen = new Set();
@@ -390,7 +348,7 @@ _JS_TEXT_OCCLUSION = (
 # reported. Scroll position and prior focus are restored after the scan.
 _JS_FOCUS_OBSCURED = (
     "(options) => { const {samplesPerAxis, probeFocus} = options;"
-    + _JS_HELPERS
+    + JS_HELPERS
     + """
   const selector = 'a[href], button, input:not([type=hidden]), select, textarea, summary, ' +
     '[tabindex]:not([tabindex="-1"]), [contenteditable="true"]';
