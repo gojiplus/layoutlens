@@ -556,20 +556,20 @@ def _judgment(lens: LayoutLens, result: bl.RequestResult, prompt: str) -> JudgeR
 async def _submit_all(
     lines: list[bl.BatchLine], endpoint: str, journal: Path, api_key: str | None
 ) -> list[bl.BatchHandle]:
-    """Keep the manifest lock until a cancelled submission thread has finished."""
+    """Keep the manifest lock until a canceled submission thread has finished."""
     task = asyncio.create_task(
         asyncio.to_thread(
             bl.submit_all, lines, endpoint=endpoint, checkpoint=journal, api_key=api_key
         )
     )
-    cancelled = False
+    canceled = False
     while not task.done():
         try:
             await asyncio.shield(task)
         except asyncio.CancelledError:
-            cancelled = True
-    if cancelled:
-        # The journal retains completed receipts even if the caller is cancelled.
+            canceled = True
+    if canceled:
+        # The journal retains completed receipts even if the caller is canceled.
         if not task.cancelled():
             task.exception()
         raise asyncio.CancelledError

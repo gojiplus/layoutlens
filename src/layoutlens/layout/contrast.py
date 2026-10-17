@@ -70,7 +70,7 @@ def parse_css_color(value: str) -> RGB:
         The ``(r, g, b)`` channels as integers 0..255.
 
     Raises:
-        ValueError: If ``value`` is not a recognised color form.
+        ValueError: If ``value`` is not a recognized color form.
     """
     s = value.strip()
     m = _HEX6.match(s)

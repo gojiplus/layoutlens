@@ -499,7 +499,7 @@ class LayoutScorer:
         occlusion_samples_per_axis: int = 5,
         probe_focus: bool = True,
     ):
-        """Initialise the scorer with detector thresholds.
+        """Initialize the scorer with detector thresholds.
 
         Args:
             min_target_px: Minimum interactive-target dimension in CSS px.

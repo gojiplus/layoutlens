@@ -217,6 +217,9 @@ link_ignore = [
 ]
 
 [tool.codespell]
+builtin = "clear,rare,en-GB_to_en-US"
+# Preserve the asyncio Task method name.
+ignore-regex = '''(?<=\.)cancelled(?=\()'''  # codespell:ignore cancelled
 # assets holds the vendored axe.min.js; benchmarks/results are frozen records
 # of real runs (honest-numbers policy) — neither may be edited. codespell
 # matches these globs against path components, not path prefixes.
