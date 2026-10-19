@@ -33,7 +33,7 @@ jobs:
           ref: be734a5d5293323d2dbe7c88cba2daadaeee1e4e
           path: consumers/bench
           persist-credentials: false
-      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           python-version: ${{ matrix.python }}
       - run: uv sync --frozen --all-groups --all-extras
