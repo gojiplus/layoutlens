@@ -4,6 +4,9 @@ All notable changes to LayoutLens are documented in this file.
 
 ## [Unreleased]
 
+- Wait for URL expectations before reading document evidence, avoiding an
+  execution-context race during WebKit navigation.
+
 ## [4.0.0] - 2026-09-12
 
 - Add stateful scenarios with keyboard, form, pointer, hover, resize, and route

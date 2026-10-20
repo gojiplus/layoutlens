@@ -315,7 +315,8 @@ async def run_scenario(
                 )
                 report.steps.append(result)
                 try:
-                    result.before = await page.evaluate(_OBSERVE)
+                    if step.action != "expect_url":
+                        result.before = await page.evaluate(_OBSERVE)
                     if step.target and step.action != "checkpoint":
                         target = await _locate(page, step.target)
                         if await target.count() == 1:
