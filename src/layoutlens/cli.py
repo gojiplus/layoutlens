@@ -6,12 +6,13 @@ import asyncio
 import json
 import os
 import sys
+from collections.abc import Awaitable
 from pathlib import Path
 
 import yaml
 from playwright.async_api import Error as PlaywrightError
 
-from .api.core import BatchResult, LayoutLens
+from .api.core import AnalysisResult, BatchResult, LayoutLens
 from .exceptions import LayoutLensError
 from .regression.capture import capture_state
 from .regression.models import DiffReport
@@ -47,6 +48,44 @@ def _browser_kwargs(args: argparse.Namespace) -> dict:
     return {name: getattr(args, name) for name in _BROWSER_KEYS}
 
 
+async def _collect(
+    work: Awaitable[list[AnalysisResult]],
+) -> list[AnalysisResult] | None:
+    try:
+        return await work
+    except LayoutLensError as e:
+        print(f"Error: {e}", file=sys.stderr)
+    except Exception as e:
+        print(f"Unexpected error: {e}", file=sys.stderr)
+    return None
+
+
+def _print_check_results(
+    results: list[AnalysisResult],
+    output: str,
+    label: str,
+    confidence_label: str,
+    *,
+    hide_unestimated_confidence: bool = False,
+) -> None:
+    if output == "sarif":
+        print(json.dumps(to_sarif(results), indent=2))
+    elif output == "json":
+        for result in results:
+            print(result.to_json())
+    else:
+        print()
+        for result in results:
+            print(f"📍 {result.source}")
+            print(f"{label}: {result.answer}")
+            unestimated = result.metadata.get("confidence_kind") == "not_estimated"
+            if not (hide_unestimated_confidence and unestimated):
+                print(f"📊 {confidence_label}: {result.confidence:.0%}")
+            if result.reasoning:
+                print(f"💭 {result.reasoning}")
+            print()
+
+
 async def _run_a11y(sources, args) -> int:
     """Run accessibility checks for each source and print results.
 
@@ -63,35 +102,20 @@ async def _run_a11y(sources, args) -> int:
         print(f"Error initializing LayoutLens: {e}", file=sys.stderr)
         return 1
 
-    try:
-        results = []
-        for source in sources:
-            result = await lens.check_accessibility(
+    async def check_all() -> list[AnalysisResult]:
+        return [
+            await lens.check_accessibility(
                 source, viewport=args.viewport, mode=args.a11y
             )
-            results.append(result)
-    except LayoutLensError as e:
-        print(f"Error: {e}", file=sys.stderr)
-        return 1
-    except Exception as e:
-        print(f"Unexpected error: {e}", file=sys.stderr)
-        return 1
+            for source in sources
+        ]
 
-    if args.output == "sarif":
-        print(json.dumps(to_sarif(results), indent=2))
-    elif args.output == "json":
-        for result in results:
-            print(result.to_json())
-    else:
-        print()
-        for result in results:
-            print(f"📍 {result.source}")
-            print(f"♿ Accessibility ({args.a11y}): {result.answer}")
-            print(f"📊 Confidence: {result.confidence:.0%}")
-            if result.reasoning:
-                print(f"💭 {result.reasoning}")
-            print()
-
+    results = await _collect(check_all())
+    if results is None:
+        return 1
+    _print_check_results(
+        results, args.output, f"♿ Accessibility ({args.a11y})", "Confidence"
+    )
     return 0
 
 
@@ -100,40 +124,30 @@ async def _run_layout(sources, args) -> int:
 
     In ``deterministic`` mode this works with no API key configured.
     """
-    try:
+
+    async def check_all() -> list[AnalysisResult]:
         lens = LayoutLens(
             **_browser_kwargs(args),
             api_key=args.api_key or os.getenv("OPENAI_API_KEY"),
             model=args.model,
         )
-        results = []
-        for source in sources:
-            result = await lens.check_layout(
+        return [
+            await lens.check_layout(
                 source, viewport=args.viewport, mode=args.layout, policy=args.fail_on
             )
-            results.append(result)
-    except LayoutLensError as e:
-        print(f"Error: {e}", file=sys.stderr)
-        return 1
-    except Exception as e:
-        print(f"Unexpected error: {e}", file=sys.stderr)
-        return 1
+            for source in sources
+        ]
 
-    if args.output == "sarif":
-        print(json.dumps(to_sarif(results), indent=2))
-    elif args.output == "json":
-        for result in results:
-            print(result.to_json())
-    else:
-        print()
-        for result in results:
-            print(f"📍 {result.source}")
-            print(f"📐 Layout ({args.layout}): {result.answer}")
-            if result.metadata.get("confidence_kind") != "not_estimated":
-                print(f"📊 Model confidence: {result.confidence:.0%}")
-            if result.reasoning:
-                print(f"💭 {result.reasoning}")
-            print()
+    results = await _collect(check_all())
+    if results is None:
+        return 1
+    _print_check_results(
+        results,
+        args.output,
+        f"📐 Layout ({args.layout})",
+        "Model confidence",
+        hide_unestimated_confidence=True,
+    )
 
     if any(r.metadata.get("gate_status") == "incomplete" for r in results):
         return 2
