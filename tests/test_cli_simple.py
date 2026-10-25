@@ -2,6 +2,7 @@
 
 import json
 import sys
+from dataclasses import asdict
 from pathlib import Path
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -10,6 +11,9 @@ import pytest
 from layoutlens import DiffReport
 from layoutlens.api.core import AnalysisResult, BatchResult
 from layoutlens.cli import main
+from layoutlens.exceptions import LayoutLensError
+from layoutlens.layout.types import LayoutFinding, LayoutReport
+from layoutlens.sarif import to_sarif
 
 
 @pytest.mark.asyncio
@@ -305,3 +309,162 @@ class TestSuiteModeGuards:
             result = await main()
         assert result == 1
         assert "Error loading suite" in capsys.readouterr().err
+
+
+def _check_results() -> list[AnalysisResult]:
+    layout = LayoutReport(
+        source="a.html",
+        viewport="desktop",
+        findings=[
+            LayoutFinding(
+                defect_class="page-overflow",
+                selector="html",
+                bbox=[0, 0, 3000, 0],
+                measured={"overflow_px": 1080},
+                threshold={"viewport_width_px": 1920},
+                description="page scrolls horizontally",
+            )
+        ],
+        timestamp="2026-01-01T00:00:00+00:00",
+    )
+    return [
+        AnalysisResult(
+            source="a.html",
+            query="",
+            answer="No",
+            confidence=1.0,
+            reasoning="one defect",
+            timestamp="2026-01-01 00:00:00",
+            metadata={
+                "layout": asdict(layout),
+                "confidence_kind": "not_estimated",
+                "gate_status": "pass",
+            },
+        ),
+        AnalysisResult(
+            source="b.html",
+            query="",
+            answer="Yes",
+            confidence=0.25,
+            reasoning="",
+            timestamp="2026-01-01 00:00:00",
+        ),
+    ]
+
+
+async def _run_check(capsys, flag, mode, output, lens=None, lens_error=None):
+    argv = ["layoutlens", "a.html", "b.html", flag, mode, "--output", output]
+    with (
+        patch("layoutlens.cli.LayoutLens") as lens_class,
+        patch("sys.argv", argv),
+        patch("pathlib.Path.exists", return_value=True),
+    ):
+        if lens_error is not None:
+            lens_class.side_effect = lens_error
+        else:
+            lens_class.return_value = lens
+        code = await main()
+    captured = capsys.readouterr()
+    return code, captured.out, captured.err
+
+
+def _lens_returning(results):
+    lens = Mock()
+    lens.check_accessibility = AsyncMock(side_effect=results)
+    lens.check_layout = AsyncMock(side_effect=results)
+    return lens
+
+
+CHECK_MODES = [("--a11y", "hybrid"), ("--layout", "hybrid")]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("flag", "mode"), CHECK_MODES)
+async def test_check_json_and_sarif_output(capsys, flag, mode):
+    for output, expected in (
+        ("json", "".join(r.to_json() + "\n" for r in _check_results())),
+        ("sarif", json.dumps(to_sarif(_check_results()), indent=2) + "\n"),
+    ):
+        lens = _lens_returning(_check_results())
+        code, out, err = await _run_check(capsys, flag, mode, output, lens)
+        assert (code, out, err) == (0, expected, "")
+
+
+@pytest.mark.asyncio
+async def test_a11y_text_output(capsys):
+    lens = _lens_returning(_check_results())
+    code, out, err = await _run_check(capsys, "--a11y", "axe", "text", lens)
+    assert (code, err) == (0, "")
+    assert out == (
+        "\n"
+        "📍 a.html\n"
+        "♿ Accessibility (axe): No\n"
+        "📊 Confidence: 100%\n"
+        "💭 one defect\n"
+        "\n"
+        "📍 b.html\n"
+        "♿ Accessibility (axe): Yes\n"
+        "📊 Confidence: 25%\n"
+        "\n"
+    )
+
+
+@pytest.mark.asyncio
+async def test_layout_text_output(capsys):
+    lens = _lens_returning(_check_results())
+    code, out, err = await _run_check(capsys, "--layout", "deterministic", "text", lens)
+    assert (code, err) == (0, "")
+    assert out == (
+        "\n"
+        "📍 a.html\n"
+        "📐 Layout (deterministic): No\n"
+        "💭 one defect\n"
+        "\n"
+        "📍 b.html\n"
+        "📐 Layout (deterministic): Yes\n"
+        "📊 Model confidence: 25%\n"
+        "\n"
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("flag", "mode"), CHECK_MODES)
+@pytest.mark.parametrize(
+    ("error", "message"),
+    [
+        (LayoutLensError("boom"), "Error: boom\n"),
+        (RuntimeError("boom"), "Unexpected error: boom\n"),
+    ],
+)
+async def test_check_errors_print_and_exit_1(capsys, flag, mode, error, message):
+    lens = _lens_returning(error)
+    assert await _run_check(capsys, flag, mode, "text", lens) == (1, "", message)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("flag", "message"),
+    [
+        ("--a11y", "Error initializing LayoutLens: boom\n"),
+        ("--layout", "Unexpected error: boom\n"),
+    ],
+)
+async def test_check_init_errors(capsys, flag, message):
+    code = await _run_check(
+        capsys, flag, "hybrid", "text", lens_error=ValueError("boom")
+    )
+    assert code == (1, "", message)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("statuses", "expected"),
+    [(["pass", "pass"], 0), (["pass", "fail"], 1), (["fail", "incomplete"], 2)],
+)
+async def test_layout_exit_code_follows_gate_status(capsys, statuses, expected):
+    results = _check_results()
+    for result, status in zip(results, statuses, strict=True):
+        result.metadata["gate_status"] = status
+    lens = _lens_returning(results)
+    code, _, _ = await _run_check(capsys, "--layout", "hybrid", "json", lens)
+    assert code == expected
