@@ -209,13 +209,6 @@ exclude = '\.venv|tests|docs'
 skip-checking-private-functions = true
 skip-checking-raises = true
 
-[tool.preen]
-link_ignore = [
-    "https://api.openai.com/v1",
-    "https://api.anthropic.com/results/a",
-    "https://generativelanguage.googleapis.com/v1beta",
-]
-
 [tool.codespell]
 builtin = "clear,rare,en-GB_to_en-US"
 # Preserve the asyncio Task method name.
