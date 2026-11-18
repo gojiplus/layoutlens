@@ -1,6 +1,6 @@
-# CLAUDE.md - LayoutLens
+# AGENTS.md - LayoutLens
 
-Guidance for Claude Code when working in this repository. Describes what the
+Guidance for coding agents working in this repository. Describes what the
 code actually does — verify against source before trusting older assumptions;
 this file has drifted from reality before.
 
