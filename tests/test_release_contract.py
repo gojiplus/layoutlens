@@ -49,14 +49,14 @@ def metadata():
 
 def test_python_floor_and_candidate_dependencies():
     version, floor, extras = metadata()
-    assert Version("3.12") in SpecifierSet(floor)
-    assert Version("3.11") not in SpecifierSet(floor)
+    assert Version("3.13") in SpecifierSet(floor)
+    assert Version("3.12") not in SpecifierSet(floor)
     if not BENCH.is_dir() or not ACTION.is_dir():
         pytest.skip("consumer checkouts supplied by the release-contract workflow")
     project = tomllib.loads((BENCH / "pyproject.toml").read_text())["project"]
     consumer_floor = SpecifierSet(project["requires-python"])
-    assert Version("3.11") not in consumer_floor
-    assert Version("3.12") in consumer_floor
+    assert Version("3.12") not in consumer_floor
+    assert Version("3.13") in consumer_floor
     requirements = project["dependencies"] + [
         r for group in project.get("optional-dependencies", {}).values() for r in group
     ]
@@ -101,7 +101,7 @@ def test_benchmark_adapters_use_installed_package(monkeypatch):
     assert callable(judge._get_lens().judge)
     batch = LayoutLensBatchJudge()
     assert callable(batch._get_lens().judge_batch)
-    assert sys.version_info >= (3, 12)
+    assert sys.version_info >= (3, 13)
 
 
 @pytest.mark.skipif(os.name != "posix", reason="the composite action runs Bash")
