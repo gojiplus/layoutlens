@@ -24,7 +24,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: gojiplus/layoutlens-action
-          ref: a265f91866a5f00d83a7db7d6e7f4fae074d0e32
+          ref: 591ff3cb99f68021caf327135beaa4fcf9e3a2ac
           path: consumers/action
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
