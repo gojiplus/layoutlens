@@ -36,8 +36,8 @@ dependencies = [
     "pyyaml>=6.0.2",
     "Pillow>=10.4.0",
     "litellm>=1.80.10",
-    "rich>=13.0.0",
-    "pydantic>=2.0.0",
+    "rich>=14.2.0",
+    "pydantic>=2.11.7",
 ]
 version = "4.0.0"
 
